@@ -10,7 +10,7 @@ Usage:
 Inputs (in ./input/):
   - GED_export.xlsx     : GED raw export
   - Grandfichier_v2.xlsx : Existing GF (for structure reference + discrepancy check)
-  - Mapping.xlsx        : Approver name mapping
+  - Approver mapping    : Hardcoded in src/normalize.py
 
 Outputs (in ./output/):
   - GF_V0_CLEAN.xlsx                : Rebuilt GF
@@ -161,7 +161,6 @@ CONSULTANT_MATCH_REPORT = OUTPUT_DIR / "consultant_match_report.xlsx"
 
 GED_FILE = INPUT_DIR / "GED_export.xlsx"
 GF_FILE = INPUT_DIR / "Grandfichier_v3.xlsx"  # NEW BASELINE (P17-T2-VISA-Tableau de suivi (2).xlsx)
-MAPPING_FILE = INPUT_DIR / "Mapping.xlsx"
 
 OUTPUT_GF = OUTPUT_DIR / "GF_V0_CLEAN.xlsx"
 OUTPUT_DISCREPANCY = OUTPUT_DIR / "DISCREPANCY_REPORT.xlsx"
@@ -1039,10 +1038,10 @@ def run_pipeline(verbose: bool = True):
     log(f"Responses: {len(responses_df)} rows")
     log(f"Approvers discovered: {len(ged_approver_names)}")
 
-    # ── STEP 2: Load Mapping ──────────────────────────────────
+    # ── STEP 2: Load Mapping (hardcoded) ─────────────────────
     _safe_console_print("\n[2/7] Loading Mapping...")
-    mapping = load_mapping(str(MAPPING_FILE))
-    log(f"Mapping entries: {len(mapping)}")
+    mapping = load_mapping()
+    log(f"Mapping entries: {len(mapping)} (hardcoded)")
 
     exception_count = sum(1 for v in mapping.values() if v == "Exception List")
     log(f"Exception List entries: {exception_count}")
@@ -1084,7 +1083,6 @@ def run_pipeline(verbose: bool = True):
             for _inp_path, _inp_type, _inp_name in [
                 (GED_FILE,     "GED",     "GED_export.xlsx"),
                 (GF_FILE,      "GF",      GF_FILE.name),
-                (MAPPING_FILE, "MAPPING", "Mapping.xlsx"),
             ]:
                 _register_input_entry(_inp_type, Path(_inp_path), _inp_name)
 
@@ -3020,7 +3018,6 @@ if __name__ == "__main__":
         result = run_pipeline_controlled(
             run_mode=RUN_MODE_FULL,
             ged_path=str(GED_FILE),
-            mapping_path=str(MAPPING_FILE),
             gf_path=str(GF_FILE),
             reports_dir=str(CONSULTANT_REPORTS_ROOT) if CONSULTANT_REPORTS_ROOT.exists() else None,
         )

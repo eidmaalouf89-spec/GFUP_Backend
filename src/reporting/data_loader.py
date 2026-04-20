@@ -21,6 +21,7 @@ from read_raw import read_ged
 from normalize import load_mapping, normalize_docs, normalize_responses
 from version_engine import VersionEngine
 from workflow_engine import WorkflowEngine, compute_responsible_party
+from reporting.bet_report_merger import merge_bet_reports
 
 
 @dataclass
@@ -43,6 +44,7 @@ class RunContext:
     warnings: list = field(default_factory=list)
     data_date: Optional[date] = None                    # from GED Détails sheet
     ged_status_labels: dict = field(default_factory=dict)  # e.g. {"Terrell": {"s1": "VSO", "s2": "OBS", "s3": "REF"}}
+    bet_merge_stats: dict = field(default_factory=dict)  # from BET report merger
 
 
 # Module-level cache
@@ -313,6 +315,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
     dernier_df = None
     workflow_engine = None
     responsible_parties = None
+    bet_merge_stats = {}
 
     if ged_available:
         try:
@@ -335,6 +338,30 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
             # Compute responsible parties for dernier docs
             dernier_ids = dernier_df["doc_id"].tolist()
             responsible_parties = compute_responsible_party(workflow_engine, dernier_ids)
+
+            # ── BET report merge: backfill status + observations from PDF reports ──
+            try:
+                responses_df, bet_merge_stats = merge_bet_reports(
+                    docs_df, responses_df, base_dir
+                )
+                if bet_merge_stats["total_status_backfilled"] > 0:
+                    # Rebuild workflow engine with enriched responses
+                    workflow_engine = WorkflowEngine(responses_df)
+                    responsible_parties = compute_responsible_party(
+                        workflow_engine, dernier_ids
+                    )
+                logger.info(
+                    "BET merge: %d status backfilled, %d obs enriched",
+                    bet_merge_stats["total_status_backfilled"],
+                    bet_merge_stats["total_obs_enriched"],
+                )
+            except Exception as e:
+                logger.warning("BET report merge failed (non-fatal): %s", e)
+                # Ensure response_source column exists even on failure
+                if "response_source" not in responses_df.columns:
+                    responses_df["response_source"] = "GED"
+                if "observation_pdf" not in responses_df.columns:
+                    responses_df["observation_pdf"] = ""
 
             logger.info("RunContext loaded: %d docs, %d dernier, %d responses",
                         len(docs_df), len(dernier_df), len(responses_df))
@@ -365,6 +392,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
         warnings=warnings,
         data_date=data_date_val,
         ged_status_labels={},
+        bet_merge_stats=bet_merge_stats,
     )
 
     # Cache it

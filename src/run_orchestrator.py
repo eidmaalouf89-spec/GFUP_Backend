@@ -88,7 +88,6 @@ def validate_run_inputs(run_mode, paths_dict) -> dict:
 
     ged_path = paths_dict.get("ged_path")
     gf_path = paths_dict.get("gf_path")
-    mapping_path = paths_dict.get("mapping_path")
     reports_dir = paths_dict.get("reports_dir")
 
     def _check_xlsx(path_value, label, required=True):
@@ -107,7 +106,6 @@ def validate_run_inputs(run_mode, paths_dict) -> dict:
             errors.append(f"{label} must be a .xlsx file: {path}")
 
     _check_xlsx(ged_path, "GED file", required=True)
-    _check_xlsx(mapping_path, "Mapping file", required=True)
     _check_xlsx(gf_path, "GF file", required=False)
     if not gf_path:
         warnings.append("GF file not provided; orchestrator will attempt inheritance from run history")
@@ -132,7 +130,6 @@ def validate_run_inputs(run_mode, paths_dict) -> dict:
 def _build_execution_context(
     run_mode: str,
     ged_path: str,
-    mapping_path: str,
     gf_path: Optional[str],
     reports_dir: Optional[str],
     *,
@@ -143,13 +140,11 @@ def _build_execution_context(
         "run_mode": run_mode,
         "inputs": {
             "ged_path": str(Path(ged_path).resolve()) if ged_path else None,
-            "mapping_path": str(Path(mapping_path).resolve()) if mapping_path else None,
             "gf_path": str(Path(gf_path).resolve()) if gf_path else None,
             "reports_dir": str(Path(reports_dir).resolve()) if reports_dir else None,
         },
         "input_files": {
             "ged": Path(ged_path).name if ged_path else None,
-            "mapping": Path(mapping_path).name if mapping_path else None,
             "gf": Path(gf_path).name if gf_path else None,
             "reports_dir": Path(reports_dir).name if reports_dir else None,
             "gf_provided_by_user": gf_provided_by_user,
@@ -165,7 +160,6 @@ def _patched_main_context(main_module, execution_context: dict):
     saved = {
         "GED_FILE": main_module.GED_FILE,
         "GF_FILE": main_module.GF_FILE,
-        "MAPPING_FILE": main_module.MAPPING_FILE,
         "CONSULTANT_REPORTS_ROOT": main_module.CONSULTANT_REPORTS_ROOT,
         "CONSULTANT_MATCH_REPORT": main_module.CONSULTANT_MATCH_REPORT,
         "OUTPUT_CONSULTANT_REPORTS_WB": main_module.OUTPUT_CONSULTANT_REPORTS_WB,
@@ -177,7 +171,6 @@ def _patched_main_context(main_module, execution_context: dict):
     }
 
     main_module.GED_FILE = Path(execution_context["inputs"]["ged_path"])
-    main_module.MAPPING_FILE = Path(execution_context["inputs"]["mapping_path"])
     if execution_context["inputs"]["gf_path"]:
         main_module.GF_FILE = Path(execution_context["inputs"]["gf_path"])
     else:
@@ -209,7 +202,6 @@ def _patched_main_context(main_module, execution_context: dict):
 def run_pipeline_controlled(
     run_mode: str,
     ged_path: str,
-    mapping_path: str,
     gf_path: Optional[str] = None,
     reports_dir: Optional[str] = None,
 ) -> dict:
@@ -220,7 +212,6 @@ def run_pipeline_controlled(
         {
             "ged_path": ged_path,
             "gf_path": gf_path,
-            "mapping_path": mapping_path,
             "reports_dir": reports_dir,
         },
     )
@@ -243,7 +234,6 @@ def run_pipeline_controlled(
     execution_context = _build_execution_context(
         run_mode=run_mode,
         ged_path=ged_path,
-        mapping_path=mapping_path,
         gf_path=resolved_gf_path,
         reports_dir=reports_dir,
         gf_provided_by_user=gf_provided_by_user,

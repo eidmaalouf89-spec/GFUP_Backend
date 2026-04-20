@@ -67,7 +67,6 @@ def _proj(relative: str) -> Path:
 INPUT_CONSULTANT_ROOT = _proj("input/consultant_reports")
 INPUT_GED             = _proj("input/GED_export.xlsx")
 INPUT_GF              = _proj("output/GF_V0_CLEAN.xlsx")
-INPUT_MAPPING         = _proj("input/Mapping.xlsx")
 
 OUTPUT_CONSULTANT_WB  = _proj("output/consultant_reports.xlsx")
 OUTPUT_MATCH_REPORT   = _proj("output/consultant_match_report.xlsx")
@@ -146,14 +145,14 @@ def _load_consultant_rows(
 # Step B: Load normalized GED universe
 # ---------------------------------------------------------------------------
 
-def _load_ged_docs(ged_path: Path, mapping_path: Path) -> pd.DataFrame:
+def _load_ged_docs(ged_path: Path) -> pd.DataFrame:
     """Load and normalize GED documents, including SAS response enrichment."""
     from read_raw import read_ged
     from normalize import load_mapping, normalize_docs, enrich_docs_with_sas
 
     logger.info("Loading GED export: %s", ged_path)
     docs_df, responses_df, _ = read_ged(str(ged_path))
-    mapping = load_mapping(str(mapping_path))
+    mapping = load_mapping()
     docs_norm = normalize_docs(docs_df, mapping)
     docs_norm = enrich_docs_with_sas(docs_norm, responses_df)
     logger.info("GED docs loaded: %d rows", len(docs_norm))
@@ -235,7 +234,7 @@ def run_consultant_integration(
 
     # ── B. Load GED documents ─────────────────────────────────────────────
     logger.info("\n── STEP B: Load GED document universe ──")
-    docs_df = _load_ged_docs(INPUT_GED, INPUT_MAPPING)
+    docs_df = _load_ged_docs(INPUT_GED)
 
     # ── C. Build GED index ────────────────────────────────────────────────
     logger.info("\n── STEP C: Build GED lookup index ──")

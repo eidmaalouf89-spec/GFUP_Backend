@@ -175,6 +175,9 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
     bloc2      = _build_bloc2(bloc1)
     bloc3      = _build_bloc3(docs, ctx, s1, s2, s3)
 
+    # ── Non-saisi GED badge (only for BET merge consultants) ──────────────
+    non_saisi = _build_non_saisi(docs, consultant_name)
+
     return {
         "consultant":  consultant,
         "header":      header,
@@ -182,6 +185,7 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
         "bloc1":       bloc1,
         "bloc2":       bloc2,
         "bloc3":       bloc3,
+        "non_saisi":   non_saisi,
         "degraded_mode": False,
         "warnings":    list(ctx.warnings or []),
     }
@@ -661,8 +665,56 @@ def _empty_fiche(name: str, ctx: RunContext,
         "bloc2": {"labels": [], "s1_series": [], "s2_series": [], "s3_series": [],
                   "hm_series": [], "open_series": [], "totals": []},
         "bloc3": _empty_bloc3(s1, s2, s3),
+        "non_saisi": None,
         "degraded_mode": True,
         "warnings": list(ctx.warnings or []) + (warnings or []),
+    }
+
+
+def _build_non_saisi(docs: pd.DataFrame, consultant_name: str) -> dict[str, Any] | None:
+    """Compute non-saisi GED stats for BET merge consultants.
+
+    Returns None for non-BET consultants (no badge shown).
+    Returns dict with count, pct, badge color for BET consultants.
+    """
+    if consultant_name not in BET_MERGE_KEYS:
+        return None
+
+    if docs.empty or "response_source" not in docs.columns:
+        return {"count": 0, "pct": 0.0, "badge": "green", "total_answered": 0}
+
+    # Count answered docs (closed = has a final status)
+    closed_mask = ~docs["_is_open"]
+    total_answered = int(closed_mask.sum())
+
+    if total_answered == 0:
+        return {"count": 0, "pct": 0.0, "badge": "green", "total_answered": 0}
+
+    # Count how many of the answered docs came from PDF only
+    pdf_only = int(
+        ((docs["response_source"] == "PDF_REPORT") & closed_mask).sum()
+    ) if "response_source" in docs.columns else 0
+
+    # Also count observation-enriched
+    obs_enriched = int(
+        (docs["response_source"] == "GED+PDF_OBS").sum()
+    ) if "response_source" in docs.columns else 0
+
+    pct = round((pdf_only / total_answered) * 100, 1) if total_answered else 0.0
+
+    if pct < 5:
+        badge = "green"
+    elif pct < 10:
+        badge = "orange"
+    else:
+        badge = "red"
+
+    return {
+        "count": pdf_only,
+        "pct": pct,
+        "badge": badge,
+        "total_answered": total_answered,
+        "obs_enriched": obs_enriched,
     }
 
 
