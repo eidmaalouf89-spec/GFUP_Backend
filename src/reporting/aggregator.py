@@ -220,6 +220,16 @@ def compute_consultant_summary(ctx: RunContext) -> list:
             if days_list:
                 avg_days = round(sum(days_list) / len(days_list), 1)
 
+        # Count blocking opens (no visa global yet)
+        blocking = 0
+        if ctx.workflow_engine is not None:
+            for _, ar in grp.iterrows():
+                if ar["date_status_type"] in ("PENDING_IN_DELAY", "PENDING_LATE"):
+                    doc_id = ar["doc_id"]
+                    visa, _ = ctx.workflow_engine.compute_visa_global_with_date(doc_id)
+                    if visa is None:
+                        blocking += 1
+
         if called > 0:
             summaries.append({
                 "name": name,
@@ -229,9 +239,61 @@ def compute_consultant_summary(ctx: RunContext) -> list:
                 "avg_response_days": avg_days,
                 "vso": vso, "vao": vao, "ref": ref, "hm": hm,
                 "open": called - answered,
+                "open_blocking": blocking,
             })
 
     summaries.sort(key=lambda x: x["docs_called"], reverse=True)
+
+    # ── Add MOEX SAS synthetic summary row ──────────────────────────────
+    sas_rows = resp[resp["approver_raw"] == "0-SAS"]
+    if not sas_rows.empty:
+        sas_called = len(sas_rows[sas_rows["date_status_type"] != "NOT_CALLED"])
+        sas_answered = len(sas_rows[sas_rows["date_status_type"] == "ANSWERED"])
+
+        def _sas_norm(s):
+            s = str(s).upper().strip()
+            if "VSO" in s: return "VSO"
+            if "VAO" in s: return "VAO"
+            if s == "REF": return "REF"
+            return s
+
+        sas_rows_copy = sas_rows.copy()
+        sas_rows_copy["_sas_status"] = sas_rows_copy["status_clean"].apply(_sas_norm)
+        sas_vso = len(sas_rows_copy[sas_rows_copy["_sas_status"] == "VSO"])
+        sas_vao = len(sas_rows_copy[sas_rows_copy["_sas_status"] == "VAO"])
+        sas_ref = len(sas_rows_copy[sas_rows_copy["_sas_status"] == "REF"])
+
+        sas_avg = None
+        sas_answered_rows = sas_rows_copy[sas_rows_copy["date_status_type"] == "ANSWERED"]
+        if not sas_answered_rows.empty and ctx.docs_df is not None:
+            days_list = []
+            for _, ar in sas_answered_rows.iterrows():
+                if ar["date_answered"] is not None:
+                    doc_row = ctx.docs_df[ctx.docs_df["doc_id"] == ar["doc_id"]]
+                    if not doc_row.empty:
+                        created = doc_row.iloc[0].get("created_at")
+                        if created is not None and not pd.isna(created):
+                            try:
+                                delta = (ar["date_answered"] - created).days
+                                if 0 <= delta <= 365:
+                                    days_list.append(delta)
+                            except Exception:
+                                pass
+            if days_list:
+                sas_avg = round(sum(days_list) / len(days_list), 1)
+
+        if sas_called > 0:
+            summaries.append({
+                "name": "MOEX SAS",
+                "docs_called": sas_called,
+                "docs_answered": sas_answered,
+                "response_rate": round(sas_answered / max(sas_called, 1), 4),
+                "avg_response_days": sas_avg,
+                "vso": sas_vso, "vao": sas_vao, "ref": sas_ref, "hm": 0,
+                "open": sas_called - sas_answered,
+                "open_blocking": sas_called - sas_answered,
+                "is_sas": True,
+            })
 
     # Scrub any NaN that may have leaked through
     _math = math

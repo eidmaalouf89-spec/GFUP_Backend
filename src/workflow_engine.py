@@ -276,6 +276,97 @@ class WorkflowEngine:
         return status, date
 
 
+def compute_moex_countdown(engine: WorkflowEngine, doc_ids: list,
+                           data_date=None) -> dict:
+    """
+    For each document, compute whether the MOEX 10-day countdown is active.
+
+    Returns:
+        {doc_id: {
+            "countdown_active": bool,
+            "last_primary_date": date or None,
+            "countdown_deadline": date or None,  # last_primary_date + 10 days
+            "countdown_expired": bool,
+            "pending_secondary": [str],  # canonical names of pending secondary
+        }}
+
+    The countdown activates when:
+      1. ALL primary approvers (excluding MOEX) have ANSWERED
+      2. At least one non-primary, non-MOEX approver is still PENDING
+    """
+    from datetime import timedelta
+
+    result = {}
+    for doc_id in doc_ids:
+        approvers_df = engine.get_all_approver_statuses(doc_id)
+        if approvers_df.empty:
+            result[doc_id] = {
+                "countdown_active": False,
+                "last_primary_date": None,
+                "countdown_deadline": None,
+                "countdown_expired": False,
+                "pending_secondary": [],
+            }
+            continue
+
+        # Classify each approver
+        primary_answered_dates = []
+        all_primary_answered = True
+        pending_secondary = []
+
+        for _, row in approvers_df.iterrows():
+            approver = row["approver_canonical"]
+            status_type = row["date_status_type"]
+
+            # Skip MOEX — it's the one who closes, not a reviewer here
+            if _is_moex(approver):
+                continue
+
+            if _is_primary(approver):
+                if status_type == "ANSWERED" and row["date_answered"] is not None:
+                    primary_answered_dates.append(row["date_answered"])
+                elif status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
+                    all_primary_answered = False
+                elif status_type == "NOT_CALLED":
+                    pass  # not called = not relevant
+                else:
+                    all_primary_answered = False
+            else:
+                # Secondary (non-primary, non-MOEX)
+                if status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
+                    pending_secondary.append(approver)
+
+        countdown_active = all_primary_answered and len(primary_answered_dates) > 0 and len(pending_secondary) > 0
+
+        last_primary_date = None
+        countdown_deadline = None
+        countdown_expired = False
+
+        if countdown_active:
+            # date_answered values might be datetime or date
+            dates = []
+            for d in primary_answered_dates:
+                if hasattr(d, 'date'):
+                    dates.append(d.date())
+                else:
+                    dates.append(d)
+            last_primary_date = max(dates)
+            countdown_deadline = last_primary_date + timedelta(days=10)
+            if data_date is not None:
+                dd = data_date.date() if hasattr(data_date, 'date') else data_date
+                countdown_expired = dd > countdown_deadline
+
+        result[doc_id] = {
+            "countdown_active": countdown_active,
+            "last_primary_date": last_primary_date,
+            "countdown_deadline": countdown_deadline,
+            "countdown_expired": countdown_expired,
+            "pending_secondary": pending_secondary,
+        }
+
+    return result
+
+
 def compute_responsible_party(engine: WorkflowEngine, doc_ids: list) -> dict:
     """
     Determine the responsible party for each document based solely on
@@ -340,15 +431,48 @@ def compute_responsible_party(engine: WorkflowEngine, doc_ids: list) -> dict:
                 if status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
                     pending.append(approver)
 
-        # ── Rule 3: One or more consultants are pending ───────────────────────
-        if len(pending) == 1:
-            # Exactly one consultant is blocking the document.
-            result[doc_id] = pending[0]
-            continue
+        # ── Rule 3: Pending consultants — check countdown ────────────────────
+        if pending:
+            # Check if all PRIMARY approvers have answered
+            primary_all_done = True
+            last_primary_date = None
+            for _, arow in approvers_df.iterrows():
+                a = arow["approver_canonical"]
+                if _is_moex(a):
+                    continue
+                if _is_primary(a):
+                    if arow["date_status_type"] != "ANSWERED":
+                        primary_all_done = False
+                        break
+                    else:
+                        d = arow.get("date_answered")
+                        if d is not None:
+                            if last_primary_date is None or d > last_primary_date:
+                                last_primary_date = d
 
-        if len(pending) > 1:
-            # Multiple consultants are blocking simultaneously.
-            result[doc_id] = "MULTIPLE_CONSULTANTS"
+            if not primary_all_done:
+                # Some primary consultants are still pending — they are blocking
+                if len(pending) == 1:
+                    result[doc_id] = pending[0]
+                else:
+                    result[doc_id] = "MULTIPLE_CONSULTANTS"
+                continue
+
+            # All primaries answered, only secondary pending — check 10-day countdown
+            if last_primary_date is not None:
+                from datetime import timedelta
+                # For now, just mark as secondary pending (MOEX countdown tracked separately)
+                if len(pending) == 1:
+                    result[doc_id] = pending[0]
+                else:
+                    result[doc_id] = "MULTIPLE_CONSULTANTS"
+                continue
+
+            # Fallback
+            if len(pending) == 1:
+                result[doc_id] = pending[0]
+            else:
+                result[doc_id] = "MULTIPLE_CONSULTANTS"
             continue
 
         # ── Rule 4: No pending consultants and no visa → MOEX must act ───────

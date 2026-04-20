@@ -22,6 +22,11 @@ input/consultant_reports/
 # Generated pipeline artifacts
 output/*.xlsx
 output/*.md
+output/*.zip
 output/debug/
 output/consultant_reports.xlsx
+output/repports output/
+
+# Generated frontend build artifacts
+ui/dist/
 data/

@@ -999,6 +999,7 @@ function ConsultantsPage() {
       {/* Data rows */}
       {consultants.map((c, i) => {
         const rateColor = c.response_rate >= 0.8 ? T.green : c.response_rate >= 0.5 ? T.amber : T.red
+        const isSas = c.is_sas || c.name === 'MOEX SAS'
         return (
           <div key={i} onClick={() => setSelectedConsultant(c.name)} style={{
             ...glassCard,
@@ -1011,11 +1012,12 @@ function ConsultantsPage() {
             fontSize: 13,
             cursor: 'pointer',
             transition: 'border-color 0.15s',
+            borderColor: isSas ? 'rgba(255,214,10,0.15)' : T.glassBorder,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = T.glassBorder }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = isSas ? 'rgba(255,214,10,0.35)' : 'rgba(59,130,246,0.3)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = isSas ? 'rgba(255,214,10,0.15)' : T.glassBorder }}
           >
-            <span style={{ color: T.accent, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+            <span style={{ color: isSas ? '#FFD60A' : T.accent, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isSas ? `◆ ${c.name}` : c.name}</span>
             <span style={{ textAlign: 'right', color: T.muted, fontVariantNumeric: 'tabular-nums' }}>{c.docs_called}</span>
             <span style={{ textAlign: 'right', color: T.muted, fontVariantNumeric: 'tabular-nums' }}>{c.docs_answered}</span>
             <span style={{ textAlign: 'right', color: rateColor, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
@@ -1611,14 +1613,14 @@ export default function App() {
                 {appState.total_runs} run{appState.total_runs !== 1 ? 's' : ''} registered
               </span>
             )}
-            <span style={{ fontSize: 11, color: T.dim }}>P17&CO T2</span>
           </div>
         </header>
 
-        {/* Page Content */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          {renderPage()}
-        </div>
+        <section style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+          <div style={{ padding: 28, minHeight: '100%' }}>
+            {renderPage()}
+          </div>
+        </section>
       </main>
     </div>
   )

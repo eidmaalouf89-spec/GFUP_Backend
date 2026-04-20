@@ -9,6 +9,7 @@ import math
 import threading
 import subprocess
 import sqlite3
+import webbrowser
 from pathlib import Path
 
 import webview
@@ -50,6 +51,13 @@ def _resolve_ui():
     raise FileNotFoundError(
         "UI not found. Run 'cd ui && npm run build' or use '--dev' flag."
     )
+
+
+def _ui_target_for_browser(ui_url: str) -> str:
+    """Return a browser-openable target for local dist files or dev URLs."""
+    if ui_url.startswith("http://") or ui_url.startswith("https://"):
+        return ui_url
+    return Path(ui_url).resolve().as_uri()
 
 # ── Database helpers ─────────────────────────────────────────
 def _query_db(db_path, sql, params=()):
@@ -458,8 +466,13 @@ class Api:
 def main():
     api = Api()
     ui_url = _resolve_ui()
+    browser_mode = "--browser" in sys.argv
 
-    is_local_file = not ui_url.startswith("http")
+    if browser_mode:
+        target = _ui_target_for_browser(ui_url)
+        print(f"[app] Opening browser mode: {target}")
+        webbrowser.open(target)
+        return
 
     window = webview.create_window(
         title="JANSA VISASIST \u2014 P17&CO T2",
@@ -471,9 +484,16 @@ def main():
         text_select=False,
     )
 
-    webview.start(
-        debug="--debug" in sys.argv,
-    )
+    try:
+        webview.start(
+            debug="--debug" in sys.argv,
+        )
+    except Exception as exc:
+        target = _ui_target_for_browser(ui_url)
+        print(f"[app] Embedded WebView startup failed: {exc}")
+        print(f"[app] Falling back to browser mode: {target}")
+        webbrowser.open(target)
+        return
 
 if __name__ == "__main__":
     main()

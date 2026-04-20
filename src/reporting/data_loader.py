@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 from read_raw import read_ged
 from normalize import load_mapping, normalize_docs, normalize_responses
 from version_engine import VersionEngine
-from workflow_engine import WorkflowEngine, compute_responsible_party
+from workflow_engine import WorkflowEngine, compute_responsible_party, compute_moex_countdown
 from reporting.bet_report_merger import merge_bet_reports
 
 
@@ -45,6 +45,7 @@ class RunContext:
     data_date: Optional[date] = None                    # from GED Détails sheet
     ged_status_labels: dict = field(default_factory=dict)  # e.g. {"Terrell": {"s1": "VSO", "s2": "OBS", "s3": "REF"}}
     bet_merge_stats: dict = field(default_factory=dict)  # from BET report merger
+    moex_countdown: dict = field(default_factory=dict)   # {doc_id: countdown_info}
 
 
 # Module-level cache
@@ -70,12 +71,22 @@ def _sha256(path: str) -> str:
 def _query_db(db_path, sql, params=()):
     if not Path(db_path).exists():
         return []
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    # Try normal open first; fall back to immutable URI mode for FUSE/network mounts
     try:
-        return [dict(r) for r in conn.execute(sql, params).fetchall()]
-    finally:
-        conn.close()
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            return [dict(r) for r in conn.execute(sql, params).fetchall()]
+        finally:
+            conn.close()
+    except sqlite3.OperationalError:
+        uri = f"file:{db_path}?immutable=1"
+        conn = sqlite3.connect(uri, uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            return [dict(r) for r in conn.execute(sql, params).fetchall()]
+        finally:
+            conn.close()
 
 
 def _resolve_latest_run(db_path: str) -> Optional[int]:
@@ -111,6 +122,18 @@ def _resolve_artifact_file(db_path: str, file_path: str) -> Optional[str]:
                 if candidate.exists():
                     return str(candidate.resolve())
                 break
+
+    # Cross-platform fallback: split stored path by backslash (Windows paths on Linux)
+    import re as _re
+    win_parts = _re.split(r'[/\\]', path_str)
+    for anchor in ("runs", "input", "output", "data", "debug"):
+        for i, part in enumerate(win_parts):
+            if part == anchor:
+                candidate = base_dir.joinpath(*win_parts[i:])
+                if candidate.exists():
+                    return str(candidate.resolve())
+                break
+
     return None
 
 
@@ -345,6 +368,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
     workflow_engine = None
     responsible_parties = None
     bet_merge_stats = {}
+    moex_countdown = {}
 
     if ged_available:
         try:
@@ -367,6 +391,12 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
             # Compute responsible parties for dernier docs
             dernier_ids = dernier_df["doc_id"].tolist()
             responsible_parties = compute_responsible_party(workflow_engine, dernier_ids)
+
+            # Inject MOEX SAS as a synthetic consultant if any 0-SAS rows exist
+            if responses_df is not None and not responses_df.empty:
+                has_sas = (responses_df["approver_raw"] == "0-SAS").any()
+                if has_sas and approver_names is not None and "MOEX SAS" not in approver_names:
+                    approver_names.append("MOEX SAS")
 
             # ── BET report merge: backfill status + observations from PDF reports ──
             try:
@@ -391,6 +421,9 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
                     responses_df["response_source"] = "GED"
                 if "observation_pdf" not in responses_df.columns:
                     responses_df["observation_pdf"] = ""
+
+            # Compute MOEX 10-day countdown for all dernier docs
+            moex_countdown = compute_moex_countdown(workflow_engine, dernier_ids, data_date=data_date_val)
 
             logger.info("RunContext loaded: %d docs, %d dernier, %d responses",
                         len(docs_df), len(dernier_df), len(responses_df))
@@ -422,6 +455,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
         data_date=data_date_val,
         ged_status_labels={},
         bet_merge_stats=bet_merge_stats,
+        moex_countdown=moex_countdown,
     )
 
     # Cache it

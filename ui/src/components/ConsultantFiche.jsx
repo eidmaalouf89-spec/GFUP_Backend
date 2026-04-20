@@ -21,7 +21,24 @@ const L = {
     refRate: "Taux de refus — top 5",
     source: "Source",
     merged: "GED AxeoBIM + Rapports PDF", gedOnly: "GED AxeoBIM",
-    fiche: "Fiche"
+    fiche: "Fiche",
+    blocking: "Bloquants",
+    nonBlocking: "Non-bloq.",
+    blocOk: "bloq. ok",
+    blocLate: "bloq. retard",
+    nbShort: "non-bloq.",
+    sasFiche: "Fiche SAS",
+    sasSection: "Conformité SAS",
+    sasChecked: "Docs contrôlés",
+    sasPassed: "Conformes",
+    sasRefused: "Refusés SAS",
+    sasPassRate: "Taux de conformité",
+    sasPending: "En attente SAS",
+    sasAvgDays: "Délai moyen SAS",
+    sasContractor: "Entreprise",
+    sasRefRate: "Taux refus SAS — par entreprise",
+    sasPendingQueue: "File d'attente SAS",
+    sasLots: "Lots",
   },
   en: {
     project: "P17&CO · Phase 2", section: "Visa Report",
@@ -38,7 +55,24 @@ const L = {
     refRate: "Rejection rate — top 5",
     source: "Source",
     merged: "AxeoBIM DMS + PDF reports", gedOnly: "AxeoBIM DMS",
-    fiche: "Report"
+    fiche: "Report",
+    blocking: "Blocking",
+    nonBlocking: "Non-blocking",
+    blocOk: "blocking ok",
+    blocLate: "blocking late",
+    nbShort: "non-blocking",
+    sasFiche: "SAS Report",
+    sasSection: "SAS Conformity",
+    sasChecked: "Docs checked",
+    sasPassed: "Conformant",
+    sasRefused: "SAS refused",
+    sasPassRate: "Conformity rate",
+    sasPending: "Awaiting SAS",
+    sasAvgDays: "Avg SAS time",
+    sasContractor: "Contractor",
+    sasRefRate: "SAS refusal rate — by contractor",
+    sasPendingQueue: "SAS queue",
+    sasLots: "Lots",
   }
 };
 
@@ -64,7 +98,8 @@ const TOK = {
   REF:{ ink:"#FF453A", tint:"rgba(255,69,58,.16)",  bar:"#FF453A", soft:"#3A0F0D" },
   DEF:{ ink:"#FF453A", tint:"rgba(255,69,58,.16)",  bar:"#FF453A", soft:"#3A0F0D" },
   HM: { ink:"#8E8E93", tint:"rgba(142,142,147,.14)",bar:"#8E8E93", soft:"#232326" },
-  OPEN:{ink:"#0A84FF", tint:"rgba(10,132,255,.16)", bar:"#0A84FF", soft:"#00284C"}
+  OPEN:{ink:"#0A84FF", tint:"rgba(10,132,255,.16)", bar:"#0A84FF", soft:"#00284C"},
+  NB:  { ink:"#636366", tint:"rgba(99,99,102,.14)", bar:"#636366", soft:"#1C1C1E" }
 };
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) => (n ?? 0).toLocaleString("fr-FR").replace(/,/g, "\u202f");
@@ -116,6 +151,7 @@ function BlockHead({ num, title, right }) {
 function Masthead({ data, t }) {
   const c = data.consultant;
   const h = data.header;
+  const isSas = data.is_sas_fiche;
   return (
     <header style={{
       padding: "48px 0 40px",
@@ -125,14 +161,14 @@ function Masthead({ data, t }) {
         display:"flex", justifyContent:"space-between",
         fontFamily: FONT_NUM, fontSize: 11, color: C.text3, letterSpacing:".08em"
       }}>
-        <span>{t.project.toUpperCase()} — {t.section.toUpperCase()}</span>
+        <span>{t.project.toUpperCase()} — {(isSas ? t.sasSection : t.section).toUpperCase()}</span>
         <span>W{String(h.week_num).padStart(2,"0")} · {h.data_date_str}</span>
       </div>
 
       <div style={{ display:"flex", alignItems:"flex-end", gap:48, marginTop: 36 }}>
         <div style={{ flex: 1 }}>
           <Eyebrow style={{ marginBottom: 12 }}>
-            {t.fiche} · {String(c.id).padStart(2,"0")} / 14
+            {isSas ? t.sasFiche : `${t.fiche} · ${String(c.id).padStart(2,"0")} / 14`}
           </Eyebrow>
           <h1 style={{
             fontFamily: FONT_UI, fontWeight: 600, color: C.text,
@@ -142,19 +178,19 @@ function Masthead({ data, t }) {
           <div style={{
             fontFamily: FONT_UI, fontWeight: 400, fontSize: 17, color: C.text2
           }}>
-            {c.role} · {c.merge_key ? t.merged : t.gedOnly}
+            {isSas ? t.sasSection : `${c.role} · ${c.merge_key ? t.merged : t.gedOnly}`}
           </div>
         </div>
 
         <div style={{ textAlign: "right", minWidth: 240 }}>
-          <Eyebrow>{t.total}</Eyebrow>
+          <Eyebrow>{isSas ? t.sasChecked : t.total}</Eyebrow>
           <div style={{
             fontFamily: FONT_UI, fontWeight: 200, color: C.text,
             fontSize: 104, letterSpacing: "-.05em", lineHeight: .92,
             marginTop: 6,
             background: "linear-gradient(180deg, #FFFFFF 0%, #9A9AA0 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"
-          }}>{fmt(h.total)}</div>
+          }}>{fmt(isSas ? (h.checked ?? h.total) : h.total)}</div>
         </div>
       </div>
     </header>
@@ -165,14 +201,47 @@ function Masthead({ data, t }) {
 function HeroStats({ data, t }) {
   const h = data.header;
   const d = data.week_delta || {};
+  const isSas = data.is_sas_fiche;
   const refusRate = pct(h.s3_count, h.answered);
 
   const last = (data.bloc1 || []).slice(-12);
   const sparkRendered = last.map(r => r.doc_ferme);
   const sparkOpen = last.map(r => r.open_ok + r.open_late);
   const sparkRefus = last.map(r => (r.doc_ferme ? Math.round((r.s3/r.doc_ferme)*1000)/10 : 0));
+  const sparkPass = last.map(r => r.pass_rate ?? 0);
 
-  const stats = [
+  const stats = isSas ? [
+    {
+      eyebrow: t.sasPassed,
+      value: fmt((h.vso_count ?? 0) + (h.vao_count ?? 0)),
+      chips: [
+        { label: "VSO", n: h.vso_count ?? h.s1_count, tone: TOK.VSO },
+        { label: "VAO", n: h.vao_count ?? h.s2_count, tone: TOK.VAO },
+        { label: "REF", n: h.ref_count ?? h.s3_count, tone: TOK.REF }
+      ],
+      delta: (d.vso||0)+(d.vao||0),
+      spark: sparkRendered, tone: TOK.VSO
+    },
+    {
+      eyebrow: t.sasPending,
+      value: fmt(h.pending_count ?? h.open_count),
+      chips: [
+        { label: t.onTime, n: h.pending_ok ?? h.open_ok, tone: TOK.OPEN },
+        { label: t.late,   n: h.pending_late ?? h.open_late, tone: TOK.REF }
+      ],
+      delta: d.pending ?? d.open ?? 0, invertDelta: true,
+      spark: sparkOpen, tone: TOK.OPEN
+    },
+    {
+      eyebrow: t.sasPassRate,
+      value: `${h.pass_rate ?? 0}%`,
+      chips: [
+        { label: `${(h.vso_count??0)+(h.vao_count??0)}/${h.checked??h.answered}`, n: null, tone: TOK.VSO }
+      ],
+      delta: d.ref_rate != null ? -d.ref_rate : 0, deltaSuffix: "pt", invertDelta: false,
+      spark: sparkPass, tone: TOK.VSO
+    }
+  ] : [
     {
       eyebrow: t.rendered,
       value: fmt(h.answered),
@@ -187,12 +256,13 @@ function HeroStats({ data, t }) {
     },
     {
       eyebrow: t.pending,
-      value: fmt(h.open_count),
+      value: fmt(h.open_blocking ?? h.open_count),
       chips: [
-        { label: t.onTime, n: h.open_ok, tone: TOK.OPEN },
-        { label: t.late,   n: h.open_late, tone: TOK.REF }
+        { label: t.blocOk,  n: h.open_blocking_ok ?? h.open_ok,   tone: TOK.OPEN },
+        { label: t.blocLate, n: h.open_blocking_late ?? h.open_late, tone: TOK.REF },
+        { label: t.nbShort, n: h.open_non_blocking ?? 0, tone: TOK.NB }
       ],
-      delta: d.open ?? 0, invertDelta: true,
+      delta: d.open_blocking ?? d.open ?? 0, invertDelta: true,
       spark: sparkOpen, tone: TOK.OPEN
     },
     {
@@ -322,10 +392,27 @@ function Sparkline({ values, color = C.accent, height = 32 }) {
 function Narrative({ data, t, lang }) {
   const h = data.header;
   const d = data.week_delta || {};
+
+  if (data.is_sas_fiche) {
+    const text = lang === "fr"
+      ? `Semaine ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} soumis au SAS, ${signed(d.checked||0)} contrôlé${Math.abs(d.checked||0)>1?"s":""}. Taux de conformité ${h.pass_rate ?? 0}% (${signed(-(d.ref_rate||0))} pt). En attente : ${h.pending_count ?? h.open_count}.`
+      : `Week ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} submitted to SAS, ${signed(d.checked||0)} checked. Conformity rate ${h.pass_rate ?? 0}% (${signed(-(d.ref_rate||0))} pt). Pending: ${h.pending_count ?? h.open_count}.`;
+    return (
+      <section style={{ padding:"48px 0 8px" }}>
+        <Eyebrow style={{ marginBottom: 14 }}>— {t.narrative}</Eyebrow>
+        <p style={{
+          fontFamily: FONT_UI, fontWeight: 400, color: C.text,
+          fontSize: 28, lineHeight: 1.35, letterSpacing: "-.015em",
+          maxWidth: "58ch", margin: 0
+        }}>{text}</p>
+      </section>
+    );
+  }
+
   const refusRate = pct(h.s3_count, h.answered);
   const text = lang === "fr"
-    ? `Semaine ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} soumis, ${signed((d.s1||0)+(d.s2||0)+(d.s3||0)+(d.hm||0))} avis rendus. Taux de refus ${refusRate}% (${signed(d.refus_rate_pct||0)} pt). Backlog en retard : ${h.open_late} (${signed(d.open_late||0)}).`
-    : `Week ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} submitted, ${signed((d.s1||0)+(d.s2||0)+(d.s3||0)+(d.hm||0))} responses issued. Rejection rate ${refusRate}% (${signed(d.refus_rate_pct||0)} pt). Overdue backlog: ${h.open_late} (${signed(d.open_late||0)}).`;
+    ? `Semaine ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} soumis, ${signed((d.s1||0)+(d.s2||0)+(d.s3||0)+(d.hm||0))} avis rendus. Taux de refus ${refusRate}% (${signed(d.refus_rate_pct||0)} pt). Backlog bloquant en retard : ${h.open_blocking_late ?? h.open_late} (${signed((d.open_blocking_late ?? d.open_late)||0)}).`
+    : `Week ${h.week_num} — ${signed(d.total||0)} document${Math.abs(d.total||0)>1?"s":""} submitted, ${signed((d.s1||0)+(d.s2||0)+(d.s3||0)+(d.hm||0))} responses issued. Rejection rate ${refusRate}% (${signed(d.refus_rate_pct||0)} pt). Blocking overdue backlog: ${h.open_blocking_late ?? h.open_late} (${signed((d.open_blocking_late ?? d.open_late)||0)}).`;
 
   return (
     <section style={{ padding:"48px 0 8px" }}>
@@ -374,7 +461,8 @@ function Bloc1({ data, t }) {
             <col style={{width:"8%"}}/><col style={{width:"6%"}}/>
             <col style={{width:"8%"}}/><col style={{width:"6%"}}/>
             <col style={{width:"8%"}}/><col style={{width:"6%"}}/>
-            <col style={{width:"17%"}}/>
+            <col style={{width:"9%"}}/>
+            <col style={{width:"8%"}}/>
           </colgroup>
           <thead>
             <tr>
@@ -385,7 +473,8 @@ function Bloc1({ data, t }) {
               <th style={{...TH, color:s2.ink}} colSpan="2">{data.header.s2}</th>
               <th style={{...TH, color:s3.ink}} colSpan="2">{data.header.s3}</th>
               <th style={TH} colSpan="2">HM</th>
-              <th style={{...TH, textAlign:"left", paddingLeft:16}}>Δ backlog</th>
+              <th style={{...TH, textAlign:"left", paddingLeft:16, color:TOK.OPEN.ink}}>{t.blocking}</th>
+              <th style={{...TH, color:TOK.NB.ink}}>{t.nonBlocking}</th>
             </tr>
           </thead>
           <tbody>
@@ -417,9 +506,14 @@ function Bloc1({ data, t }) {
                   <td style={{...TD, color:hm.ink}}>{r.hm || <span style={{color:C.text3}}>·</span>}</td>
                   <td style={{...TD, color:C.text3, fontSize:11}}>{r.hm_pct != null ? `${r.hm_pct}%` : "—"}</td>
 
-                  <td style={{...TD, textAlign:"left", paddingLeft: 16}}>
-                    <BalanceGlyph delta={bal} active={r.nvx || r.doc_ferme}/>
+                  <td style={{...TD, textAlign:"left", paddingLeft:16}}>
+                    <span style={{display:"inline-flex", gap:8, fontFamily:FONT_NUM, fontSize:11.5}}>
+                      <span style={{color:TOK.OPEN.ink}}>{r.open_blocking_ok ?? r.open_ok}</span>
+                      <span style={{color:C.text3}}>·</span>
+                      <span style={{color:TOK.REF.ink}}>{r.open_blocking_late ?? r.open_late}</span>
+                    </span>
                   </td>
+                  <td style={{...TD, color:TOK.NB.ink, opacity:0.7}}>{r.open_nb ?? 0}</td>
                 </tr>
               );
             })}
@@ -479,8 +573,14 @@ function Bloc2({ data, t }) {
 
   const stack = b2.labels.map((_, i) => {
     const s1 = b2.s1_series[i], s2 = b2.s2_series[i], s3 = b2.s3_series[i];
-    const hm = b2.hm_series[i], op = b2.open_series[i];
-    return { s1, s2:s1+s2, s3:s1+s2+s3, hm:s1+s2+s3+hm, total:s1+s2+s3+hm+op };
+    const hm = b2.hm_series[i];
+    const ob = (b2.open_blocking_series || b2.open_series)[i];
+    const nb = (b2.open_nb_series || [])[i] || 0;
+    return {
+      s1, s2:s1+s2, s3:s1+s2+s3, hm:s1+s2+s3+hm,
+      ob:s1+s2+s3+hm+ob,
+      total:s1+s2+s3+hm+ob+nb
+    };
   });
 
   const area = (keyLo, keyHi, color) => {
@@ -516,11 +616,12 @@ function Bloc2({ data, t }) {
             </g>
           ))}
 
-          {area(null,    "s1", TOK.VSO.bar)}
-          {area("s1",    "s2", TOK.VAO.bar)}
-          {area("s2",    "s3", TOK.REF.bar)}
-          {area("s3",    "hm", TOK.HM.bar)}
-          {area("hm", "total", TOK.OPEN.bar)}
+          {area(null,    "s1",   TOK.VSO.bar)}
+          {area("s1",    "s2",   TOK.VAO.bar)}
+          {area("s2",    "s3",   TOK.REF.bar)}
+          {area("s3",    "hm",   TOK.HM.bar)}
+          {area("hm",    "ob",   TOK.OPEN.bar)}
+          {area("ob",  "total",  TOK.NB.bar)}
 
           <path
             d={b2.totals.map((v,i) => `${i?"L":"M"}${xOf(i)},${yOf(v)}`).join(" ")}
@@ -549,16 +650,17 @@ function Bloc2({ data, t }) {
               <line x1={xOf(hover)} x2={xOf(hover)} y1={pad.t} y2={H-pad.b}
                     stroke={C.text2} strokeDasharray="2 4" strokeWidth="1"/>
               <g transform={`translate(${Math.min(xOf(hover)+12, W-190)}, ${pad.t+8})`}>
-                <rect width="178" height="108" rx="10" fill={C.surf2} stroke={C.line2} strokeWidth="1"/>
+                <rect width="178" height="122" rx="10" fill={C.surf2} stroke={C.line2} strokeWidth="1"/>
                 <text x="12" y="22" fontFamily={FONT_UI} fontWeight="600" fontSize="13" fill={C.text}>
                   {b2.labels[hover]} · {fmt(b2.totals[hover])}
                 </text>
                 {[
-                  {k:"s1_series", c:TOK.VSO, lbl:data.header.s1},
-                  {k:"s2_series", c:TOK.VAO, lbl:data.header.s2},
-                  {k:"s3_series", c:TOK.REF, lbl:data.header.s3},
-                  {k:"hm_series", c:TOK.HM,  lbl:"HM"},
-                  {k:"open_series",c:TOK.OPEN,lbl:t.pending}
+                  {k:"s1_series",            c:TOK.VSO,  lbl:data.header.s1},
+                  {k:"s2_series",            c:TOK.VAO,  lbl:data.header.s2},
+                  {k:"s3_series",            c:TOK.REF,  lbl:data.header.s3},
+                  {k:"hm_series",            c:TOK.HM,   lbl:"HM"},
+                  {k:"open_blocking_series", c:TOK.OPEN, lbl:t.blocking},
+                  {k:"open_nb_series",       c:TOK.NB,   lbl:t.nonBlocking}
                 ].map((row,i) => (
                   <g key={i} transform={`translate(12, ${42+i*14})`}>
                     <circle cx="4" cy="-4" r="3" fill={row.c.bar}/>
@@ -566,7 +668,7 @@ function Bloc2({ data, t }) {
                       {row.lbl}
                     </text>
                     <text x="168" y="0" textAnchor="end" fontFamily={FONT_NUM} fontSize="10.5" fill={C.text}>
-                      {fmt(b2[row.k][hover])}
+                      {fmt(b2[row.k] ? b2[row.k][hover] : 0)}
                     </text>
                   </g>
                 ))}
@@ -581,11 +683,12 @@ function Bloc2({ data, t }) {
           fontFamily: FONT_UI, fontSize:11, color: C.text2, flexWrap:"wrap"
         }}>
           {[
-            {c:TOK.VSO, l:data.header.s1},
-            {c:TOK.VAO, l:data.header.s2},
-            {c:TOK.REF, l:data.header.s3},
-            {c:TOK.HM,  l:"HM"},
-            {c:TOK.OPEN,l:t.pending}
+            {c:TOK.VSO,  l:data.header.s1},
+            {c:TOK.VAO,  l:data.header.s2},
+            {c:TOK.REF,  l:data.header.s3},
+            {c:TOK.HM,   l:"HM"},
+            {c:TOK.OPEN, l:t.blocking},
+            {c:TOK.NB,   l:t.nonBlocking}
           ].map((x,i)=>(
             <span key={i} style={{display:"inline-flex", gap:6, alignItems:"center"}}>
               <Dot c={x.c.bar}/> {x.l}
@@ -600,6 +703,7 @@ function Bloc2({ data, t }) {
 // ── Bloc 3 ──────────────────────────────────────────────────────────────────
 function Bloc3({ data, t }) {
   const b3 = data.bloc3;
+  const isSas = data.is_sas_fiche;
   return (
     <section style={{ marginTop: 64 }}>
       <BlockHead num="03" title={t.b3}/>
@@ -612,14 +716,14 @@ function Bloc3({ data, t }) {
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr>
-                <th style={{...TH, textAlign:"left", paddingLeft:20}}>{t.lot}</th>
+                <th style={{...TH, textAlign:"left", paddingLeft:20}}>{isSas ? t.sasContractor : t.lot}</th>
                 <th style={TH}>{t.tot}</th>
                 <th style={{...TH, color:TOK.VSO.ink}}>{b3.s1}</th>
                 <th style={{...TH, color:TOK.VAO.ink}}>{b3.s2}</th>
                 <th style={{...TH, color:TOK.REF.ink}}>{b3.s3}</th>
                 <th style={TH}>HM</th>
                 <th style={{...TH, textAlign:"left", paddingLeft:18, width:"32%"}}>
-                  {t.onTime} · {t.late}
+                  {t.blocking} · {t.nonBlocking}
                 </th>
               </tr>
             </thead>
@@ -639,6 +743,17 @@ function Bloc3({ data, t }) {
                   <td style={{...TD, color:TOK.HM.ink}}>{l.HM}</td>
                   <td style={{...TD, padding:"10px 0 10px 18px"}}>
                     <LotHealthBar l={l} keys={b3}/>
+                    <span style={{display:"inline-flex", gap:8, fontFamily:FONT_NUM, fontSize:11.5, marginTop:4}}>
+                      <span style={{color:TOK.OPEN.ink}}>{l.open_blocking_ok ?? l.open_ok}</span>
+                      <span style={{color:C.text3}}>·</span>
+                      <span style={{color:TOK.REF.ink}}>{l.open_blocking_late ?? l.open_late}</span>
+                      {(l.open_nb ?? 0) > 0 && (
+                        <>
+                          <span style={{color:C.text3}}>|</span>
+                          <span style={{color:TOK.NB.ink, opacity:0.7}}>{l.open_nb}</span>
+                        </>
+                      )}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -673,15 +788,15 @@ function Bloc3({ data, t }) {
         <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
           <Donut b3={b3} t={t}/>
           <SideList
-            title={t.critical}
+            title={isSas ? t.sasPendingQueue : t.critical}
             items={b3.critical_lots.map(c => ({
               name:c.name, value:c.open_late,
               max:Math.max(...b3.critical_lots.map(x=>x.open_late))
             }))}
-            tone={TOK.REF}
+            tone={isSas ? TOK.OPEN : TOK.REF}
           />
           <SideList
-            title={t.refRate}
+            title={isSas ? t.sasRefRate : t.refRate}
             items={b3.refus_lots.map(([c,p]) => ({
               name:c.name, value:p,
               max:Math.max(...b3.refus_lots.map(([, q]) => q)),
@@ -702,8 +817,9 @@ function LotHealthBar({ l, keys }) {
     { v:l[keys.s2], c:TOK.VAO.bar },
     { v:l[keys.s3], c:TOK.REF.bar },
     { v:l.HM,       c:TOK.HM.bar, alpha:.7 },
-    { v:l.open_ok,  c:TOK.OPEN.bar, alpha:.6 },
-    { v:l.open_late,c:TOK.REF.bar, hatch:true }
+    { v:l.open_blocking_ok ?? l.open_ok,   c:TOK.OPEN.bar, alpha:.6 },
+    { v:l.open_blocking_late ?? l.open_late, c:TOK.REF.bar, hatch:true },
+    { v:l.open_nb ?? 0,  c:TOK.NB.bar, alpha:.4 }
   ];
   return (
     <div style={{
@@ -771,6 +887,13 @@ function Donut({ b3, t }) {
             <span style={{fontFamily:FONT_NUM}}>{b3.donut_late}</span>
             <span style={{color:C.text2}}>{t.late}</span>
           </div>
+          {(b3.donut_nb ?? 0) > 0 && (
+            <div style={{ color: TOK.NB.ink, display:"flex", gap:8, alignItems:"center", opacity:0.7 }}>
+              <Dot c={TOK.NB.bar}/>
+              <span style={{fontFamily:FONT_NUM}}>{b3.donut_nb}</span>
+              <span style={{color:C.text2}}>{t.nonBlocking}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

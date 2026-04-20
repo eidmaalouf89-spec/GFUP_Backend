@@ -41,6 +41,7 @@ CONSULTANT_DISPLAY_NAMES = {
     "BET VRD":              "BET VRD",
     "Bureau de Contrôle":   "SOCOTEC",
     "Maître d'Oeuvre EXE":  "GEMO",
+    "MOEX SAS":             "GEMO (SAS)",
 }
 
 # Canonical name → role label for display
@@ -60,6 +61,7 @@ ROLE_BY_CANONICAL = {
     "BET VRD":              "BET VRD",
     "Bureau de Contrôle":   "Bureau de Contrôle (SOCOTEC)",
     "Maître d'Oeuvre EXE":  "MOEX (GEMO)",
+    "MOEX SAS":             "Conformité SAS (GEMO)",
 }
 
 # Status vocabulary per consultant.
@@ -67,6 +69,7 @@ ROLE_BY_CANONICAL = {
 # Most consultants use VSO/VAO/REF. Bureau de Contrôle uses FAV/SUS/DEF.
 STATUS_LABELS_BY_CANONICAL = {
     "Bureau de Contrôle": {"s1": "FAV", "s2": "SUS", "s3": "DEF"},
+    "MOEX SAS": {"s1": "VSO", "s2": "VAO", "s3": "REF"},
     # All others default to VSO/VAO/REF — no entry needed
 }
 
@@ -147,6 +150,10 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
         Dict matching window.FICHE_DATA shape. Always returns a dict; on degraded
         mode, fields are zero/empty but structure is complete.
     """
+    # Concept 3: MOEX SAS has its own dedicated fiche builder
+    if consultant_name == "MOEX SAS":
+        return build_sas_fiche(ctx)
+
     # ── Degraded mode short-circuit ──────────────────────────────────────────
     if not ctx.ged_available or ctx.docs_df is None:
         return _empty_fiche(consultant_name, ctx)
@@ -165,7 +172,7 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
     s1, s2, s3 = _resolve_status_labels(ctx, consultant_name)
 
     # ── Attach derived columns used by all blocks ────────────────────────────
-    docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3)
+    docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3, ctx=ctx)
 
     # ── Build blocks ─────────────────────────────────────────────────────────
     consultant = _build_consultant_meta(ctx, consultant_name)
@@ -188,6 +195,426 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
         "non_saisi":   non_saisi,
         "degraded_mode": False,
         "warnings":    list(ctx.warnings or []),
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SAS Conformity Gate Fiche
+# ═════════════════════════════════════════════════════════════════════════════
+
+def build_sas_fiche(ctx: RunContext) -> dict[str, Any]:
+    """Build dedicated SAS conformity gate fiche.
+
+    This is NOT a standard consultant fiche — it tracks submission quality
+    and conformity discipline, not engineering review responses.
+
+    SAS statuses (from clean_status on 0-SAS approver_raw):
+      - VSO-SAS, VSO → passed clean
+      - VAO-SAS, VAO → passed with minor remarks
+      - REF → refused, contractor must correct and resubmit
+      - empty/pending → SAS check not yet performed
+
+    Key metrics:
+      - SAS pass rate (VSO+VAO vs total checked)
+      - SAS refusal rate per contractor (submission discipline)
+      - SAS turnaround time (submission date → SAS response date)
+      - Currently pending SAS checks (backlog)
+    """
+    if not ctx.ged_available or ctx.responses_df is None:
+        return _empty_sas_fiche(ctx)
+
+    data_date = _resolve_data_date(ctx)
+    resp = ctx.responses_df
+    docs = ctx.dernier_df
+
+    # ── Filter to 0-SAS approver rows only ──────────────────────────────
+    sas_resp = resp[
+        (resp["approver_raw"] == "0-SAS") &
+        (resp["date_status_type"] != "NOT_CALLED")
+    ].copy()
+
+    if sas_resp.empty or docs is None or docs.empty:
+        return _empty_sas_fiche(ctx)
+
+    # Merge with dernier docs
+    merged = sas_resp.merge(docs, on="doc_id", how="inner", suffixes=("_resp", "_doc"))
+
+    if merged.empty:
+        return _empty_sas_fiche(ctx)
+
+    # ── Normalize SAS statuses ──────────────────────────────────────────
+    def _normalize_sas_status(s):
+        if s is None:
+            return None
+        s = str(s).upper().strip()
+        if s in ("VSO-SAS", "VSO"):
+            return "VSO"
+        if s in ("VAO-SAS", "VAO"):
+            return "VAO"
+        if s == "REF":
+            return "REF"
+        if s in ("", "NONE", "NAN"):
+            return None
+        return s
+
+    status_col = "status_clean_resp" if "status_clean_resp" in merged.columns else "status_clean"
+    merged["_sas_status"] = merged[status_col].apply(_normalize_sas_status)
+
+    # Date columns
+    da_col = "date_answered_resp" if "date_answered_resp" in merged.columns else "date_answered"
+    merged["_sas_date"] = pd.to_datetime(merged[da_col], errors="coerce")
+    merged["_sas_date_d"] = merged["_sas_date"].dt.date
+
+    created_col = "created_at_doc" if "created_at_doc" in merged.columns else "created_at"
+    merged["_created"] = pd.to_datetime(merged[created_col], errors="coerce")
+    merged["_created_d"] = merged["_created"].dt.date
+
+    date_status_col = "date_status_type_resp" if "date_status_type_resp" in merged.columns else "date_status_type"
+
+    # ── Classify ────────────────────────────────────────────────────────
+    sas_closed_statuses = {"VSO", "VAO", "REF"}
+    merged["_sas_is_closed"] = merged["_sas_status"].isin(sas_closed_statuses)
+    merged["_sas_is_pending"] = ~merged["_sas_is_closed"]
+    merged["_sas_is_late"] = merged[date_status_col] == "PENDING_LATE"
+
+    # Emetteur (contractor) column
+    em_col = "emetteur_doc" if "emetteur_doc" in merged.columns else (
+             "emetteur" if "emetteur" in merged.columns else None)
+    if em_col:
+        merged["_emetteur"] = merged[em_col].fillna("?").astype(str)
+    else:
+        merged["_emetteur"] = "?"
+
+    # Lot column
+    lot_col = "lot_normalized_doc" if "lot_normalized_doc" in merged.columns else (
+              "lot_normalized" if "lot_normalized" in merged.columns else None)
+    if lot_col:
+        merged["_lot"] = merged[lot_col].fillna("?").astype(str)
+    else:
+        merged["_lot"] = "?"
+
+    # GF sheet for grouping
+    for col in ("gf_sheet_doc", "gf_sheet", "_gf_sheet"):
+        if col in merged.columns:
+            merged["_gf_sheet"] = merged[col].fillna("").astype(str)
+            break
+    else:
+        merged["_gf_sheet"] = merged["_lot"]
+
+    total = len(merged)
+
+    # ── HEADER ──────────────────────────────────────────────────────────
+    checked = int(merged["_sas_is_closed"].sum())
+    vso_count = int((merged["_sas_status"] == "VSO").sum())
+    vao_count = int((merged["_sas_status"] == "VAO").sum())
+    ref_count = int((merged["_sas_status"] == "REF").sum())
+    pending_count = int(merged["_sas_is_pending"].sum())
+    pending_late = int((merged["_sas_is_pending"] & merged["_sas_is_late"]).sum())
+    pending_ok = pending_count - pending_late
+
+    pass_rate = round(((vso_count + vao_count) / checked) * 100, 1) if checked else 0.0
+    ref_rate = round((ref_count / checked) * 100, 1) if checked else 0.0
+
+    # Turnaround time (submission → SAS response, in days)
+    turnaround_days = []
+    for _, row in merged[merged["_sas_is_closed"]].iterrows():
+        if pd.notna(row["_sas_date"]) and pd.notna(row["_created"]):
+            try:
+                delta = (row["_sas_date"] - row["_created"]).days
+                if 0 <= delta <= 365:
+                    turnaround_days.append(delta)
+            except Exception:
+                pass
+    avg_turnaround = round(sum(turnaround_days) / len(turnaround_days), 1) if turnaround_days else None
+
+    header = {
+        "week_num":        data_date.isocalendar()[1],
+        "data_date_str":   data_date.strftime("%d/%m/%Y"),
+        "total":           total,
+        "checked":         checked,
+        "vso_count":       vso_count,
+        "vao_count":       vao_count,
+        "ref_count":       ref_count,
+        "pending_count":   pending_count,
+        "pending_ok":      pending_ok,
+        "pending_late":    pending_late,
+        "pass_rate":       pass_rate,
+        "ref_rate":        ref_rate,
+        "avg_turnaround":  avg_turnaround,
+        # Legacy compat fields
+        "s1": "VSO", "s2": "VAO", "s3": "REF",
+        "s1_count": vso_count, "s2_count": vao_count, "s3_count": ref_count,
+        "hm_count": 0,
+        "answered": checked,
+        "open_count": pending_count,
+        "open_ok": pending_ok,
+        "open_late": pending_late,
+        "open_blocking": pending_count,
+        "open_blocking_ok": pending_ok,
+        "open_blocking_late": pending_late,
+        "open_non_blocking": 0,
+    }
+
+    # ── WEEK DELTA ──────────────────────────────────────────────────────
+    prev_date = data_date - timedelta(days=7)
+    cur = merged[merged["_created_d"] <= data_date]
+    prv = merged[merged["_created_d"] <= prev_date]
+
+    def _sas_stats(df):
+        if df.empty:
+            return {"total": 0, "checked": 0, "vso": 0, "vao": 0, "ref": 0,
+                    "pending": 0, "pending_late": 0, "ref_rate": 0.0}
+        chk = int(df["_sas_is_closed"].sum())
+        v = int((df["_sas_status"] == "VSO").sum())
+        a = int((df["_sas_status"] == "VAO").sum())
+        r = int((df["_sas_status"] == "REF").sum())
+        p = int(df["_sas_is_pending"].sum())
+        pl = int((df["_sas_is_pending"] & df["_sas_is_late"]).sum())
+        rr = round((r / chk) * 100, 1) if chk else 0.0
+        return {"total": len(df), "checked": chk, "vso": v, "vao": a, "ref": r,
+                "pending": p, "pending_late": pl, "ref_rate": rr}
+
+    cs, ps = _sas_stats(cur), _sas_stats(prv)
+    week_delta = {
+        "total":        cs["total"] - ps["total"],
+        "checked":      cs["checked"] - ps["checked"],
+        "vso":          cs["vso"] - ps["vso"],
+        "vao":          cs["vao"] - ps["vao"],
+        "ref":          cs["ref"] - ps["ref"],
+        "pending":      cs["pending"] - ps["pending"],
+        "pending_late": cs["pending_late"] - ps["pending_late"],
+        "ref_rate":     round(cs["ref_rate"] - ps["ref_rate"], 1),
+        # Legacy compat
+        "s1": cs["vso"] - ps["vso"],
+        "s2": cs["vao"] - ps["vao"],
+        "s3": cs["ref"] - ps["ref"],
+        "hm": 0,
+        "open": cs["pending"] - ps["pending"],
+        "open_late": cs["pending_late"] - ps["pending_late"],
+        "open_blocking": cs["pending"] - ps["pending"],
+        "open_blocking_late": cs["pending_late"] - ps["pending_late"],
+        "refus_rate_pct": round(cs["ref_rate"] - ps["ref_rate"], 1),
+    }
+
+    # ── BLOC 1 — Monthly SAS activity ───────────────────────────────────
+    first_created = merged["_created_d"].dropna().min()
+    months = _month_range(first_created, data_date) if first_created and not pd.isna(first_created) else []
+    if len(months) > 18:
+        months = months[-18:]
+
+    current_ym = (data_date.year, data_date.month)
+    bloc1 = []
+    for y, m in months:
+        month_start = date(y, m, 1)
+        month_end = _month_last_day(y, m)
+
+        created_in = merged[
+            (merged["_created_d"] >= month_start) & (merged["_created_d"] <= month_end)
+        ]
+        checked_in = merged[
+            merged["_sas_date_d"].notna() &
+            (merged["_sas_date_d"] >= month_start) & (merged["_sas_date_d"] <= month_end) &
+            merged["_sas_is_closed"]
+        ]
+
+        nvx = int(len(created_in))
+        doc_ferme = int(len(checked_in))
+        s1c = int((checked_in["_sas_status"] == "VSO").sum())
+        s2c = int((checked_in["_sas_status"] == "VAO").sum())
+        s3c = int((checked_in["_sas_status"] == "REF").sum())
+
+        def _pct(c, d=doc_ferme):
+            return round((c / d) * 100, 1) if d else None
+
+        # End-of-month pending snapshot
+        snapshot = merged[merged["_created_d"] <= month_end]
+        closed_by_month_end = snapshot[
+            snapshot["_sas_date_d"].notna() & (snapshot["_sas_date_d"] <= month_end) &
+            snapshot["_sas_is_closed"]
+        ]
+        open_at_end = max(len(snapshot) - len(closed_by_month_end), 0)
+
+        bloc1.append({
+            "label":      f"{y:04d}-{m:02d}",
+            "is_current": (y, m) == current_ym,
+            "nvx":        nvx,
+            "doc_ferme":  doc_ferme,
+            "s1": s1c, "s1_pct": _pct(s1c),
+            "s2": s2c, "s2_pct": _pct(s2c),
+            "s3": s3c, "s3_pct": _pct(s3c),
+            "hm": 0,   "hm_pct": None,
+            "open_ok":   open_at_end,
+            "open_late": 0,
+            "pass_rate": round(((s1c + s2c) / doc_ferme) * 100, 1) if doc_ferme else None,
+            "open_blocking_ok": open_at_end,
+            "open_blocking_late": 0,
+            "open_nb": 0,
+        })
+
+    # ── BLOC 2 — reuse standard builder ────────────────────────────────
+    bloc2 = _build_bloc2(bloc1)
+
+    # ── BLOC 3 — SAS performance PER CONTRACTOR ─────────────────────────
+    contractor_groups = merged.groupby("_emetteur", dropna=True)
+    contractors = []
+    for em, sub in contractor_groups:
+        sub_checked = int(sub["_sas_is_closed"].sum())
+        sub_vso = int((sub["_sas_status"] == "VSO").sum())
+        sub_vao = int((sub["_sas_status"] == "VAO").sum())
+        sub_ref = int((sub["_sas_status"] == "REF").sum())
+        sub_pending = int(sub["_sas_is_pending"].sum())
+        sub_total = int(len(sub))
+        sub_ref_rate = round((sub_ref / sub_checked) * 100, 1) if sub_checked else 0.0
+        sub_pass_rate = round(((sub_vso + sub_vao) / sub_checked) * 100, 1) if sub_checked else 0.0
+
+        ct_days = []
+        for _, row in sub[sub["_sas_is_closed"]].iterrows():
+            if pd.notna(row["_sas_date"]) and pd.notna(row["_created"]):
+                try:
+                    d = (row["_sas_date"] - row["_created"]).days
+                    if 0 <= d <= 365:
+                        ct_days.append(d)
+                except Exception:
+                    pass
+        ct_avg = round(sum(ct_days) / len(ct_days), 1) if ct_days else None
+
+        lots = sorted(sub["_lot"].unique().tolist())
+
+        contractors.append({
+            "name":        str(em),
+            "total":       sub_total,
+            "checked":     sub_checked,
+            "VSO":         sub_vso,
+            "VAO":         sub_vao,
+            "REF":         sub_ref,
+            "HM":          0,
+            "pending":     sub_pending,
+            "ref_rate":    sub_ref_rate,
+            "pass_rate":   sub_pass_rate,
+            "avg_days":    ct_avg,
+            "lots":        lots,
+            # Legacy compat for LotHealthBar
+            "open_ok":     sub_pending,
+            "open_late":   0,
+            "open_blocking_ok": sub_pending,
+            "open_blocking_late": 0,
+            "open_nb":     0,
+        })
+
+    contractors.sort(key=lambda r: -r["total"])
+
+    def _sum_c(key):
+        return int(sum(r[key] for r in contractors))
+
+    total_row = {
+        "total":              _sum_c("total"),
+        "VSO":                _sum_c("VSO"),
+        "VAO":                _sum_c("VAO"),
+        "REF":                _sum_c("REF"),
+        "HM":                 0,
+        "open_ok":            _sum_c("pending"),
+        "open_late":          0,
+        "open_blocking_ok":   _sum_c("pending"),
+        "open_blocking_late": 0,
+        "open_nb":            0,
+    }
+
+    refus_scored = [(r, r["ref_rate"]) for r in contractors if r["checked"] >= 3]
+    refus_scored.sort(key=lambda rp: -rp[1])
+    refus_contractors = [
+        [{"name": r["name"]}, p] for r, p in refus_scored[:5]
+    ]
+
+    pending_contractors = [
+        {"name": r["name"], "open_late": r["pending"]}
+        for r in sorted(contractors, key=lambda r: -r["pending"])
+        if r["pending"] > 0
+    ][:5]
+
+    bloc3 = {
+        "s1": "VSO", "s2": "VAO", "s3": "REF",
+        "lots":          contractors,
+        "total_row":     total_row,
+        "donut_total":   _sum_c("pending"),
+        "donut_ok":      _sum_c("pending"),
+        "donut_late":    0,
+        "donut_nb":      0,
+        "critical_lots": pending_contractors,
+        "refus_lots":    refus_contractors,
+    }
+
+    bloc4_contractor_ranking = sorted(
+        [c for c in contractors if c["checked"] >= 1],
+        key=lambda c: -c["ref_rate"]
+    )
+
+    return {
+        "consultant": {
+            "id":             0,
+            "slug":           "MOEXSAS",
+            "canonical_name": "MOEX SAS",
+            "display_name":   "GEMO",
+            "name":           "MOEX SAS",
+            "role":           "Conformité SAS",
+            "merge_key":      None,
+        },
+        "header":       header,
+        "week_delta":   week_delta,
+        "bloc1":        bloc1,
+        "bloc2":        bloc2,
+        "bloc3":        bloc3,
+        "bloc4_sas":    bloc4_contractor_ranking,
+        "non_saisi":    None,
+        "degraded_mode": False,
+        "warnings":     list(ctx.warnings or []),
+        "is_sas_fiche": True,
+    }
+
+
+def _empty_sas_fiche(ctx: RunContext) -> dict[str, Any]:
+    return {
+        "consultant": {
+            "id": 0, "slug": "MOEXSAS", "display_name": "GEMO",
+            "canonical_name": "MOEX SAS", "name": "MOEX SAS",
+            "role": "Conformité SAS", "merge_key": None,
+        },
+        "header": {
+            "week_num": 0, "data_date_str": "",
+            "total": 0, "checked": 0,
+            "vso_count": 0, "vao_count": 0, "ref_count": 0,
+            "pending_count": 0, "pending_ok": 0, "pending_late": 0,
+            "pass_rate": 0.0, "ref_rate": 0.0, "avg_turnaround": None,
+            "s1": "VSO", "s2": "VAO", "s3": "REF",
+            "s1_count": 0, "s2_count": 0, "s3_count": 0, "hm_count": 0,
+            "answered": 0, "open_count": 0, "open_ok": 0, "open_late": 0,
+            "open_blocking": 0, "open_blocking_ok": 0,
+            "open_blocking_late": 0, "open_non_blocking": 0,
+        },
+        "week_delta": {
+            "total": 0, "s1": 0, "s2": 0, "s3": 0, "hm": 0,
+            "open": 0, "open_late": 0, "refus_rate_pct": 0.0,
+            "open_blocking": 0, "open_blocking_late": 0,
+            "checked": 0, "vso": 0, "vao": 0, "ref": 0,
+            "pending": 0, "pending_late": 0, "ref_rate": 0.0,
+        },
+        "bloc1": [],
+        "bloc2": {"labels": [], "s1_series": [], "s2_series": [], "s3_series": [],
+                  "hm_series": [], "open_series": [], "totals": [],
+                  "open_blocking_series": [], "open_nb_series": []},
+        "bloc3": {
+            "s1": "VSO", "s2": "VAO", "s3": "REF",
+            "lots": [],
+            "total_row": {"total": 0, "VSO": 0, "VAO": 0, "REF": 0, "HM": 0,
+                          "open_ok": 0, "open_late": 0,
+                          "open_blocking_ok": 0, "open_blocking_late": 0, "open_nb": 0},
+            "donut_total": 0, "donut_ok": 0, "donut_late": 0, "donut_nb": 0,
+            "critical_lots": [], "refus_lots": [],
+        },
+        "bloc4_sas": [],
+        "non_saisi": None,
+        "degraded_mode": True,
+        "warnings": list(ctx.warnings or []),
+        "is_sas_fiche": True,
     }
 
 
@@ -233,6 +660,14 @@ def _build_header(docs: pd.DataFrame, data_date: date,
     open_ok    = int((open_mask & docs["_on_time"]).sum())
     open_late  = int((open_mask & ~docs["_on_time"]).sum())
 
+    # Concept 1: split into blocking vs non-blocking
+    blocking_mask = docs["_is_blocking"]
+    non_blocking_mask = open_mask & ~blocking_mask
+    open_blocking       = int(blocking_mask.sum())
+    open_blocking_ok    = int((blocking_mask & docs["_on_time"]).sum())
+    open_blocking_late  = int((blocking_mask & ~docs["_on_time"]).sum())
+    open_non_blocking   = int(non_blocking_mask.sum())
+
     return {
         "week_num":       data_date.isocalendar()[1],
         "data_date_str":  data_date.strftime("%d/%m/%Y"),
@@ -244,6 +679,10 @@ def _build_header(docs: pd.DataFrame, data_date: date,
         "open_count": open_count,
         "open_ok":    open_ok,
         "open_late":  open_late,
+        "open_blocking":       open_blocking,
+        "open_blocking_ok":    open_blocking_ok,
+        "open_blocking_late":  open_blocking_late,
+        "open_non_blocking":   open_non_blocking,
     }
 
 
@@ -258,7 +697,8 @@ def _build_week_delta(docs: pd.DataFrame, data_date: date, prev_date: date,
     def _stats(df: pd.DataFrame) -> dict:
         if df.empty:
             return {"total": 0, "s1": 0, "s2": 0, "s3": 0, "hm": 0,
-                    "open": 0, "open_late": 0, "refus_rate_pct": 0.0}
+                    "open": 0, "open_late": 0, "refus_rate_pct": 0.0,
+                    "open_blocking": 0, "open_blocking_late": 0}
         closed   = df["_status_for_consultant"].isin(closed_statuses)
         answered = int(closed.sum())
         s1c = int((df["_status_for_consultant"] == s1).sum())
@@ -268,9 +708,12 @@ def _build_week_delta(docs: pd.DataFrame, data_date: date, prev_date: date,
         opn = int(df["_is_open"].sum())
         olt = int((df["_is_open"] & ~df["_on_time"]).sum())
         refus_pct = round((s3c / answered) * 100, 1) if answered else 0.0
+        blk = int(df["_is_blocking"].sum())
+        blk_late = int((df["_is_blocking"] & ~df["_on_time"]).sum())
         return {
             "total": len(df), "s1": s1c, "s2": s2c, "s3": s3c, "hm": hmc,
             "open": opn, "open_late": olt, "refus_rate_pct": refus_pct,
+            "open_blocking": blk, "open_blocking_late": blk_late,
         }
 
     c, p = _stats(cur), _stats(prv)
@@ -283,6 +726,8 @@ def _build_week_delta(docs: pd.DataFrame, data_date: date, prev_date: date,
         "open":           c["open"]  - p["open"],
         "open_late":      c["open_late"] - p["open_late"],
         "refus_rate_pct": round(c["refus_rate_pct"] - p["refus_rate_pct"], 1),
+        "open_blocking":      c["open_blocking"] - p["open_blocking"],
+        "open_blocking_late": c["open_blocking_late"] - p["open_blocking_late"],
     }
 
 
@@ -340,6 +785,18 @@ def _build_bloc1(docs: pd.DataFrame, data_date: date,
         open_ok    = int(open_at_end["_on_time"].sum())
         open_late  = int(len(open_at_end)) - open_ok
 
+        # Blocking subset of open_at_end (Concept 1)
+        if "_is_blocking" in open_at_end.columns:
+            blocking_at_end = open_at_end[open_at_end["_is_blocking"]]
+            nb_at_end = open_at_end[~open_at_end["_is_blocking"]]
+        else:
+            blocking_at_end = open_at_end
+            nb_at_end = open_at_end.iloc[0:0]
+
+        open_blocking_ok   = int(blocking_at_end["_on_time"].sum())
+        open_blocking_late = int(len(blocking_at_end)) - open_blocking_ok
+        open_nb            = int(len(nb_at_end))
+
         rows.append({
             "label":      f"{y:04d}-{m:02d}",
             "is_current": (y, m) == current_ym,
@@ -351,12 +808,16 @@ def _build_bloc1(docs: pd.DataFrame, data_date: date,
             "hm": hmc, "hm_pct": _pct(hmc),
             "open_ok":   open_ok,
             "open_late": open_late,
+            "open_blocking_ok":   open_blocking_ok,
+            "open_blocking_late": open_blocking_late,
+            "open_nb":            open_nb,
         })
     return rows
 
 
 def _build_bloc2(bloc1: list[dict]) -> dict[str, Any]:
     labels, s1s, s2s, s3s, hms, opens, tots = [], [], [], [], [], [], []
+    open_blockings, open_nbs = [], []
     c1 = c2 = c3 = chm = 0
     for row in bloc1:
         c1  += row["s1"]
@@ -364,18 +825,24 @@ def _build_bloc2(bloc1: list[dict]) -> dict[str, Any]:
         c3  += row["s3"]
         chm += row["hm"]
         open_level = row["open_ok"] + row["open_late"]
+        open_blocking_level = row.get("open_blocking_ok", 0) + row.get("open_blocking_late", 0)
+        open_nb_level = row.get("open_nb", 0)
         total = c1 + c2 + c3 + chm + open_level
         labels.append(row["label"])
         s1s.append(c1); s2s.append(c2); s3s.append(c3)
         hms.append(chm); opens.append(open_level); tots.append(total)
+        open_blockings.append(open_blocking_level)
+        open_nbs.append(open_nb_level)
     return {
-        "labels":       labels,
-        "s1_series":    s1s,
-        "s2_series":    s2s,
-        "s3_series":    s3s,
-        "hm_series":    hms,
-        "open_series":  opens,
-        "totals":       tots,
+        "labels":               labels,
+        "s1_series":            s1s,
+        "s2_series":            s2s,
+        "s3_series":            s3s,
+        "hm_series":            hms,
+        "open_series":          opens,
+        "totals":               tots,
+        "open_blocking_series": open_blockings,
+        "open_nb_series":       open_nbs,
     }
 
 
@@ -395,19 +862,25 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
         hm  = int((sub["_status_for_consultant"] == "HM").sum())
         ook = int((sub["_is_open"] & sub["_on_time"]).sum())
         olt = int((sub["_is_open"] & ~sub["_on_time"]).sum())
+        blk_ok   = int((sub["_is_blocking"] & sub["_on_time"]).sum())
+        blk_late = int((sub["_is_blocking"] & ~sub["_on_time"]).sum())
+        nb_count = int((sub["_is_open"] & ~sub["_is_blocking"]).sum())
         total = int(len(sub))
 
         # Populate BOTH the dynamic-keyed fields (s1/s2/s3 values) AND the
         # canonical VSO/VAO/REF fields so the JSX can index either way.
         row = {
-            "name":      str(sheet_name),
-            "total":     total,
-            "VSO":       vso,
-            "VAO":       vao,
-            "REF":       ref,
-            "HM":        hm,
-            "open_ok":   ook,
-            "open_late": olt,
+            "name":              str(sheet_name),
+            "total":             total,
+            "VSO":               vso,
+            "VAO":               vao,
+            "REF":               ref,
+            "HM":                hm,
+            "open_ok":           ook,
+            "open_late":         olt,
+            "open_blocking_ok":  blk_ok,
+            "open_blocking_late": blk_late,
+            "open_nb":           nb_count,
         }
         # If a consultant uses non-default s1/s2/s3 labels, also mirror them:
         row.setdefault(s1, vso)
@@ -422,26 +895,29 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
         return int(sum(r[key] for r in lots))
 
     total_row = {
-        "total":     _sum("total"),
-        "VSO":       _sum("VSO"),
-        "VAO":       _sum("VAO"),
-        "REF":       _sum("REF"),
-        "HM":        _sum("HM"),
-        "open_ok":   _sum("open_ok"),
-        "open_late": _sum("open_late"),
+        "total":              _sum("total"),
+        "VSO":                _sum("VSO"),
+        "VAO":                _sum("VAO"),
+        "REF":                _sum("REF"),
+        "HM":                 _sum("HM"),
+        "open_ok":            _sum("open_ok"),
+        "open_late":          _sum("open_late"),
+        "open_blocking_ok":   _sum("open_blocking_ok"),
+        "open_blocking_late": _sum("open_blocking_late"),
+        "open_nb":            _sum("open_nb"),
     }
     total_row.setdefault(s1, total_row["VSO"])
     total_row.setdefault(s2, total_row["VAO"])
     total_row.setdefault(s3, total_row["REF"])
 
-    donut_ok   = total_row["open_ok"]
-    donut_late = total_row["open_late"]
+    donut_ok   = _sum("open_blocking_ok")
+    donut_late = _sum("open_blocking_late")
 
-    # Critical lots — top 5 by open_late desc (open_late > 0 only)
+    # Critical lots — top 5 by open_blocking_late desc (open_blocking_late > 0 only)
     critical_lots = [
-        {"name": r["name"], "open_late": r["open_late"]}
-        for r in sorted(lots, key=lambda r: -r["open_late"])
-        if r["open_late"] > 0
+        {"name": r["name"], "open_late": r["open_blocking_late"]}
+        for r in sorted(lots, key=lambda r: -r.get("open_blocking_late", 0))
+        if r.get("open_blocking_late", 0) > 0
     ][:5]
 
     # Rejection rate lots — lots with >=3 closed docs, top 5 by %
@@ -463,6 +939,7 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
         "donut_total":   donut_ok + donut_late,
         "donut_ok":      donut_ok,
         "donut_late":    donut_late,
+        "donut_nb":      _sum("open_nb"),
         "critical_lots": critical_lots,
         "refus_lots":    refus_lots,
     }
@@ -509,11 +986,25 @@ def _filter_for_consultant(ctx: RunContext, name: str) -> pd.DataFrame:
     resp = ctx.responses_df
     docs = ctx.dernier_df
 
-    # Filter responses for this consultant (exclude NOT_CALLED)
-    cons_resp = resp[
-        (resp["approver_canonical"] == name) &
-        (resp["date_status_type"] != "NOT_CALLED")
-    ].copy()
+    if name == "MOEX SAS":
+        # SAS fiche: only 0-SAS approver rows
+        cons_resp = resp[
+            (resp["approver_raw"] == "0-SAS") &
+            (resp["date_status_type"] != "NOT_CALLED")
+        ].copy()
+    elif name == "Maître d'Oeuvre EXE":
+        # Real MOEX fiche: exclude 0-SAS rows
+        cons_resp = resp[
+            (resp["approver_canonical"] == name) &
+            (resp["approver_raw"] != "0-SAS") &
+            (resp["date_status_type"] != "NOT_CALLED")
+        ].copy()
+    else:
+        # All other consultants: unchanged
+        cons_resp = resp[
+            (resp["approver_canonical"] == name) &
+            (resp["date_status_type"] != "NOT_CALLED")
+        ].copy()
 
     if cons_resp.empty:
         return pd.DataFrame()
@@ -525,7 +1016,8 @@ def _filter_for_consultant(ctx: RunContext, name: str) -> pd.DataFrame:
 
 
 def _attach_derived(df: pd.DataFrame, data_date: date,
-                    s1: str, s2: str, s3: str) -> pd.DataFrame:
+                    s1: str, s2: str, s3: str,
+                    ctx: RunContext | None = None) -> pd.DataFrame:
     """Attach all derived columns used by the block builders.
 
     The input df is a merged docs+responses DataFrame from _filter_for_consultant.
@@ -577,6 +1069,18 @@ def _attach_derived(df: pd.DataFrame, data_date: date,
 
     # ── Open/closed: a doc is open if the consultant hasn't rendered a final status
     df["_is_open"] = ~df["_status_for_consultant"].isin(closed_statuses)
+
+    # ── Blocking: open AND no VISA GLOBAL yet (Concept 1) ──────────────────
+    if ctx is not None and ctx.workflow_engine is not None and "doc_id" in df.columns:
+        doc_id_col = "doc_id_resp" if "doc_id_resp" in df.columns else "doc_id"
+        def _has_visa_global(doc_id):
+            visa, _ = ctx.workflow_engine.compute_visa_global_with_date(doc_id)
+            return visa is not None
+        df["_has_visa_global"] = df[doc_id_col].apply(_has_visa_global)
+        df["_is_blocking"] = df["_is_open"] & ~df["_has_visa_global"]
+    else:
+        df["_has_visa_global"] = False
+        df["_is_blocking"] = df["_is_open"]  # fallback: all open = blocking
 
     # ── On-time / late: compare date_limite against data_date ──────────────
     # A pending doc is late if its deadline (date_limite) is before data_date.
@@ -658,9 +1162,12 @@ def _empty_fiche(name: str, ctx: RunContext,
             "s1": s1, "s2": s2, "s3": s3,
             "s1_count": 0, "s2_count": 0, "s3_count": 0,
             "hm_count": 0, "open_count": 0, "open_ok": 0, "open_late": 0,
+            "open_blocking": 0, "open_blocking_ok": 0,
+            "open_blocking_late": 0, "open_non_blocking": 0,
         },
         "week_delta": {"total": 0, "s1": 0, "s2": 0, "s3": 0, "hm": 0,
-                       "open": 0, "open_late": 0, "refus_rate_pct": 0.0},
+                       "open": 0, "open_late": 0, "refus_rate_pct": 0.0,
+                       "open_blocking": 0, "open_blocking_late": 0},
         "bloc1": [],
         "bloc2": {"labels": [], "s1_series": [], "s2_series": [], "s3_series": [],
                   "hm_series": [], "open_series": [], "totals": []},
@@ -723,7 +1230,8 @@ def _empty_bloc3(s1: str, s2: str, s3: str) -> dict[str, Any]:
         "s1": s1, "s2": s2, "s3": s3,
         "lots": [],
         "total_row": {"total": 0, "VSO": 0, "VAO": 0, "REF": 0, "HM": 0,
-                      "open_ok": 0, "open_late": 0},
-        "donut_total": 0, "donut_ok": 0, "donut_late": 0,
+                      "open_ok": 0, "open_late": 0,
+                      "open_blocking_ok": 0, "open_blocking_late": 0, "open_nb": 0},
+        "donut_total": 0, "donut_ok": 0, "donut_late": 0, "donut_nb": 0,
         "critical_lots": [], "refus_lots": [],
     }
