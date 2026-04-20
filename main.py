@@ -982,26 +982,32 @@ def run_pipeline(verbose: bool = True):
     _run_dir    = None
     _run_input_entries = []
     _arts_registered = 0
+    _is_baseline_bootstrap = False
     _ACTIVE_RUN_NUMBER = None
     _ACTIVE_RUN_FINALIZED = False
     try:
         init_run_memory_db_fn(RUN_MEMORY_DB)
-        if not baseline_run_exists(RUN_MEMORY_DB):
-            raise RuntimeError(
-                "run_memory baseline missing: bootstrap Run 0 first with "
-                "scripts/bootstrap_run_zero.py"
-            )
+        _baseline_exists = baseline_run_exists(RUN_MEMORY_DB)
         _run_number = get_next_run_number(RUN_MEMORY_DB)
-        _run_type   = "INCREMENTAL"
 
-        # Determine lineage
-        _current_run_df   = get_current_run(RUN_MEMORY_DB)
-        _parent_run_number = (
-            int(_current_run_df.iloc[0]["run_number"])
-            if not _current_run_df.empty else None
-        )
-        # root is always 0 once it exists; before Run 0 exists it self-references
-        _root_run_number = 0
+        if not _baseline_exists:
+            if _run_number != 0:
+                raise RuntimeError(
+                    "run_memory baseline missing while non-baseline runs exist: "
+                    "rebuild Run 0 first or clean run history"
+                )
+            _run_type = "BASELINE"
+            _parent_run_number = None
+            _root_run_number = 0
+            _is_baseline_bootstrap = True
+        else:
+            _run_type = "INCREMENTAL"
+            _current_run_df = get_current_run(RUN_MEMORY_DB)
+            _parent_run_number = (
+                int(_current_run_df.iloc[0]["run_number"])
+                if not _current_run_df.empty else None
+            )
+            _root_run_number = 0
 
         _run_dir = get_run_dir(str(BASE_DIR), _run_number)
         import os as _os
@@ -1011,6 +1017,8 @@ def run_pipeline(verbose: bool = True):
         _run_notes = "Auto-created by run_pipeline()"
         if _RUN_CONTROL_CONTEXT and _RUN_CONTROL_CONTEXT.get("run_mode"):
             _run_notes = f"{_run_notes} | run_mode={_RUN_CONTROL_CONTEXT['run_mode']}"
+        if _is_baseline_bootstrap:
+            _run_notes = f"{_run_notes} | bootstrap_baseline=1"
 
         create_run(
             db_path              = RUN_MEMORY_DB,
@@ -1019,8 +1027,11 @@ def run_pipeline(verbose: bool = True):
             parent_run_number    = _parent_run_number,
             root_run_number      = _root_run_number,
             based_on_run_number  = _parent_run_number,
-            is_baseline          = False,
-            run_label            = f"Run {_run_number}",
+            is_baseline          = _is_baseline_bootstrap,
+            run_label            = (
+                "Run 0 - baseline"
+                if _is_baseline_bootstrap else f"Run {_run_number}"
+            ),
             notes                = _run_notes,
             core_version         = RUN_MEMORY_CORE_VERSION,
         )

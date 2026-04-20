@@ -34,6 +34,36 @@ _VALID_RUN_MODES = {
 
 
 def _resolve_inherited_gf_record(db_path: str) -> tuple[int, str]:
+    """Resolve the FINAL_GF artifact from the most recent completed run.
+
+    Tries stored path first. If that fails (repo relocated), falls back
+    to resolving relative to the project base directory (parent of data/).
+    """
+    base_dir = Path(db_path).resolve().parent.parent  # data/run_memory.db → project root
+
+    def _try_resolve(file_path: str) -> Optional[str]:
+        """Try stored path, then relocation-aware fallback."""
+        if not file_path:
+            return None
+        p = Path(file_path)
+        if p.exists():
+            return str(p.resolve())
+        # Extract tail from "runs/" or "output/" onward, resolve against base_dir
+        path_str = str(p)
+        for anchor in ("runs/", "runs\\", "output/", "output\\"):
+            idx = path_str.find(anchor)
+            if idx >= 0:
+                candidate = base_dir / path_str[idx:]
+                if candidate.exists():
+                    return str(candidate.resolve())
+        # Last resort: search by filename in run dirs
+        if p.name:
+            for run_dir in sorted(base_dir.glob("runs/run_*")):
+                candidate = run_dir / p.name
+                if candidate.exists():
+                    return str(candidate.resolve())
+        return None
+
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             """
@@ -49,9 +79,9 @@ def _resolve_inherited_gf_record(db_path: str) -> tuple[int, str]:
         ).fetchall()
 
         for run_number, file_path in rows:
-            resolved = Path(file_path).resolve()
-            if resolved.exists():
-                return int(run_number), str(resolved)
+            resolved = _try_resolve(file_path)
+            if resolved:
+                return int(run_number), resolved
 
         row = conn.execute(
             """
@@ -65,9 +95,9 @@ def _resolve_inherited_gf_record(db_path: str) -> tuple[int, str]:
         ).fetchone()
 
     if row is not None and row[0]:
-        resolved = Path(row[0]).resolve()
-        if resolved.exists():
-            return 0, str(resolved)
+        resolved = _try_resolve(row[0])
+        if resolved:
+            return 0, resolved
 
     raise RuntimeError(
         "No saved GF baseline available. Provide a GF or bootstrap a valid baseline first."

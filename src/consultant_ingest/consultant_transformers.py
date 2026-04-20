@@ -222,12 +222,14 @@ def transform_avls_records(
         lot_label   = _clean(r.get("LOT_LABEL"))
         n_visa      = _clean(r.get("N_VISA"))
         numero      = _clean(r.get("NUMERO"))
-        indice      = _clean(r.get("INDICE"))
         statut_norm = _clean(r.get("STATUT_NORM"))
         pdf_page    = _clean(r.get("PDF_PAGE"))
 
-        if not indice and ref_doc:
-            indice = _indice_from_ref(ref_doc)
+        # AVLS: ALWAYS derive INDICE from the trailing letter in REF_DOC.
+        # The parser's "INDICE" field contains the report revision number
+        # (IND column from the AVLS header: 1, 2, 3...) which is NOT the
+        # document version letter (A, B, C...).
+        indice = _indice_from_ref(ref_doc) if ref_doc else ""
         if not numero and ref_doc:
             numero = _numero_from_ref(ref_doc)
 

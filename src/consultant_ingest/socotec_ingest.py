@@ -208,6 +208,15 @@ def find_columns(header_row: list) -> dict:
 
 P17_RE = re.compile(r'P17_T2_\S+')
 
+# Fix for SOCOTEC Excel text-wrap: when a P17 ref is too long for the cell,
+# the indice letter wraps to the next line. Handles all variants:
+#   "...249618\n_A..."   (newline + _A)
+#   "...249618_\nA..."   (underscore at end + newline + A)
+#   "...249618\n_A"      (newline + _A at end of text)
+# Does NOT match "...249523_A\nP17_T2_..." (two separate refs on separate lines)
+# because the lookahead requires [-\s] or end-of-string after the letter.
+_REJOIN_WRAPPED_INDICE = re.compile(r'(\d{5,6})_?\n_?([A-Z])(?=[-\s]|$)')
+
 
 def clean_socotec_ref(raw: str) -> str:
     """
@@ -333,7 +342,13 @@ def parse_avis_table(table: list, cols: dict, metadata: dict, page_num: int) -> 
 
         # Always scan elem_text for P17 refs (first and continuation rows)
         if elem_text and current_avis:
-            refs = P17_RE.findall(elem_text)
+            # Fix SOCOTEC text-wrap: when Excel wraps a long P17 ref,
+            # the indice letter (_A, _B...) falls onto the next line.
+            # pdfplumber delivers this as "...249618\n_A-Description".
+            # Rejoin: NUMERO + optional _ + newline + optional _ + letter
+            # → NUMERO_LETTER (e.g. "249618_A-Description")
+            elem_fixed = _REJOIN_WRAPPED_INDICE.sub(r'\1_\2', elem_text)
+            refs = P17_RE.findall(elem_fixed)
             current_refs.extend(refs)
 
     flush()  # emit last block

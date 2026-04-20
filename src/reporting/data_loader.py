@@ -87,17 +87,43 @@ def _resolve_latest_run(db_path: str) -> Optional[int]:
     return rows[0]["run_number"] if rows else None
 
 
+def _resolve_artifact_file(db_path: str, file_path: str) -> Optional[str]:
+    """Try stored path, then relocation-aware fallback relative to project root."""
+    if not file_path:
+        return None
+    p = Path(file_path)
+    if p.exists():
+        return str(p)
+    base_dir = Path(db_path).resolve().parent.parent
+    path_str = str(p)
+    for anchor in ("runs/", "runs\\", "output/", "output\\"):
+        idx = path_str.find(anchor)
+        if idx >= 0:
+            candidate = base_dir / path_str[idx:]
+            if candidate.exists():
+                return str(candidate.resolve())
+    # Parts-based fallback for Linux paths parsed on Windows (and vice versa)
+    parts = p.parts
+    for anchor in ("runs", "input", "output", "data", "debug"):
+        for i, part in enumerate(parts):
+            if part == anchor:
+                candidate = base_dir.joinpath(*parts[i:])
+                if candidate.exists():
+                    return str(candidate.resolve())
+                break
+    return None
+
+
 def _get_artifact_path(db_path: str, run_number: int, artifact_type: str) -> Optional[str]:
+    """Resolve an artifact file path, with relocation-aware fallback."""
     rows = _query_db(db_path,
         "SELECT file_path FROM run_artifacts "
         "WHERE run_number=? AND artifact_type=? "
         "ORDER BY created_at DESC LIMIT 1",
         (run_number, artifact_type))
-    if rows and rows[0]["file_path"]:
-        p = Path(rows[0]["file_path"])
-        if p.exists():
-            return str(p)
-    return None
+    if not rows or not rows[0]["file_path"]:
+        return None
+    return _resolve_artifact_file(db_path, rows[0]["file_path"])
 
 
 def _verify_ged_provenance(db_path: str, run_number: int) -> tuple:
@@ -114,12 +140,15 @@ def _verify_ged_provenance(db_path: str, run_number: int) -> tuple:
     row = rows[0]
     source_path = row.get("source_path")
     stored_hash = row.get("source_file_hash")
-    if not source_path or not Path(source_path).exists():
+    if not source_path:
+        return source_path, False
+    resolved_str = _resolve_artifact_file(db_path, source_path)
+    if not resolved_str:
         return source_path, False
     if not stored_hash:
-        return source_path, True  # No hash stored — trust it
-    actual_hash = _sha256(source_path)
-    return source_path, (actual_hash == stored_hash)
+        return resolved_str, True  # No hash stored — trust it
+    actual_hash = _sha256(resolved_str)
+    return resolved_str, (actual_hash == stored_hash)
 
 
 
@@ -342,7 +371,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
             # ── BET report merge: backfill status + observations from PDF reports ──
             try:
                 responses_df, bet_merge_stats = merge_bet_reports(
-                    docs_df, responses_df, base_dir
+                    versioned_df, responses_df, base_dir
                 )
                 if bet_merge_stats["total_status_backfilled"] > 0:
                     # Rebuild workflow engine with enriched responses

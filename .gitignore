@@ -18,10 +18,10 @@ data/report_memory.db
 data/.fuse_hidden*
 
 input/consultant_reports/
-output/debug/
-output/*.xlsx
 
-ui/node_modules/
-ui/dist/
-ui/dist-ssr/
-ui/.vite-temp/
+# Generated pipeline artifacts
+output/*.xlsx
+output/*.md
+output/debug/
+output/consultant_reports.xlsx
+data/

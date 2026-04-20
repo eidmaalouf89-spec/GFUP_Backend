@@ -18,6 +18,27 @@ Current UI/revision note for GitHub:
 
 This repository state should be treated as an early UI integration milestone, not as a finished reporting release.
 
+### Corrections since the last GitHub push
+
+The changes currently in the worktree close several defects found after `backfill GED, to be verfied`.
+
+- consultant fiche fixes were implemented in the ingestion layer
+- AVLS report ingestion now derives `INDICE` from `REF_DOC` instead of reusing the report revision counter
+- SOCOTEC ingestion now repairs wrapped P17 references where the indice letter is split onto the next line
+- BET report merge no longer backfills all historical versions when a report row has no usable indice; it now targets only the `dernier` version
+- reporting data loading now resolves artifact and GED provenance paths after repo relocation and uses the versioned dataset for BET merge backfill
+- inherited GF lookup now survives project moves by resolving saved artifact paths relative to the current project root
+- `python main.py` can now rebuild and register `Run 0` directly after a full nuke instead of ending with `Pipeline did not register a run_number`
+- generated pipeline outputs and data artifacts are now ignored by git
+
+### Still missing
+
+The following items are still not finished and must remain explicit in GitHub history:
+
+- finished workflow doc
+- MOEX module
+- reports
+
 ---
 
 ## What this system is
@@ -83,7 +104,7 @@ The software builds a traceable working truth by combining:
 GED remains the authoritative base for:
 
 - document identity
-n- workflow rows
+- workflow rows
 - mission calling
 - primary lifecycle structure
 

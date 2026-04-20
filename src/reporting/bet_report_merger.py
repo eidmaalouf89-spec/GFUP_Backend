@@ -182,14 +182,19 @@ def merge_bet_reports(
     responses_df["response_source"] = "GED"
     responses_df["observation_pdf"] = ""
 
-    # Build GED NUMERO → [(doc_id, indice), ...] index from all docs.
-    # Stores the indice letter so we can match RAPPORT indice to the right version.
+    # Build NUMERO → [(doc_id, indice, is_dernier), ...] index.
+    # When a RAPPORT row has no usable INDICE, only the dernier version is matched.
+    dernier_ids: set = set()
+    if "is_dernier_indice" in docs_df.columns:
+        dernier_ids = set(docs_df.loc[docs_df["is_dernier_indice"] == True, "doc_id"].tolist())
+
     numero_to_docs: dict[str, list] = {}
     for _, row in docs_df.iterrows():
         num = str(row.get("numero_normalized", "")).strip()
         if num and num != "nan":
             indice = str(row.get("indice", "")).strip().upper()
-            numero_to_docs.setdefault(num, []).append((row["doc_id"], indice))
+            is_dernier = row["doc_id"] in dernier_ids
+            numero_to_docs.setdefault(num, []).append((row["doc_id"], indice, is_dernier))
 
     # Pre-build a fast lookup: (doc_id, approver_canonical) → list of positional indices
     # This avoids a full O(n) scan of responses_df for every rapport row.
@@ -244,14 +249,21 @@ def merge_bet_reports(
             rapport_status = rr.get("STATUT_NORM", "").strip()
             rapport_obs    = rr.get("COMMENTAIRE", "").strip()
             rapport_date   = rr.get("DATE_FICHE", "").strip()
-            rapport_indice = rr.get("INDICE", "").strip().upper()
+            # Only use INDICE for matching if it's a single uppercase letter (A-Z).
+            # Defensive guard against any remaining non-letter values.
+            raw_indice = rr.get("INDICE", "").strip().upper()
+            rapport_indice = raw_indice if (len(raw_indice) == 1 and raw_indice.isalpha()) else ""
 
-            # For each matching doc_id, find the GED response row.
-            # If the RAPPORT has an INDICE, only match docs with that specific indice.
-            # If no INDICE in RAPPORT, match all versions of this NUMERO.
-            for doc_id, doc_indice in doc_entries:
-                if rapport_indice and doc_indice and rapport_indice != doc_indice:
-                    continue
+            # Matching rules:
+            #   - With valid letter INDICE: match only docs with that specific indice
+            #   - Without usable INDICE: match ONLY dernier (avoid polluting history)
+            for doc_id, doc_indice, is_dernier in doc_entries:
+                if rapport_indice:
+                    if doc_indice and rapport_indice != doc_indice:
+                        continue
+                else:
+                    if not is_dernier:
+                        continue
                 positions = pair_to_pos.get((doc_id, canonical_name), [])
                 if not positions:
                     continue
