@@ -108,6 +108,267 @@ const icons = {
 
 const NAV_ITEMS = ['Overview', 'Executer', 'Runs', 'Consultants', 'Contractors', 'Discrepancies', 'Reports', 'Settings']
 
+/* ── Focus Mode Toggle ──────────────────────────────────────── */
+function FocusModeToggle({ focusMode, setFocusMode, staleDays, setStaleDays, focusStats }) {
+  const [showPopover, setShowPopover] = useState(false)
+
+  const totalFocused = focusStats?.focused ?? null
+  const overdue = focusStats?.p1_overdue ?? 0
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '6px 14px', borderRadius: 10,
+        background: focusMode ? 'rgba(59,130,246,0.15)' : T.glass,
+        border: `1px solid ${focusMode ? 'rgba(59,130,246,0.45)' : T.glassBorder}`,
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        boxShadow: focusMode ? '0 0 12px rgba(59,130,246,0.2)' : 'none',
+      }} onClick={() => setFocusMode(m => !m)}>
+        {/* Toggle pill */}
+        <div style={{
+          width: 32, height: 18, borderRadius: 9,
+          background: focusMode ? T.accent : 'rgba(255,255,255,0.12)',
+          position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+        }}>
+          <div style={{
+            position: 'absolute', top: 3, left: focusMode ? 17 : 3,
+            width: 12, height: 12, borderRadius: '50%', background: '#fff',
+            transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }} />
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: focusMode ? T.accent : T.muted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Mode Focus
+        </span>
+        {focusMode && totalFocused !== null && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.text, fontVariantNumeric: 'tabular-nums' }}>
+            {totalFocused}
+            {overdue > 0 && <span style={{ color: T.red, marginLeft: 4 }}>· {overdue} 🔴</span>}
+          </span>
+        )}
+      </div>
+
+      {/* Gear icon to open popover */}
+      {focusMode && (
+        <button
+          onClick={e => { e.stopPropagation(); setShowPopover(p => !p) }}
+          style={{
+            position: 'absolute', top: -6, right: -6,
+            width: 18, height: 18, borderRadius: '50%',
+            background: 'rgba(59,130,246,0.25)', border: `1px solid ${T.accent}`,
+            color: T.accent, fontSize: 10, cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+            fontFamily: 'inherit',
+          }}
+          title="Paramètres Focus"
+        >⚙</button>
+      )}
+
+      {/* Popover */}
+      {showPopover && focusMode && (
+        <div style={{
+          position: 'absolute', top: '110%', right: 0, zIndex: 100,
+          ...glassCard,
+          padding: 20, width: 280,
+          border: `1px solid rgba(59,130,246,0.3)`,
+          background: 'rgba(10,11,15,0.96)',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 14, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Seuil de péremption
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <input
+              type="range" min={30} max={365} step={15}
+              value={staleDays}
+              onChange={e => setStaleDays(Number(e.target.value))}
+              style={{ flex: 1, accentColor: T.accent }}
+            />
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.accent, fontVariantNumeric: 'tabular-nums', minWidth: 50, textAlign: 'right' }}>
+              {staleDays} j
+            </span>
+          </div>
+          {focusStats && (
+            <div style={{ borderTop: `1px solid ${T.glassBorder}`, paddingTop: 12 }}>
+              <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>Documents exclus : {focusStats.excluded_total ?? '—'}</div>
+              <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>· Résolus : {focusStats.resolved ?? 0}</div>
+              <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>· Périmés (&gt;{staleDays}j) : {focusStats.stale ?? 0}</div>
+              <div style={{ fontSize: 11, color: T.dim }}>· Total traçés : {focusStats.total_dernier ?? 0}</div>
+            </div>
+          )}
+          <button
+            onClick={() => setShowPopover(false)}
+            style={{ marginTop: 14, fontSize: 11, color: T.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+          >
+            Fermer
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Priority Queue Panel ────────────────────────────────────── */
+const PRIORITY_META = {
+  1: { emoji: '🔴', label: 'EN RETARD', color: '#f87171', bg: 'rgba(248,113,113,0.06)', border: 'rgba(248,113,113,0.2)' },
+  2: { emoji: '🟠', label: 'URGENT ≤5j', color: '#fb923c', bg: 'rgba(251,146,60,0.06)', border: 'rgba(251,146,60,0.2)' },
+  3: { emoji: '🟡', label: 'BIENTÔT ≤15j', color: '#fbbf24', bg: 'rgba(251,191,36,0.06)', border: 'rgba(251,191,36,0.15)' },
+  4: { emoji: '🟢', label: 'OK', color: '#34d399', bg: 'rgba(52,211,153,0.04)', border: 'rgba(52,211,153,0.15)' },
+  5: { emoji: '⚪', label: 'SANS DÉLAI', color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.02)', border: T.glassBorder },
+}
+
+function PriorityQueuePanel({ queue, stats, setActivePage }) {
+  const [expanded, setExpanded] = useState({ 1: true, 2: true, 3: false, 4: false, 5: false })
+
+  if (!queue || queue.length === 0) {
+    return (
+      <div style={{ ...glassCard, padding: 20, marginBottom: 24, borderColor: 'rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.04)' }}>
+        <div style={{ fontSize: 13, color: '#34d399' }}>✓ Aucune action urgente — tous les documents sont sous contrôle</div>
+      </div>
+    )
+  }
+
+  // Group by priority
+  const byPriority = {}
+  for (let p = 1; p <= 5; p++) byPriority[p] = queue.filter(r => r.priority === p)
+
+  const countBadge = (p) => {
+    const meta = PRIORITY_META[p]
+    const n = (stats ? stats[`p${p}_overdue`] || stats[`p${p}_urgent`] || stats[`p${p}_soon`] || stats[`p${p}_ok`] || stats[`p${p}_no_deadline`] : null) ?? byPriority[p].length
+    return n
+  }
+
+  return (
+    <div style={{ ...glassCard, padding: 0, marginBottom: 28, overflow: 'hidden' }}>
+      {/* Panel header */}
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.glassBorder}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: '0.02em' }}>
+          File d'attente prioritaire
+        </div>
+        {stats && (
+          <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
+            {[1,2,3].map(p => {
+              const meta = PRIORITY_META[p]
+              const n = byPriority[p].length
+              if (!n) return null
+              return (
+                <span key={p} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color, fontVariantNumeric: 'tabular-nums' }}>
+                  {meta.emoji} {n}
+                </span>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Priority groups */}
+      {[1, 2, 3, 4, 5].map(p => {
+        const rows = byPriority[p]
+        if (!rows || rows.length === 0) return null
+        const meta = PRIORITY_META[p]
+        const isOpen = expanded[p]
+
+        return (
+          <div key={p} style={{ borderBottom: `1px solid ${T.glassBorder}` }}>
+            {/* Group header */}
+            <button
+              onClick={() => setExpanded(prev => ({ ...prev, [p]: !prev[p] }))}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '10px 20px',
+                background: isOpen ? meta.bg : 'transparent',
+                border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                transition: 'background 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 12 }}>{meta.emoji}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {meta.label}
+              </span>
+              <span style={{ fontSize: 11, color: meta.color, fontVariantNumeric: 'tabular-nums', opacity: 0.8 }}>
+                ({rows.length})
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: 10, color: T.dim }}>
+                {isOpen ? '▲' : '▼'}
+              </span>
+            </button>
+
+            {/* Rows table */}
+            {isOpen && (
+              <div style={{ padding: '0 0 4px 0' }}>
+                {/* Table header */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1.5fr 1fr 1fr',
+                  gap: 8, padding: '6px 20px',
+                  fontSize: 10, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.04em',
+                  borderBottom: `1px solid ${T.glassBorder}`,
+                }}>
+                  <span>N° / Indice</span>
+                  <span>Émetteur</span>
+                  <span>Spécialité</span>
+                  <span>Responsable</span>
+                  <span style={{ textAlign: 'right' }}>Délai</span>
+                  <span style={{ textAlign: 'right' }}>Date limite</span>
+                </div>
+
+                {rows.slice(0, 20).map((row, i) => (
+                  <div
+                    key={row.doc_id || i}
+                    style={{
+                      display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1.5fr 1fr 1fr',
+                      gap: 8, padding: '7px 20px',
+                      fontSize: 12, color: T.text,
+                      background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                      transition: 'background 0.1s',
+                      cursor: 'default',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.06)'}
+                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'}
+                  >
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
+                      {row.numero}
+                      {row.indice && <span style={{ color: T.dim, marginLeft: 5, fontSize: 11 }}>{row.indice}</span>}
+                    </span>
+                    <span style={{ color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {row.emetteur}
+                    </span>
+                    <span style={{ color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {row.specialite || row.lot}
+                    </span>
+                    <span style={{
+                      color: row.responsible === 'MOEX' ? T.accent :
+                             row.responsible === 'CONTRACTOR' ? T.amber :
+                             row.responsible === 'MULTIPLE_CONSULTANTS' ? '#c084fc' : T.text,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11,
+                    }}>
+                      {row.responsible}
+                    </span>
+                    <span style={{
+                      textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600,
+                      color: row.delta_days !== null && row.delta_days < 0 ? T.red :
+                             row.delta_days <= 5 ? '#fb923c' : T.muted,
+                    }}>
+                      {row.delta_days !== null ? `${row.delta_days > 0 ? '+' : ''}${row.delta_days}j` : '—'}
+                    </span>
+                    <span style={{ textAlign: 'right', fontSize: 11, color: T.dim, fontVariantNumeric: 'tabular-nums' }}>
+                      {row.date_limite || '—'}
+                    </span>
+                  </div>
+                ))}
+                {rows.length > 20 && (
+                  <div style={{ padding: '8px 20px', fontSize: 11, color: T.dim }}>
+                    +{rows.length - 20} de plus…
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── KPI Card ───────────────────────────────────────────────── */
 function KpiCard({ label, value, sub, color }) {
   return (
@@ -193,17 +454,24 @@ function VisaBar({ data }) {
 }
 
 /* ── Overview Page ──────────────────────────────────────────── */
-function OverviewPage({ appState, setActivePage }) {
+function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleDays, setStaleDays, onFocusStatsUpdate }) {
   const s = appState
   const [dash, setDash] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Reload dashboard whenever focus mode or stale threshold changes
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const data = await api.call("get_dashboard_data")
-        if (data) setDash(data)
+        const data = await api.call("get_dashboard_data", focusMode, staleDays)
+        if (data) {
+          setDash(data)
+          // Bubble focus stats up to App for sidebar badge
+          if (onFocusStatsUpdate) {
+            onFocusStatsUpdate(data.kpis?.focus_stats ?? null)
+          }
+        }
       } catch (e) {
         console.error('Dashboard load error:', e)
       } finally {
@@ -211,16 +479,23 @@ function OverviewPage({ appState, setActivePage }) {
       }
     }
     load()
-  }, [])
+  }, [focusMode, staleDays])
 
   if (loading) return <Spinner text="Loading dashboard data..." />
 
   const kpis = dash?.kpis || {}
   const monthly = dash?.monthly || []
   const isDegraded = kpis.degraded_mode
+  const focusStats = kpis.focus_stats || null
+  const priorityQueue = kpis.focus_priority_queue || []
 
   return (
-    <div style={{ padding: 32, overflowY: 'auto', height: '100%' }}>
+    <div style={{
+      padding: 32, overflowY: 'auto', height: '100%',
+      // Subtle accent border when Focus Mode is ON
+      borderLeft: focusMode ? `3px solid ${T.accent}` : '3px solid transparent',
+      transition: 'border-left 0.3s',
+    }}>
       {/* Degraded mode banner */}
       {isDegraded && <DegradedBanner />}
 
@@ -228,9 +503,48 @@ function OverviewPage({ appState, setActivePage }) {
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 28 }}>
         <KpiCard label="Total Runs" value={s.total_runs} sub="pipeline executions" color={T.accent} />
         <KpiCard label="Current Run" value={s.current_run != null ? `#${s.current_run}` : '\u2014'} sub={s.current_run_date ? formatDate(s.current_run_date) : 'no completed run'} color={T.green} />
-        <KpiCard label="Documents" value={kpis.total_docs_current || '\u2014'} sub={kpis.total_docs_all_indices ? `${kpis.total_docs_all_indices} all indices` : 'dernier indice'} color={T.text} />
-        <KpiCard label="Discrepancies" value={kpis.discrepancies_count || 0} sub="pending review" color={T.amber} />
+
+        {focusMode && focusStats ? (
+          // Focus Mode KPIs
+          <>
+            <KpiCard
+              label="Actions"
+              value={focusStats.focused ?? '\u2014'}
+              sub={`sur ${focusStats.total_dernier ?? '?'} docs actifs`}
+              color={T.accent}
+            />
+            <KpiCard
+              label="En retard"
+              value={focusStats.p1_overdue ?? 0}
+              sub="dépassement délai"
+              color={focusStats.p1_overdue > 0 ? T.red : T.green}
+            />
+            <KpiCard
+              label="Urgent ≤5j"
+              value={focusStats.p2_urgent ?? 0}
+              sub="à traiter rapidement"
+              color={focusStats.p2_urgent > 0 ? '#fb923c' : T.green}
+            />
+            <KpiCard
+              label="Exclus (périmés)"
+              value={focusStats.excluded_total ?? 0}
+              sub={`dont ${focusStats.stale ?? 0} périmés, ${focusStats.resolved ?? 0} résolus`}
+              color={T.dim}
+            />
+          </>
+        ) : (
+          // Normal Mode KPIs
+          <>
+            <KpiCard label="Documents" value={kpis.total_docs_current || '\u2014'} sub={kpis.total_docs_all_indices ? `${kpis.total_docs_all_indices} all indices` : 'dernier indice'} color={T.text} />
+            <KpiCard label="Discrepancies" value={kpis.discrepancies_count || 0} sub="pending review" color={T.amber} />
+          </>
+        )}
       </div>
+
+      {/* Priority Queue Panel — visible only in Focus Mode */}
+      {focusMode && (
+        <PriorityQueuePanel queue={priorityQueue} stats={focusStats} setActivePage={setActivePage} />
+      )}
 
       {/* Visa Distribution + Stats Row */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 28 }}>
@@ -1399,6 +1713,11 @@ export default function App() {
   const [appState, setAppState] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Focus Mode state — shared across Overview + sidebar badge
+  const [focusMode, setFocusMode] = useState(false)
+  const [staleDays, setStaleDays] = useState(90)
+  const [focusStats, setFocusStats] = useState(null)
+
   useEffect(() => {
     const loadState = async () => {
       try {
@@ -1462,7 +1781,15 @@ export default function App() {
 
     switch (activePage) {
       case 'Overview':
-        return <OverviewPage appState={appState} setActivePage={setActivePage} />
+        return <OverviewPage
+          appState={appState}
+          setActivePage={setActivePage}
+          focusMode={focusMode}
+          setFocusMode={setFocusMode}
+          staleDays={staleDays}
+          setStaleDays={setStaleDays}
+          onFocusStatsUpdate={setFocusStats}
+        />
       case 'Runs':
         return <RunsPage />
       case 'Executer':
@@ -1514,6 +1841,7 @@ export default function App() {
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV_ITEMS.map(item => {
             const isActive = activePage === item
+            const showFocusBadge = item === 'Overview' && focusMode && focusStats && focusStats.focused != null
             return (
               <button
                 key={item}
@@ -1545,7 +1873,17 @@ export default function App() {
                 <span style={{ opacity: isActive ? 1 : 0.5, display: 'flex', alignItems: 'center' }}>
                   {icons[item]}
                 </span>
-                {item}
+                <span style={{ flex: 1 }}>{item}</span>
+                {showFocusBadge && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: T.accent,
+                    fontVariantNumeric: 'tabular-nums',
+                    background: 'rgba(59,130,246,0.18)', borderRadius: 100,
+                    padding: '1px 6px',
+                  }}>
+                    {focusStats.focused}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -1608,6 +1946,14 @@ export default function App() {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Focus Mode Toggle — always visible in header */}
+            <FocusModeToggle
+              focusMode={focusMode}
+              setFocusMode={setFocusMode}
+              staleDays={staleDays}
+              setStaleDays={setStaleDays}
+              focusStats={focusStats}
+            />
             {appState && (
               <span style={{ fontSize: 12, color: T.dim, fontVariantNumeric: 'tabular-nums' }}>
                 {appState.total_runs} run{appState.total_runs !== 1 ? 's' : ''} registered
@@ -1616,11 +1962,11 @@ export default function App() {
           </div>
         </header>
 
-        <section style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-          <div style={{ padding: 28, minHeight: '100%' }}>
-            {renderPage()}
-          </div>
-        </section>
+        {/* Page Content */}
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {renderPage()}
+        </div>
+
       </main>
     </div>
   )

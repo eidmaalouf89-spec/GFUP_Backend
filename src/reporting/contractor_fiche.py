@@ -22,7 +22,8 @@ def _safe_str(val):
     return s if s and s.lower() not in ("nan", "none", "") else "?"
 
 
-def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
+def build_contractor_fiche(ctx: RunContext, contractor_code: str,
+                           focus_result=None) -> dict:
     """
     Build the complete fiche for one contractor (emetteur).
 
@@ -62,6 +63,12 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
     dernier = None
     if ctx.dernier_df is not None:
         dernier = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code].copy()
+
+    # Focus filter
+    focus_enabled = (focus_result is not None and
+                     focus_result.stats.get("focus_enabled"))
+    if focus_enabled and dernier is not None:
+        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
 
     # Metadata
     lots = sorted(set(_safe_str(v) for v in contractor_docs["lot_normalized"].unique() if _safe_str(v) != "?"))
@@ -112,6 +119,45 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
 
     block1 = [{"month": m, **monthly_sub[m]} for m in sorted(monthly_sub.keys())]
 
+    # Focus mode: rebuild block1 as weekly
+    if focus_enabled:
+        weekly_sub = defaultdict(lambda: {"new_submissions": 0, "re_submissions": 0, "sas_ref": 0, "sas_vao": 0})
+        for _, row in contractor_docs.iterrows():
+            dt = row.get("created_at")
+            if dt is None or pd.isna(dt):
+                continue
+            try:
+                iso = dt.isocalendar()
+                wk = f"{iso[0]}-S{iso[1]:02d}"
+            except Exception:
+                continue
+            indice = _safe_str(row.get("indice"))
+            if indice in ("A", "?", "0", "1"):
+                weekly_sub[wk]["new_submissions"] += 1
+            else:
+                weekly_sub[wk]["re_submissions"] += 1
+        # SAS enrichment
+        if we is not None:
+            for _, row in contractor_docs.iterrows():
+                did = row["doc_id"]
+                dt = row.get("created_at")
+                if dt is None or pd.isna(dt):
+                    continue
+                try:
+                    iso = dt.isocalendar()
+                    wk = f"{iso[0]}-S{iso[1]:02d}"
+                except Exception:
+                    continue
+                visa, _ = we.compute_visa_global_with_date(did)
+                if visa == "SAS REF":
+                    weekly_sub[wk]["sas_ref"] += 1
+                elif visa in ("VSO", "VAO"):
+                    weekly_sub[wk]["sas_vao"] += 1
+        sorted_weeks = sorted(weekly_sub.keys())
+        if len(sorted_weeks) > 26:
+            sorted_weeks = sorted_weeks[-26:]
+        block1 = [{"month": w, **weekly_sub[w]} for w in sorted_weeks]
+
     # ── Block 2: VISA result chart ────────────────────────────────────
     monthly_visa = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
 
@@ -139,6 +185,36 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
                 monthly_visa[mk]["open"] += 1
 
     block2 = [{"month": m, **monthly_visa[m]} for m in sorted(monthly_visa.keys())]
+
+    # Focus mode: rebuild block2 as weekly
+    if focus_enabled and dernier is not None and we is not None:
+        weekly_visa = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
+        for _, row in dernier.iterrows():
+            dt = row.get("created_at")
+            if dt is None or pd.isna(dt):
+                continue
+            try:
+                iso = dt.isocalendar()
+                wk = f"{iso[0]}-S{iso[1]:02d}"
+            except Exception:
+                continue
+            did = row["doc_id"]
+            visa, _ = we.compute_visa_global_with_date(did)
+            weekly_visa[wk]["total"] += 1
+            if visa == "VSO":
+                weekly_visa[wk]["vso"] += 1
+            elif visa == "VAO":
+                weekly_visa[wk]["vao"] += 1
+            elif visa == "REF":
+                weekly_visa[wk]["ref"] += 1
+            elif visa == "SAS REF":
+                weekly_visa[wk]["sas_ref"] += 1
+            else:
+                weekly_visa[wk]["open"] += 1
+        sorted_wks = sorted(weekly_visa.keys())
+        if len(sorted_wks) > 26:
+            sorted_wks = sorted_wks[-26:]
+        block2 = [{"month": w, **weekly_visa[w]} for w in sorted_wks]
 
     # ── Block 3: Document table (dernier indice only) ─────────────────
     block3 = []
@@ -218,4 +294,5 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
         "block2_visa_chart": block2,
         "block3_document_table": block3,
         "block4_quality": block4,
+        "focus_enabled": bool(focus_enabled),
     }

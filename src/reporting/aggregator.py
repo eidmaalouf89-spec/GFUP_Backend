@@ -1,15 +1,19 @@
 """
 aggregator.py — Project-wide KPIs and summaries
 Computes dashboard data from a RunContext.
+When a FocusResult is supplied, every iteration is filtered to focused_doc_ids only.
 """
 import logging
 import math
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
 from .data_loader import RunContext
+
+if TYPE_CHECKING:
+    from .focus_filter import FocusResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +30,13 @@ def _safe_str(val, fallback="?"):
     return s
 
 
-def compute_project_kpis(ctx: RunContext) -> dict:
+def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] = None) -> dict:
     """
     Compute project-wide KPI numbers.
     If ctx.degraded_mode: returns summary_json-based approximations.
     If ctx.ged_available: computes exact numbers from DataFrames.
+    If focus_result is supplied: KPIs reflect only the focused (actionable) doc set,
+    and extra focus keys are included (focus_stats, focus_priority_queue).
     """
     result = {
         "run_number": ctx.run_number,
@@ -64,6 +70,10 @@ def compute_project_kpis(ctx: RunContext) -> dict:
     we = ctx.workflow_engine
     resp = ctx.responsible_parties or {}
 
+    # Apply focus filter if provided
+    if focus_result is not None and focus_result.stats.get("focus_enabled"):
+        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+
     # Visa global distribution
     visa_counts = defaultdict(int)
     visa_dates = []
@@ -90,9 +100,14 @@ def compute_project_kpis(ctx: RunContext) -> dict:
         bldg = building_map.get(prefix, prefix)
         building_counts[bldg] += 1
 
-    # Responsible party distribution
+    # Responsible party distribution (filtered to focused set if applicable)
     resp_counts = defaultdict(int)
+    focus_ids = (focus_result.focused_doc_ids
+                 if (focus_result is not None and focus_result.stats.get("focus_enabled"))
+                 else None)
     for doc_id, party in resp.items():
+        if focus_ids is not None and doc_id not in focus_ids:
+            continue
         resp_counts[party or "Closed"] += 1
 
     # SAS stats
@@ -116,7 +131,7 @@ def compute_project_kpis(ctx: RunContext) -> dict:
                 consultants.add(name)
 
     result.update({
-        "total_docs_current": len(dernier),
+        "total_docs_current": len(ctx.dernier_df),
         "total_docs_all_indices": len(ctx.docs_df) if ctx.docs_df is not None else 0,
         "by_visa_global": dict(visa_counts),
         "by_visa_global_pct": {k: round(v / max(len(dernier), 1), 4) for k, v in visa_counts.items()},
@@ -130,21 +145,35 @@ def compute_project_kpis(ctx: RunContext) -> dict:
         "total_lots": len(ctx.gf_sheets),
         "discrepancies_count": ctx.summary_json.get("discrepancies_count", 0),
     })
+
+    # Attach focus-mode extras when active
+    if focus_result is not None:
+        result["focus_stats"] = focus_result.stats
+        result["focus_priority_queue"] = focus_result.priority_queue[:50]  # cap at 50 for JSON payload
+
     return result
 
 
-def compute_monthly_timeseries(ctx: RunContext) -> list:
+def compute_monthly_timeseries(
+    ctx: RunContext,
+    focus_result: Optional["FocusResult"] = None,
+) -> list:
     """
     Monthly visa distribution. Non-cumulative: each month counts new activity.
     Returns [] in degraded mode.
+    When focus_result supplied, only counts documents in focused_doc_ids.
     """
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
 
     we = ctx.workflow_engine
+    dernier = ctx.dernier_df
+    if focus_result is not None and focus_result.stats.get("focus_enabled"):
+        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)]
+
     monthly = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
 
-    for _, row in ctx.dernier_df.iterrows():
+    for _, row in dernier.iterrows():
         did = row["doc_id"]
         created = row.get("created_at")
         if created is None or pd.isna(created):
@@ -172,10 +201,65 @@ def compute_monthly_timeseries(ctx: RunContext) -> list:
     return result
 
 
-def compute_consultant_summary(ctx: RunContext) -> list:
+def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
+    """
+    Weekly visa distribution for Focus Mode. Same structure as monthly
+    but keyed by ISO week: "2026-S14", "2026-S15", etc.
+    Returns [] in degraded mode.
+    """
+    if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
+        return []
+
+    we = ctx.workflow_engine
+    dernier = ctx.dernier_df
+    if focus_result is not None and focus_result.stats.get("focus_enabled"):
+        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)]
+
+    weekly = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
+
+    for _, row in dernier.iterrows():
+        did = row["doc_id"]
+        created = row.get("created_at")
+        if created is None or pd.isna(created):
+            continue
+        iso = created.isocalendar()
+        week_key = f"{iso[0]}-S{iso[1]:02d}"
+
+        visa, _ = we.compute_visa_global_with_date(did)
+        weekly[week_key]["total"] += 1
+        if visa == "VSO":
+            weekly[week_key]["vso"] += 1
+        elif visa == "VAO":
+            weekly[week_key]["vao"] += 1
+        elif visa == "REF":
+            weekly[week_key]["ref"] += 1
+        elif visa == "SAS REF":
+            weekly[week_key]["sas_ref"] += 1
+        else:
+            weekly[week_key]["open"] += 1
+
+    result = []
+    for week in sorted(weekly.keys()):
+        entry = {"month": week}  # reuse "month" key for UI compat
+        entry.update(weekly[week])
+        result.append(entry)
+
+    # Limit to last 26 weeks (6 months)
+    if len(result) > 26:
+        result = result[-26:]
+
+    return result
+
+
+def compute_consultant_summary(
+    ctx: RunContext,
+    focus_result: Optional["FocusResult"] = None,
+) -> list:
     """
     Summary row per consultant: docs called, answered, rates, visa breakdown.
     Returns [] in degraded mode.
+    When focus_result supplied, only counts responses on focused (dernier) doc_ids —
+    this implements F3 (superseded responses excluded) and F2/F4 together.
     """
     if ctx.degraded_mode or ctx.responses_df is None:
         return []
@@ -187,6 +271,10 @@ def compute_consultant_summary(ctx: RunContext) -> list:
         (resp["approver_raw"] != "0-SAS") &
         (~resp["approver_raw"].str.startswith("Sollicitation", na=False))
     ]
+
+    # Apply focus filter: restrict to responses whose doc_id is in focused set
+    if focus_result is not None and focus_result.stats.get("focus_enabled"):
+        filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
 
     summaries = []
     for name, grp in filtered.groupby("approver_canonical"):
@@ -305,10 +393,14 @@ def compute_consultant_summary(ctx: RunContext) -> list:
     return summaries
 
 
-def compute_contractor_summary(ctx: RunContext) -> list:
+def compute_contractor_summary(
+    ctx: RunContext,
+    focus_result: Optional["FocusResult"] = None,
+) -> list:
     """
     Summary row per contractor (GF sheet).
     Returns [] in degraded mode.
+    When focus_result supplied, only counts documents in focused_doc_ids.
     """
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
@@ -317,7 +409,11 @@ def compute_contractor_summary(ctx: RunContext) -> list:
     # Group dernier docs by emetteur
     by_emetteur = defaultdict(lambda: {"docs": 0, "vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "lots": set()})
 
-    for _, row in ctx.dernier_df.iterrows():
+    dernier_iter = ctx.dernier_df
+    if focus_result is not None and focus_result.stats.get("focus_enabled"):
+        dernier_iter = ctx.dernier_df[ctx.dernier_df["doc_id"].isin(focus_result.focused_doc_ids)]
+
+    for _, row in dernier_iter.iterrows():
         em = _safe_str(row.get("emetteur"))
         lot = _safe_str(row.get("lot_normalized"))
         did = row["doc_id"]

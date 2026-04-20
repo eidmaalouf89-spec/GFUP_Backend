@@ -139,12 +139,14 @@ def resolve_consultant_name(name: str) -> str:
     return COMPANY_TO_CANONICAL.get(name, name)
 
 
-def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, Any]:
+def build_consultant_fiche(ctx: RunContext, consultant_name: str,
+                           focus_result=None) -> dict[str, Any]:
     """Build the fiche.jsx FICHE_DATA payload for one consultant.
 
     Args:
         ctx: Loaded RunContext (from data_loader.load_run_context).
         consultant_name: Canonical consultant name as used in GED Mission column.
+        focus_result: Optional FocusResult from apply_focus_filter.
 
     Returns:
         Dict matching window.FICHE_DATA shape. Always returns a dict; on degraded
@@ -152,7 +154,7 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
     """
     # Concept 3: MOEX SAS has its own dedicated fiche builder
     if consultant_name == "MOEX SAS":
-        return build_sas_fiche(ctx)
+        return build_sas_fiche(ctx, focus_result=focus_result)
 
     # ── Degraded mode short-circuit ──────────────────────────────────────────
     if not ctx.ged_available or ctx.docs_df is None:
@@ -168,6 +170,16 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
         return _empty_fiche(consultant_name, ctx,
                             warnings=[f"No GED rows matched consultant '{consultant_name}'"])
 
+    # ── Focus filter: restrict to focused doc_ids ───────────────────────────
+    focus_enabled = (focus_result is not None and
+                     focus_result.stats.get("focus_enabled"))
+    if focus_enabled and not docs.empty:
+        id_col = "doc_id_resp" if "doc_id_resp" in docs.columns else "doc_id"
+        docs = docs[docs[id_col].isin(focus_result.focused_doc_ids)].copy()
+        if docs.empty:
+            return _empty_fiche(consultant_name, ctx,
+                                warnings=[f"No focused docs for '{consultant_name}'"])
+
     # ── Status label resolution (s1/s2/s3) ───────────────────────────────────
     s1, s2, s3 = _resolve_status_labels(ctx, consultant_name)
 
@@ -178,12 +190,34 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
     consultant = _build_consultant_meta(ctx, consultant_name)
     header     = _build_header(docs, data_date, s1, s2, s3)
     week_delta = _build_week_delta(docs, data_date, prev_date, s1, s2, s3)
-    bloc1      = _build_bloc1(docs, data_date, s1, s2, s3)
+    if focus_enabled:
+        bloc1 = _build_bloc1_weekly(docs, data_date, s1, s2, s3)
+    else:
+        bloc1 = _build_bloc1(docs, data_date, s1, s2, s3)
     bloc2      = _build_bloc2(bloc1)
     bloc3      = _build_bloc3(docs, ctx, s1, s2, s3)
 
     # ── Non-saisi GED badge (only for BET merge consultants) ──────────────
     non_saisi = _build_non_saisi(docs, consultant_name)
+
+    # ── Focus: build priority strip for this consultant ──────────────
+    focus_priority = None
+    if focus_enabled:
+        my_pq = [item for item in (focus_result.priority_queue or [])
+                 if item.get("responsible") == consultant_name]
+        p_counts = {}
+        for item in my_pq:
+            p = item["priority"]
+            p_counts[p] = p_counts.get(p, 0) + 1
+        focus_priority = {
+            "p1": p_counts.get(1, 0),
+            "p2": p_counts.get(2, 0),
+            "p3": p_counts.get(3, 0),
+            "p4": p_counts.get(4, 0),
+            "p5": p_counts.get(5, 0),
+            "total_focused": len(docs),
+            "items": my_pq[:20],
+        }
 
     return {
         "consultant":  consultant,
@@ -193,6 +227,8 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
         "bloc2":       bloc2,
         "bloc3":       bloc3,
         "non_saisi":   non_saisi,
+        "focus_priority": focus_priority,
+        "focus_enabled": bool(focus_enabled),
         "degraded_mode": False,
         "warnings":    list(ctx.warnings or []),
     }
@@ -202,7 +238,7 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
 # SAS Conformity Gate Fiche
 # ═════════════════════════════════════════════════════════════════════════════
 
-def build_sas_fiche(ctx: RunContext) -> dict[str, Any]:
+def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
     """Build dedicated SAS conformity gate fiche.
 
     This is NOT a standard consultant fiche — it tracks submission quality
@@ -241,6 +277,14 @@ def build_sas_fiche(ctx: RunContext) -> dict[str, Any]:
 
     if merged.empty:
         return _empty_sas_fiche(ctx)
+
+    # Focus filter
+    focus_enabled = (focus_result is not None and
+                     focus_result.stats.get("focus_enabled"))
+    if focus_enabled:
+        merged = merged[merged["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        if merged.empty:
+            return _empty_sas_fiche(ctx)
 
     # ── Normalize SAS statuses ──────────────────────────────────────────
     def _normalize_sas_status(s):
@@ -450,6 +494,74 @@ def build_sas_fiche(ctx: RunContext) -> dict[str, Any]:
             "open_blocking_late": 0,
             "open_nb": 0,
         })
+
+    # Focus mode: rebuild bloc1 as weekly
+    if focus_enabled:
+        weekly_bloc1 = []
+        week_data: dict = {}
+        for _, row in merged.iterrows():
+            cd = row.get("_created_d")
+            if cd is None:
+                continue
+            try:
+                if pd.isna(cd):
+                    continue
+            except Exception:
+                pass
+            try:
+                iso = cd.isocalendar()
+                wk = (int(iso[0]), int(iso[1]))
+                if wk not in week_data:
+                    week_data[wk] = {"created": [], "checked": []}
+                week_data[wk]["created"].append(row)
+            except Exception:
+                pass
+
+        for _, row in merged[merged["_sas_is_closed"]].iterrows():
+            sd = row.get("_sas_date_d")
+            if sd is None:
+                continue
+            try:
+                if pd.isna(sd):
+                    continue
+            except Exception:
+                pass
+            try:
+                iso = sd.isocalendar()
+                wk = (int(iso[0]), int(iso[1]))
+                if wk not in week_data:
+                    week_data[wk] = {"created": [], "checked": []}
+                week_data[wk]["checked"].append(row)
+            except Exception:
+                pass
+
+        current_iso = data_date.isocalendar()
+        current_wk = (int(current_iso[0]), int(current_iso[1]))
+
+        for (wy, ww) in sorted(week_data.keys())[-26:]:
+            wd = week_data[(wy, ww)]
+            nvx = len(wd["created"])
+            doc_ferme = len(wd["checked"])
+            s1c = sum(1 for r in wd["checked"] if r.get("_sas_status") == "VSO")
+            s2c = sum(1 for r in wd["checked"] if r.get("_sas_status") == "VAO")
+            s3c = sum(1 for r in wd["checked"] if r.get("_sas_status") == "REF")
+
+            def _pct_w(c, d=doc_ferme):
+                return round((c / d) * 100, 1) if d else None
+
+            weekly_bloc1.append({
+                "label": f"{wy}-S{ww:02d}",
+                "is_current": (wy, ww) == current_wk,
+                "nvx": nvx, "doc_ferme": doc_ferme,
+                "s1": s1c, "s1_pct": _pct_w(s1c),
+                "s2": s2c, "s2_pct": _pct_w(s2c),
+                "s3": s3c, "s3_pct": _pct_w(s3c),
+                "hm": 0, "hm_pct": None,
+                "open_ok": 0, "open_late": 0,
+                "pass_rate": round(((s1c + s2c) / doc_ferme) * 100, 1) if doc_ferme else None,
+                "open_blocking_ok": 0, "open_blocking_late": 0, "open_nb": 0,
+            })
+        bloc1 = weekly_bloc1
 
     # ── BLOC 2 — reuse standard builder ────────────────────────────────
     bloc2 = _build_bloc2(bloc1)
@@ -800,6 +912,117 @@ def _build_bloc1(docs: pd.DataFrame, data_date: date,
         rows.append({
             "label":      f"{y:04d}-{m:02d}",
             "is_current": (y, m) == current_ym,
+            "nvx":        nvx,
+            "doc_ferme":  doc_ferme,
+            "s1": s1c, "s1_pct": _pct(s1c),
+            "s2": s2c, "s2_pct": _pct(s2c),
+            "s3": s3c, "s3_pct": _pct(s3c),
+            "hm": hmc, "hm_pct": _pct(hmc),
+            "open_ok":   open_ok,
+            "open_late": open_late,
+            "open_blocking_ok":   open_blocking_ok,
+            "open_blocking_late": open_blocking_late,
+            "open_nb":            open_nb,
+        })
+    return rows
+
+
+def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
+                        s1: str, s2: str, s3: str) -> list[dict[str, Any]]:
+    """Weekly version of bloc1 for Focus Mode.
+    Same structure as monthly but keyed by ISO week."""
+    if docs.empty:
+        return []
+
+    closed_statuses = {s1, s2, s3, "HM"}
+
+    # Collect all ISO weeks represented in created or answered dates
+    weeks: dict = {}
+    for _, row in docs.iterrows():
+        for col in ("_created_date", "_date_answered"):
+            cd = row.get(col)
+            if cd is None or (hasattr(cd, '__class__') and cd.__class__.__name__ == 'float'):
+                continue
+            try:
+                if pd.isna(cd):
+                    continue
+            except Exception:
+                pass
+            if isinstance(cd, pd.Timestamp):
+                cd = cd.date()
+            try:
+                iso = cd.isocalendar()
+                wk = (int(iso[0]), int(iso[1]))
+                weeks[wk] = True
+            except Exception:
+                pass
+
+    if not weeks:
+        return []
+
+    sorted_weeks = sorted(weeks.keys())
+    if len(sorted_weeks) > 26:
+        sorted_weeks = sorted_weeks[-26:]
+
+    current_iso = data_date.isocalendar()
+    current_wk = (int(current_iso[0]), int(current_iso[1]))
+
+    rows = []
+    for (y, w) in sorted_weeks:
+        # ISO week boundaries (Monday to Sunday)
+        jan4 = date(y, 1, 4)
+        week_start = jan4 + timedelta(weeks=w - 1, days=-jan4.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        created_in_week = docs[
+            docs["_created_date"].notna() &
+            (docs["_created_date"] >= week_start) &
+            (docs["_created_date"] <= week_end)
+        ]
+        closed_in_week = docs[
+            docs["_date_answered"].notna() &
+            (docs["_date_answered"] >= week_start) &
+            (docs["_date_answered"] <= week_end) &
+            docs["_status_for_consultant"].isin(closed_statuses)
+        ]
+
+        nvx = int(len(created_in_week))
+        doc_ferme = int(len(closed_in_week))
+
+        def _count(label: str) -> int:
+            return int((closed_in_week["_status_for_consultant"] == label).sum())
+
+        s1c = _count(s1); s2c = _count(s2); s3c = _count(s3); hmc = _count("HM")
+
+        def _pct(c: int) -> float | None:
+            return round((c / doc_ferme) * 100, 1) if doc_ferme else None
+
+        # Open snapshot at end of week
+        snapshot = docs[docs["_created_date"].notna() & (docs["_created_date"] <= week_end)]
+        try:
+            open_at_end = snapshot[snapshot.apply(
+                lambda r: r["_open_at_date"](week_end), axis=1
+            )]
+        except Exception:
+            open_at_end = snapshot.iloc[0:0]
+
+        open_ok = int(open_at_end["_on_time"].sum()) if "_on_time" in open_at_end.columns else 0
+        open_late = int(len(open_at_end)) - open_ok
+
+        if "_is_blocking" in open_at_end.columns:
+            blocking_at_end = open_at_end[open_at_end["_is_blocking"]]
+            nb_at_end = open_at_end[~open_at_end["_is_blocking"]]
+        else:
+            blocking_at_end = open_at_end
+            nb_at_end = open_at_end.iloc[0:0]
+
+        open_blocking_ok = int(blocking_at_end["_on_time"].sum()) if "_on_time" in blocking_at_end.columns else 0
+        open_blocking_late = int(len(blocking_at_end)) - open_blocking_ok
+        open_nb = int(len(nb_at_end))
+
+        rows.append({
+            "label":      f"{y}-S{w:02d}",
+            "is_current": (y, w) == current_wk,
             "nvx":        nvx,
             "doc_ferme":  doc_ferme,
             "s1": s1c, "s1_pct": _pct(s1c),

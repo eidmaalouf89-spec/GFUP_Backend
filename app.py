@@ -319,76 +319,102 @@ class Api:
 
     # ── Dashboard / reporting data ─────────────────────────────
 
-    def get_dashboard_data(self):
+    def get_dashboard_data(self, focus=False, stale_days=90):
         """Full dashboard payload: KPIs + monthly chart + consultant/contractor summaries."""
         try:
             from reporting.data_loader import load_run_context
             from reporting.aggregator import (
                 compute_project_kpis,
                 compute_monthly_timeseries,
+                compute_weekly_timeseries,
                 compute_consultant_summary,
                 compute_contractor_summary,
             )
+            from reporting.focus_filter import apply_focus_filter, FocusConfig
 
             ctx = load_run_context(BASE_DIR)
-            kpis = compute_project_kpis(ctx)
-            monthly = compute_monthly_timeseries(ctx)
-            consultants = compute_consultant_summary(ctx)
-            contractors = compute_contractor_summary(ctx)
+            focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
+            focus_result = apply_focus_filter(ctx, focus_config)
 
-            return _sanitize_for_json({
+            kpis = compute_project_kpis(ctx, focus_result=focus_result)
+            consultants = compute_consultant_summary(ctx, focus_result=focus_result)
+            contractors = compute_contractor_summary(ctx, focus_result=focus_result)
+
+            if focus:
+                timeseries = compute_weekly_timeseries(ctx, focus_result=focus_result)
+            else:
+                timeseries = compute_monthly_timeseries(ctx)
+
+            payload = {
                 "kpis": kpis,
-                "monthly": monthly,
+                "monthly": timeseries,
                 "consultants": consultants,
                 "contractors": contractors,
-            })
+                "focus": focus_result.stats,
+            }
+            if focus:
+                payload["priority_queue"] = focus_result.priority_queue[:50]
+
+            return _sanitize_for_json(payload)
         except Exception as exc:
             import traceback
             traceback.print_exc()
             return {"error": str(exc), "kpis": {}, "monthly": [], "consultants": [], "contractors": []}
 
-    def get_consultant_list(self):
+    def get_consultant_list(self, focus=False, stale_days=90):
         """Consultant summary list for the Consultants page."""
         try:
             from reporting.data_loader import load_run_context
             from reporting.aggregator import compute_consultant_summary
+            from reporting.focus_filter import apply_focus_filter, FocusConfig
             ctx = load_run_context(BASE_DIR)
-            return _sanitize_for_json(compute_consultant_summary(ctx))
+            focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
+            focus_result = apply_focus_filter(ctx, focus_config)
+            return _sanitize_for_json(compute_consultant_summary(ctx, focus_result=focus_result))
         except Exception as exc:
             return {"error": str(exc)}
 
-    def get_contractor_list(self):
+    def get_contractor_list(self, focus=False, stale_days=90):
         """Contractor summary list for the Contractors page."""
         try:
             from reporting.data_loader import load_run_context
             from reporting.aggregator import compute_contractor_summary
+            from reporting.focus_filter import apply_focus_filter, FocusConfig
             ctx = load_run_context(BASE_DIR)
-            return _sanitize_for_json(compute_contractor_summary(ctx))
+            focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
+            focus_result = apply_focus_filter(ctx, focus_config)
+            return _sanitize_for_json(compute_contractor_summary(ctx, focus_result=focus_result))
         except Exception as exc:
             return {"error": str(exc)}
 
-    def get_consultant_fiche(self, consultant_name):
+    def get_consultant_fiche(self, consultant_name, focus=False, stale_days=90):
         """Full fiche data for one consultant."""
         import traceback
         try:
             from reporting.data_loader import load_run_context
             from reporting.consultant_fiche import build_consultant_fiche, resolve_consultant_name
+            from reporting.focus_filter import apply_focus_filter, FocusConfig
             ctx = load_run_context(BASE_DIR)
             canonical = resolve_consultant_name(consultant_name)
-            result = build_consultant_fiche(ctx, canonical)
+            focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
+            focus_result = apply_focus_filter(ctx, focus_config)
+            result = build_consultant_fiche(ctx, canonical, focus_result=focus_result)
             return _sanitize_for_json(result)
         except Exception as exc:
             traceback.print_exc()
             return _sanitize_for_json({"error": str(exc), "consultant_name": consultant_name})
 
-    def get_contractor_fiche(self, contractor_code):
+    def get_contractor_fiche(self, contractor_code, focus=False, stale_days=90):
         """Full fiche data for one contractor."""
         import traceback
         try:
             from reporting.data_loader import load_run_context
             from reporting.contractor_fiche import build_contractor_fiche
+            from reporting.focus_filter import apply_focus_filter, FocusConfig
             ctx = load_run_context(BASE_DIR)
-            result = build_contractor_fiche(ctx, contractor_code)
+            focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
+            focus_result = apply_focus_filter(ctx, focus_config)
+            result = build_contractor_fiche(ctx, contractor_code, focus_result=focus_result)
             return _sanitize_for_json(result)
         except Exception as exc:
             traceback.print_exc()
@@ -474,7 +500,7 @@ def main():
         webbrowser.open(target)
         return
 
-    window = webview.create_window(
+    webview.create_window(
         title="JANSA VISASIST \u2014 P17&CO T2",
         url=ui_url,
         js_api=api,
@@ -494,6 +520,7 @@ def main():
         print(f"[app] Falling back to browser mode: {target}")
         webbrowser.open(target)
         return
+
 
 if __name__ == "__main__":
     main()
