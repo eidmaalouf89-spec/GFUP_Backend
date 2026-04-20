@@ -1,0 +1,221 @@
+"""
+contractor_fiche.py — Per-contractor fiche builder
+Builds submission timeline, VISA chart, document table, quality metrics
+"""
+import math
+import logging
+from collections import defaultdict
+
+import pandas as pd
+
+from .data_loader import RunContext
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_str(val):
+    if val is None:
+        return "?"
+    if isinstance(val, float) and math.isnan(val):
+        return "?"
+    s = str(val).strip()
+    return s if s and s.lower() not in ("nan", "none", "") else "?"
+
+
+def build_contractor_fiche(ctx: RunContext, contractor_code: str) -> dict:
+    """
+    Build the complete fiche for one contractor (emetteur).
+
+    Filters docs_df for this emetteur, then computes:
+      - Header KPIs
+      - Block 1: submission timeline (monthly new + re-submissions)
+      - Block 2: VISA result chart (monthly visa distribution)
+      - Block 3: document table (per-document detail for dernier indice)
+      - Block 4: quality metrics (SAS REF rate, avg revisions, avg delay)
+    """
+    if ctx.degraded_mode or ctx.docs_df is None:
+        return {
+            "contractor_name": contractor_code, "contractor_code": contractor_code,
+            "degraded_mode": True, "warnings": ctx.warnings,
+            "lots": [], "buildings": [], "gf_sheets": [],
+            "total_submitted": 0, "total_current": 0,
+            "block1_submission_timeline": [], "block2_visa_chart": [],
+            "block3_document_table": [], "block4_quality": {},
+        }
+
+    docs = ctx.docs_df
+    we = ctx.workflow_engine
+
+    # Filter docs for this contractor
+    contractor_docs = docs[docs["emetteur"] == contractor_code].copy()
+    if contractor_docs.empty:
+        return {
+            "contractor_name": contractor_code, "contractor_code": contractor_code,
+            "degraded_mode": False, "warnings": [f"No docs found for {contractor_code}"],
+            "lots": [], "buildings": [], "gf_sheets": [],
+            "total_submitted": 0, "total_current": 0,
+            "block1_submission_timeline": [], "block2_visa_chart": [],
+            "block3_document_table": [], "block4_quality": {},
+        }
+
+    # Get dernier indice docs for this contractor
+    dernier = None
+    if ctx.dernier_df is not None:
+        dernier = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code].copy()
+
+    # Metadata
+    lots = sorted(set(_safe_str(v) for v in contractor_docs["lot_normalized"].unique() if _safe_str(v) != "?"))
+    buildings = sorted(set(_safe_str(v) for v in contractor_docs["lot_prefix"].unique() if _safe_str(v) != "?"))
+    total_submitted = len(contractor_docs)
+    total_current = len(dernier) if dernier is not None else 0
+
+    # Match to GF sheets
+    gf_sheets = []
+    for sheet_name, info in ctx.gf_sheets.items():
+        code = info.get("contractor_code", "")
+        if code.upper() == contractor_code.upper():
+            gf_sheets.append(sheet_name)
+
+    # ── Block 1: Submission timeline ──────────────────────────────────
+    monthly_sub = defaultdict(lambda: {"new_submissions": 0, "re_submissions": 0, "sas_ref": 0, "sas_vao": 0})
+
+    for _, row in contractor_docs.iterrows():
+        dt = row.get("created_at")
+        if dt is None or pd.isna(dt):
+            continue
+        try:
+            mk = dt.strftime("%Y-%m")
+        except Exception:
+            continue
+        indice = _safe_str(row.get("indice"))
+        if indice == "A" or indice == "?" or indice == "0" or indice == "1":
+            monthly_sub[mk]["new_submissions"] += 1
+        else:
+            monthly_sub[mk]["re_submissions"] += 1
+
+    # Enrich with SAS data if workflow engine available
+    if we is not None:
+        for _, row in contractor_docs.iterrows():
+            did = row["doc_id"]
+            dt = row.get("created_at")
+            if dt is None or pd.isna(dt):
+                continue
+            try:
+                mk = dt.strftime("%Y-%m")
+            except Exception:
+                continue
+            visa, _ = we.compute_visa_global_with_date(did)
+            if visa == "SAS REF":
+                monthly_sub[mk]["sas_ref"] += 1
+            elif visa in ("VSO", "VAO"):
+                monthly_sub[mk]["sas_vao"] += 1
+
+    block1 = [{"month": m, **monthly_sub[m]} for m in sorted(monthly_sub.keys())]
+
+    # ── Block 2: VISA result chart ────────────────────────────────────
+    monthly_visa = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
+
+    if dernier is not None and we is not None:
+        for _, row in dernier.iterrows():
+            dt = row.get("created_at")
+            if dt is None or pd.isna(dt):
+                continue
+            try:
+                mk = dt.strftime("%Y-%m")
+            except Exception:
+                continue
+            did = row["doc_id"]
+            visa, _ = we.compute_visa_global_with_date(did)
+            monthly_visa[mk]["total"] += 1
+            if visa == "VSO":
+                monthly_visa[mk]["vso"] += 1
+            elif visa == "VAO":
+                monthly_visa[mk]["vao"] += 1
+            elif visa == "REF":
+                monthly_visa[mk]["ref"] += 1
+            elif visa == "SAS REF":
+                monthly_visa[mk]["sas_ref"] += 1
+            else:
+                monthly_visa[mk]["open"] += 1
+
+    block2 = [{"month": m, **monthly_visa[m]} for m in sorted(monthly_visa.keys())]
+
+    # ── Block 3: Document table (dernier indice only) ─────────────────
+    block3 = []
+    if dernier is not None and we is not None:
+        for _, row in dernier.iterrows():
+            did = row["doc_id"]
+            visa, vdate = we.compute_visa_global_with_date(did)
+
+            # Get SAS result from responses
+            sas_result = None
+            if ctx.responses_df is not None:
+                sas_rows = ctx.responses_df[
+                    (ctx.responses_df["doc_id"] == did) &
+                    (ctx.responses_df["approver_raw"] == "0-SAS")
+                ]
+                if not sas_rows.empty:
+                    sas_result = _safe_str(sas_rows.iloc[0].get("status_clean"))
+
+            created = row.get("created_at")
+            block3.append({
+                "numero": _safe_str(row.get("numero_normalized")),
+                "indice": _safe_str(row.get("indice")),
+                "titre": _safe_str(row.get("libelle_du_document") or row.get("lib_ll_du_document")),
+                "type_doc": _safe_str(row.get("type_de_doc")),
+                "sas_result": sas_result or "-",
+                "visa_global": visa or "-",
+                "date_submitted": str(created.date()) if created and not pd.isna(created) else "-",
+                "date_visa": str(vdate.date()) if vdate and not pd.isna(vdate) else "-",
+                "status": "Open" if visa is None else visa,
+            })
+
+    block3.sort(key=lambda x: x["numero"])
+
+    # ── Block 4: Quality metrics ──────────────────────────────────────
+    visa_counts = defaultdict(int)
+    visa_days = []
+    if dernier is not None and we is not None:
+        for _, row in dernier.iterrows():
+            did = row["doc_id"]
+            visa, vdate = we.compute_visa_global_with_date(did)
+            visa_counts[visa or "Open"] += 1
+            if vdate and row.get("created_at") and not pd.isna(row["created_at"]):
+                try:
+                    delta = (vdate - row["created_at"]).days
+                    if 0 <= delta <= 365:
+                        visa_days.append(delta)
+                except Exception:
+                    pass
+
+    # Avg revision cycles: count unique indices per numero for this contractor
+    if not contractor_docs.empty:
+        indices_per_num = contractor_docs.groupby("numero_normalized")["indice"].nunique()
+        avg_revisions = round(indices_per_num.mean(), 1) if len(indices_per_num) > 0 else 1.0
+    else:
+        avg_revisions = 1.0
+
+    block4 = {
+        "sas_refusal_rate": round((visa_counts.get("SAS REF", 0) + visa_counts.get("REF", 0)) / max(total_current, 1), 4),
+        "avg_revision_cycles": avg_revisions,
+        "avg_days_to_visa": round(sum(visa_days) / len(visa_days), 1) if visa_days else None,
+        "docs_a_reprendre": visa_counts.get("REF", 0) + visa_counts.get("SAS REF", 0),
+        "docs_pending_consultant": visa_counts.get("Open", 0),
+        "docs_pending_moex": 0,  # Would need responsible_party computation
+    }
+
+    return {
+        "contractor_name": contractor_code,
+        "contractor_code": contractor_code,
+        "degraded_mode": False,
+        "warnings": [],
+        "lots": lots,
+        "buildings": buildings,
+        "gf_sheets": gf_sheets,
+        "total_submitted": total_submitted,
+        "total_current": total_current,
+        "block1_submission_timeline": block1,
+        "block2_visa_chart": block2,
+        "block3_document_table": block3,
+        "block4_quality": block4,
+    }

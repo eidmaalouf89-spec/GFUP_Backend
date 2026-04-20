@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+src/**/__pycache__/
 
 .venv/
 venv/
@@ -14,7 +15,13 @@ runs/
 tmp*.db
 data/run_memory.db
 data/report_memory.db
+data/.fuse_hidden*
 
 input/consultant_reports/
 output/debug/
 output/*.xlsx
+
+ui/node_modules/
+ui/dist/
+ui/dist-ssr/
+ui/.vite-temp/

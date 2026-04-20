@@ -4,6 +4,22 @@ Deterministic GED → GF reconstruction, enrichment, and run-tracked baseline en
 
 ---
 
+## Revision status
+
+Current UI/revision note for GitHub:
+
+- **Revision**: `Rev 0`
+- **UI Step 1**: done
+- **UI Step 2**: done
+- **UI Step 3**: done
+- **UI Step 4**: done
+- **Major corrections**: still to be done
+- **Reporting**: still not done
+
+This repository state should be treated as an early UI integration milestone, not as a finished reporting release.
+
+---
+
 ## What this system is
 
 GF Updater v3 is **not** a simple ETL script.
