@@ -163,11 +163,6 @@ class Api:
             if "grandfichier" in f.name.lower():
                 gf = str(f)
                 break
-        mapping = None
-        for f in INPUT_DIR.glob("*.xlsx"):
-            if "mapping" in f.name.lower():
-                mapping = str(f)
-                break
 
         return _sanitize_for_json({
             "has_baseline": has_baseline,
@@ -176,7 +171,6 @@ class Api:
             "total_runs": total_runs,
             "ged_file_detected": ged,
             "gf_file_detected": gf,
-            "mapping_detected": mapping,
             "data_dir": str(DATA_DIR),
             "pipeline_running": False,
             "app_version": "1.0.0",
@@ -228,7 +222,7 @@ class Api:
     # ── Pipeline execution (background thread) ───────────────
 
     def run_pipeline_async(self, run_mode, ged_path=None, gf_path=None,
-                           mapping_path=None, reports_dir=None):
+                           reports_dir=None):
         """
         Start pipeline in a background thread.
         Uses src.run_orchestrator.run_pipeline_controlled().
@@ -243,15 +237,12 @@ class Api:
             ged_path = self._detect_file("GED")
         if not gf_path:
             gf_path = self._detect_file("GF")
-        if not mapping_path:
-            mapping_path = self._detect_file("MAPPING")
 
         # Pre-validate via orchestrator
         from run_orchestrator import validate_run_inputs
         validation = validate_run_inputs(run_mode, {
             "ged_path": ged_path,
             "gf_path": gf_path,
-            "mapping_path": mapping_path,
             "reports_dir": reports_dir,
         })
         if not validation["valid"]:
@@ -275,7 +266,6 @@ class Api:
                 result = run_pipeline_controlled(
                     run_mode=run_mode,
                     ged_path=ged_path,
-                    mapping_path=mapping_path,
                     gf_path=gf_path,
                     reports_dir=reports_dir,
                 )
@@ -374,9 +364,10 @@ class Api:
         import traceback
         try:
             from reporting.data_loader import load_run_context
-            from reporting.consultant_fiche import build_consultant_fiche
+            from reporting.consultant_fiche import build_consultant_fiche, resolve_consultant_name
             ctx = load_run_context(BASE_DIR)
-            result = build_consultant_fiche(ctx, consultant_name)
+            canonical = resolve_consultant_name(consultant_name)
+            result = build_consultant_fiche(ctx, canonical)
             return _sanitize_for_json(result)
         except Exception as exc:
             traceback.print_exc()
@@ -398,7 +389,7 @@ class Api:
     # ── Input validation (pre-flight check) ──────────────────
 
     def validate_inputs(self, run_mode, ged_path=None, gf_path=None,
-                        mapping_path=None, reports_dir=None):
+                        reports_dir=None):
         """
         Pre-validates without running. Delegates to run_orchestrator.validate_run_inputs().
         Called by UI on mode/file change for inline validation.
@@ -407,7 +398,6 @@ class Api:
         return _sanitize_for_json(validate_run_inputs(run_mode, {
             "ged_path": ged_path or self._detect_file("GED"),
             "gf_path": gf_path or self._detect_file("GF"),
-            "mapping_path": mapping_path or self._detect_file("MAPPING"),
             "reports_dir": reports_dir,
         }))
 
@@ -461,10 +451,6 @@ class Api:
         elif file_type == "GF":
             for f in INPUT_DIR.glob("*.xlsx"):
                 if "grandfichier" in f.name.lower():
-                    return str(f)
-        elif file_type == "MAPPING":
-            for f in INPUT_DIR.glob("*.xlsx"):
-                if "mapping" in f.name.lower():
                     return str(f)
         return None
 

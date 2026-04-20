@@ -120,27 +120,18 @@ def _verify_ged_provenance(db_path: str, run_number: int) -> tuple:
     return source_path, (actual_hash == stored_hash)
 
 
-def _get_mapping_path(db_path: str, run_number: int, base_dir: Path) -> Optional[str]:
-    """Resolve mapping file: try run provenance first, then fallback to input/."""
-    rows = _query_db(db_path,
-        "SELECT source_path FROM run_inputs "
-        "WHERE run_number=? AND input_type='MAPPING'",
-        (run_number,))
-    if rows and rows[0]["source_path"] and Path(rows[0]["source_path"]).exists():
-        return rows[0]["source_path"]
-    # Fallback
-    for f in (base_dir / "input").glob("*.xlsx"):
-        if "mapping" in f.name.lower():
-            return str(f)
-    return None
 
 
 def _read_ged_data_date(ged_path: str) -> Optional[date]:
     """Extract DATA_DATE from the GED workbook's Détails sheet.
 
-    Scans the first 30 rows of any sheet named 'Détails' or 'Details' for a cell
-    containing 'Date d\\'extraction' or similar, then reads the adjacent value.
-    Returns None if not found.
+    The AxeoBIM export places the export timestamp at row ~15:
+      Col B: "Date & heure de la demande"
+      Col C: "∙"  (decorative dot)
+      Col D: datetime value
+
+    We scan for any cell containing 'date' AND one of: 'demande', 'extraction', 'export'.
+    Then we look at column+2 first (skipping the dot separator), then column+1.
     """
     import openpyxl
     try:
@@ -157,37 +148,39 @@ def _read_ged_data_date(ged_path: str) -> Optional[date]:
         for row in details_sheet.iter_rows(min_row=1, max_row=30, max_col=10, values_only=False):
             for cell in row:
                 val = str(cell.value or "").lower()
-                if "date" in val and ("extraction" in val or "export" in val):
-                    # The date value is typically in the next column or the row below
-                    # Try adjacent cell first (same row, next col)
-                    ws = cell.parent
-                    adj = ws.cell(row=cell.row, column=cell.column + 1).value
-                    if adj is not None:
-                        if isinstance(adj, datetime):
-                            wb.close()
-                            return adj.date()
-                        if isinstance(adj, date):
-                            wb.close()
-                            return adj
-                        try:
-                            wb.close()
-                            return datetime.strptime(str(adj).strip(), "%d/%m/%Y").date()
-                        except Exception:
-                            pass
-                    # Try cell below
-                    below = ws.cell(row=cell.row + 1, column=cell.column).value
-                    if below is not None:
-                        if isinstance(below, datetime):
-                            wb.close()
-                            return below.date()
-                        if isinstance(below, date):
-                            wb.close()
-                            return below
-                        try:
-                            wb.close()
-                            return datetime.strptime(str(below).strip(), "%d/%m/%Y").date()
-                        except Exception:
-                            pass
+                if "date" not in val:
+                    continue
+                # Match any of the known label patterns
+                if not any(kw in val for kw in ("demande", "extraction", "export")):
+                    continue
+
+                ws = cell.parent
+                # Try col+2 first (AxeoBIM uses col B=label, col C=dot, col D=value)
+                for offset in (2, 1, 3):
+                    adj = ws.cell(row=cell.row, column=cell.column + offset).value
+                    if adj is None:
+                        continue
+                    if isinstance(adj, datetime):
+                        wb.close()
+                        return adj.date()
+                    if isinstance(adj, date):
+                        wb.close()
+                        return adj
+                    try:
+                        wb.close()
+                        return datetime.strptime(str(adj).strip(), "%d/%m/%Y").date()
+                    except Exception:
+                        pass
+
+                # Try cell below as last resort
+                below = ws.cell(row=cell.row + 1, column=cell.column).value
+                if below is not None:
+                    if isinstance(below, datetime):
+                        wb.close()
+                        return below.date()
+                    if isinstance(below, date):
+                        wb.close()
+                        return below
         wb.close()
     except Exception:
         pass
@@ -323,13 +316,8 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
 
     if ged_available:
         try:
-            # Get mapping
-            mapping_path = _get_mapping_path(db_path, run_number, base_dir)
-            if not mapping_path:
-                warnings.append("Mapping file not found — using raw approver names")
-                mapping = {}
-            else:
-                mapping = load_mapping(mapping_path)
+            # Mapping is now hardcoded in normalize.py
+            mapping = load_mapping()
 
             # Read and normalize GED
             docs_df, responses_df, approver_names = read_ged(ged_path)

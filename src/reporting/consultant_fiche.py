@@ -19,26 +19,121 @@ import pandas as pd
 
 from .data_loader import RunContext
 
-# ── BET consultants whose responses are merged from PDF reports ──────────────
-BET_MERGE_KEYS = {
-    "AVLS":     "AVLS",
-    "SOCOTEC":  "SOCOTEC",
-    "Le Sommer": "LeSommer",
-    "LeSommer": "LeSommer",
-    "Terrell":  "Terrell",   # OBS-ONLY: status from GED, observations from PDF
+# ══════════════════════════════════════════════════════════════════════════════
+# DEFINITIVE PROJECT REFERENCE — P17&CO Tranche 2
+# Hardcoded from full GED + Mapping.xlsx cross-reference (2026-04-20)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Canonical name (from Mapping.xlsx) → company display name
+CONSULTANT_DISPLAY_NAMES = {
+    "AMO HQE":              "Le Sommer Environnement",
+    "ARCHITECTE":           "Hardel + Le Bihan Architectes",
+    "BET Acoustique":       "AVLS",
+    "BET Ascenseur":        "BET Ascenseur",
+    "BET CVC":              "BET CVC",
+    "BET Electricité":      "BET Electricité",
+    "BET EV":               "BET EV",
+    "BET Façade":           "BET Façade",
+    "BET Plomberie":        "BET Plomberie",
+    "BET POL":              "BET POL",
+    "BET SPK":              "BET SPK",
+    "BET Structure":        "Terrell",
+    "BET VRD":              "BET VRD",
+    "Bureau de Contrôle":   "SOCOTEC",
+    "Maître d'Oeuvre EXE":  "GEMO",
 }
 
-# ── Role resolution from consultant canonical name ───────────────────────────
-ROLE_BY_NAME = {
-    "MOX":      "Architecte (Hardel + Le Bihan)",
-    "GEMO":     "MOEX",
-    "Terrell":  "BET Structure",
-    "AVLS":     "BET Acoustique",
-    "SOCOTEC":  "Bureau de Contrôle",
-    "Le Sommer": "AMO HQE",
-    "LeSommer": "AMO HQE",
-    # Add others as mapping extends. Fallback = "Consultant".
+# Canonical name → role label for display
+ROLE_BY_CANONICAL = {
+    "AMO HQE":              "AMO HQE (Le Sommer)",
+    "ARCHITECTE":           "Architecte (Hardel + Le Bihan)",
+    "BET Acoustique":       "BET Acoustique (AVLS)",
+    "BET Ascenseur":        "BET Ascenseur",
+    "BET CVC":              "BET CVC",
+    "BET Electricité":      "BET Electricité",
+    "BET EV":               "BET Espaces Verts",
+    "BET Façade":           "BET Façade",
+    "BET Plomberie":        "BET Plomberie",
+    "BET POL":              "BET Pollution",
+    "BET SPK":              "BET Sprinkler",
+    "BET Structure":        "BET Structure (Terrell)",
+    "BET VRD":              "BET VRD",
+    "Bureau de Contrôle":   "Bureau de Contrôle (SOCOTEC)",
+    "Maître d'Oeuvre EXE":  "MOEX (GEMO)",
 }
+
+# Status vocabulary per consultant.
+# s1=approved, s2=approved-with-remarks, s3=refused.
+# Most consultants use VSO/VAO/REF. Bureau de Contrôle uses FAV/SUS/DEF.
+STATUS_LABELS_BY_CANONICAL = {
+    "Bureau de Contrôle": {"s1": "FAV", "s2": "SUS", "s3": "DEF"},
+    # All others default to VSO/VAO/REF — no entry needed
+}
+
+# BET consultants with PDF report merge (non-saisi-GED tracking)
+BET_MERGE_KEYS = {
+    "BET Acoustique":     "AVLS",
+    "Bureau de Contrôle": "SOCOTEC",
+    "AMO HQE":            "LeSommer",
+    "BET Structure":      "Terrell",    # OBS-ONLY: status from GED, observations from PDF
+}
+
+# Company short name → canonical (for reverse lookup from UI or legacy references)
+COMPANY_TO_CANONICAL = {
+    "SOCOTEC":    "Bureau de Contrôle",
+    "AVLS":       "BET Acoustique",
+    "Terrell":    "BET Structure",
+    "Le Sommer":  "AMO HQE",
+    "LeSommer":   "AMO HQE",
+    "GEMO":       "Maître d'Oeuvre EXE",
+    "MOX":        "ARCHITECTE",
+}
+
+# Contractor (EMETTEUR) code → display name + lots
+# From GED docs analysis (2026-04-20)
+CONTRACTOR_REFERENCE = {
+    "LGD":  {"name": "Legendre",           "lots": ["03", "07", "06B"]},
+    "BEN":  {"name": "Bentin",             "lots": ["31", "33", "34"]},
+    "SNI":  {"name": "SNIE",               "lots": ["31", "33", "34"]},
+    "AXI":  {"name": "Axima",              "lots": ["41"]},
+    "UTB":  {"name": "UTB",                "lots": ["42"]},
+    "DUV":  {"name": "Duval",              "lots": ["08", "13A"]},
+    "LAC":  {"name": "Lacroix",            "lots": ["12", "12A"]},
+    "AMP":  {"name": "AMP / CLD",          "lots": ["11", "16A"]},
+    "AAI":  {"name": "AAI",                "lots": ["43"]},
+    "SMA":  {"name": "SMAC",               "lots": ["04", "06B"]},
+    "ICM":  {"name": "ICM",                "lots": ["05"]},
+    "FRS":  {"name": "France Sols",         "lots": ["18", "19"]},
+    "API":  {"name": "Apilog / Schneider",  "lots": ["35"]},
+    "FER":  {"name": "Fermeté",            "lots": ["06", "13", "14"]},
+    "CMF":  {"name": "CMF BAT",            "lots": ["18"]},
+    "SPA":  {"name": "SEPA",               "lots": ["61", "62"]},
+    "SCH":  {"name": "Schindler",          "lots": ["51"]},
+    "LIN":  {"name": "Lindner",            "lots": ["16B"]},
+    "IST":  {"name": "IST",                "lots": ["11", "16", "12B"]},
+    "CHV":  {"name": "Atchouel",           "lots": ["13"]},
+    "VAL":  {"name": "Vallée",             "lots": ["19"]},
+    "CPL":  {"name": "CPLC",               "lots": ["12B"]},
+    "VTP":  {"name": "VTP",                "lots": ["01"]},
+    "CRE":  {"name": "Créa Diffusion",     "lots": ["42B"]},
+    "FKI":  {"name": "FKI",                "lots": ["02"]},
+    "BAN":  {"name": "Bangui",             "lots": ["17"]},
+    "FMC":  {"name": "FMC",                "lots": ["13B"]},
+    "JLE":  {"name": "Jean Letuvé",        "lots": ["20"]},
+    "DBH":  {"name": "DBH",                "lots": ["20"]},
+    "HVA":  {"name": "HVA Concept",        "lots": ["22"]},
+}
+
+
+def resolve_consultant_name(name: str) -> str:
+    """Resolve a consultant name to its canonical form.
+
+    Accepts either canonical names ('Bureau de Contrôle') or company
+    shortnames ('SOCOTEC') and returns the canonical name.
+    """
+    if name in CONSULTANT_DISPLAY_NAMES:
+        return name  # already canonical
+    return COMPANY_TO_CANONICAL.get(name, name)
 
 
 def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, Any]:
@@ -97,7 +192,6 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str) -> dict[str, A
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _build_consultant_meta(ctx: RunContext, name: str) -> dict[str, Any]:
-    # Stable 1-based ID: alphabetical index in sorted consultant list.
     all_consultants = sorted(ctx.approver_names or [name])
     try:
         cid = all_consultants.index(name) + 1
@@ -105,12 +199,14 @@ def _build_consultant_meta(ctx: RunContext, name: str) -> dict[str, Any]:
         cid = 0
 
     merge_key = BET_MERGE_KEYS.get(name)
-    role      = ROLE_BY_NAME.get(name, "Consultant")
+    role = ROLE_BY_CANONICAL.get(name, "Consultant")
+    display = CONSULTANT_DISPLAY_NAMES.get(name, name)
 
     return {
         "id":            cid,
         "slug":          _slugify(name),
-        "display_name":  name,
+        "canonical_name": name,
+        "display_name":  display,
         "name":          name,
         "role":          role,
         "merge_key":     merge_key,
@@ -386,37 +482,30 @@ def _resolve_data_date(ctx: RunContext) -> date:
 def _resolve_status_labels(ctx: RunContext, name: str) -> tuple[str, str, str]:
     """Returns (s1, s2, s3) for the consultant.
 
-    Reads ctx.ged_status_labels[name] if present. Default: (VSO, VAO, REF).
-    Terrell is OBS-ONLY but still uses VSO/VAO/REF where present.
+    Bureau de Contrôle (SOCOTEC) uses FAV/SUS/DEF.
+    All others use VSO/VAO/REF.
     """
-    mapping = getattr(ctx, "ged_status_labels", {}) or {}
-    labels = mapping.get(name) or mapping.get(_slugify(name)) or {}
+    labels = STATUS_LABELS_BY_CANONICAL.get(name, {})
     return (labels.get("s1", "VSO"),
             labels.get("s2", "VAO"),
             labels.get("s3", "REF"))
 
 
 def _filter_for_consultant(ctx: RunContext, name: str) -> pd.DataFrame:
-    """Return a merged DataFrame of docs + this consultant's responses.
+    """Return a merged DataFrame of dernier-indice docs + this consultant's responses.
 
-    The GED data model has two tables:
-      - docs_df:      one row per document (doc_id, lot, numero, created_at, ...)
-      - responses_df: one row per approver per document (doc_id, approver_canonical,
-                      status_clean, date_answered, date_status_type, ...)
-
-    We filter responses_df for this consultant, then left-join onto docs_df to get
-    all document-level columns. NOT_CALLED rows are excluded (consultant not called
-    for that document).
-
-    Returns a DataFrame with both doc columns and response columns.
+    Uses ctx.dernier_df (latest version per document) as the doc base,
+    then inner-joins with this consultant's response rows.
     """
     if ctx.responses_df is None or ctx.responses_df.empty:
         return pd.DataFrame()
+    if ctx.dernier_df is None or ctx.dernier_df.empty:
+        return pd.DataFrame()
 
     resp = ctx.responses_df
-    docs = ctx.docs_df
+    docs = ctx.dernier_df
 
-    # Filter responses for this consultant (exclude NOT_CALLED = not participating)
+    # Filter responses for this consultant (exclude NOT_CALLED)
     cons_resp = resp[
         (resp["approver_canonical"] == name) &
         (resp["date_status_type"] != "NOT_CALLED")
@@ -425,8 +514,7 @@ def _filter_for_consultant(ctx: RunContext, name: str) -> pd.DataFrame:
     if cons_resp.empty:
         return pd.DataFrame()
 
-    # Merge with docs to get document-level columns (lot, created_at, etc.)
-    # Use inner join: only docs that have a response row for this consultant.
+    # Merge with dernier-indice docs only
     merged = cons_resp.merge(docs, on="doc_id", how="inner", suffixes=("_resp", "_doc"))
 
     return merged
@@ -486,8 +574,25 @@ def _attach_derived(df: pd.DataFrame, data_date: date,
     # ── Open/closed: a doc is open if the consultant hasn't rendered a final status
     df["_is_open"] = ~df["_status_for_consultant"].isin(closed_statuses)
 
-    # ── On-time / late: derived from date_status_type (PENDING_LATE = late)
-    if "date_status_type" in df.columns:
+    # ── On-time / late: compare date_limite against data_date ──────────────
+    # A pending doc is late if its deadline (date_limite) is before data_date.
+    # A closed doc is always "on time" (it's done).
+    # If date_limite is missing, fall back to date_status_type heuristic.
+    dl_col = "date_limite_resp" if "date_limite_resp" in df.columns else (
+             "date_limite" if "date_limite" in df.columns else None)
+    if dl_col and dl_col in df.columns:
+        def _compute_on_time(row):
+            if not row["_is_open"]:
+                return True  # closed = not late
+            dl = row.get(dl_col)
+            if dl is not None and not pd.isna(dl):
+                if isinstance(dl, pd.Timestamp):
+                    dl = dl.date()
+                return dl >= data_date
+            # Fallback: PENDING_LATE from Rappel prefix
+            return row.get("date_status_type") != "PENDING_LATE"
+        df["_on_time"] = df.apply(_compute_on_time, axis=1)
+    elif "date_status_type" in df.columns:
         df["_on_time"] = df.apply(
             lambda r: (not r["_is_open"]) or (r["date_status_type"] != "PENDING_LATE"),
             axis=1,
@@ -539,8 +644,8 @@ def _empty_fiche(name: str, ctx: RunContext,
     s1, s2, s3 = "VSO", "VAO", "REF"
     return {
         "consultant": {
-            "id": 0, "slug": _slugify(name), "display_name": name,
-            "name": name, "role": ROLE_BY_NAME.get(name, "Consultant"),
+            "id": 0, "slug": _slugify(name), "display_name": CONSULTANT_DISPLAY_NAMES.get(name, name),
+            "canonical_name": name, "name": name, "role": ROLE_BY_CANONICAL.get(name, "Consultant"),
             "merge_key": BET_MERGE_KEYS.get(name),
         },
         "header": {
