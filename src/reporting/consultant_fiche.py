@@ -170,52 +170,89 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
         return _empty_fiche(consultant_name, ctx,
                             warnings=[f"No GED rows matched consultant '{consultant_name}'"])
 
-    # ── Focus filter: restrict to docs this consultant OWNS ─────────────────
+    # ── Focus: compute owned_ids for this consultant ────────────────────────
     focus_enabled = (focus_result is not None and
                      focus_result.stats.get("focus_enabled"))
+    owned_ids = None
     if focus_enabled and not docs.empty:
         id_col = "doc_id_resp" if "doc_id_resp" in docs.columns else "doc_id"
-        # Get the focused DataFrame with ownership columns
         focused_df = getattr(focus_result, 'focused_df', None)
         if focused_df is not None and "_focus_owner" in focused_df.columns:
-            # Only keep docs where this consultant is in the _focus_owner list
             owned_ids = set()
             for _, frow in focused_df.iterrows():
                 owners = frow.get("_focus_owner", [])
                 if isinstance(owners, list) and consultant_name in owners:
                     owned_ids.add(frow["doc_id"])
-            # Also include MOEX-owned docs for Maître d'Oeuvre EXE fiche
             if consultant_name == "Maître d'Oeuvre EXE":
                 for _, frow in focused_df.iterrows():
                     if frow.get("_focus_owner_tier") == "MOEX":
                         owned_ids.add(frow["doc_id"])
-            docs = docs[docs[id_col].isin(owned_ids)].copy()
         else:
-            # Fallback: use focused_doc_ids if ownership columns missing
-            docs = docs[docs[id_col].isin(focus_result.focused_doc_ids)].copy()
-        if docs.empty:
-            return _empty_fiche(consultant_name, ctx,
-                                warnings=[f"No owned docs for '{consultant_name}' in focus mode"])
+            owned_ids = focus_result.focused_doc_ids
 
     # ── Status label resolution (s1/s2/s3) ───────────────────────────────────
     s1, s2, s3 = _resolve_status_labels(ctx, consultant_name)
 
     # ── Attach derived columns used by all blocks ────────────────────────────
-    docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3, ctx=ctx)
+    # Use ALL docs (full history) for charts and tables
+    all_docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3, ctx=ctx)
 
     # ── Build blocks ─────────────────────────────────────────────────────────
+    # Bloc1, Bloc2: FULL HISTORY (all avis: VSO, VAO, REF, HM + open)
+    # Header, Week delta: FULL HISTORY for totals/answered, FOCUSED for open
+    # Bloc3: FULL HISTORY for status counts, FOCUSED for open column
     consultant = _build_consultant_meta(ctx, consultant_name)
-    header     = _build_header(docs, data_date, s1, s2, s3)
-    week_delta = _build_week_delta(docs, data_date, prev_date, s1, s2, s3)
+    header     = _build_header(all_docs, data_date, s1, s2, s3)
+    week_delta = _build_week_delta(all_docs, data_date, prev_date, s1, s2, s3)
     if focus_enabled:
-        bloc1 = _build_bloc1_weekly(docs, data_date, s1, s2, s3)
+        bloc1 = _build_bloc1_weekly(all_docs, data_date, s1, s2, s3)
     else:
-        bloc1 = _build_bloc1(docs, data_date, s1, s2, s3)
+        bloc1 = _build_bloc1(all_docs, data_date, s1, s2, s3)
     bloc2      = _build_bloc2(bloc1)
-    bloc3      = _build_bloc3(docs, ctx, s1, s2, s3)
+    bloc3      = _build_bloc3(all_docs, ctx, s1, s2, s3)
+
+    # ── Focus: override open counts in header/bloc3 with ownership-filtered values
+    if focus_enabled and owned_ids is not None:
+        id_col = "doc_id_resp" if "doc_id_resp" in all_docs.columns else "doc_id"
+        focused_docs = all_docs[all_docs[id_col].isin(owned_ids)]
+        # Override header open counts
+        open_mask = focused_docs["_is_open"]
+        header["open_count"] = int(open_mask.sum())
+        header["open_ok"] = int((open_mask & focused_docs["_on_time"]).sum())
+        header["open_late"] = int((open_mask & ~focused_docs["_on_time"]).sum())
+        blocking_mask = focused_docs["_is_blocking"]
+        header["open_blocking"] = int(blocking_mask.sum())
+        header["open_blocking_ok"] = int((blocking_mask & focused_docs["_on_time"]).sum())
+        header["open_blocking_late"] = int((blocking_mask & ~focused_docs["_on_time"]).sum())
+        header["open_non_blocking"] = int((open_mask & ~blocking_mask).sum())
+        # Override bloc3 open counts per lot
+        for lot_row in bloc3.get("lots", []):
+            lot_name = lot_row["name"]
+            lot_focused = focused_docs[focused_docs["_gf_sheet"] == lot_name]
+            lot_open = lot_focused["_is_open"]
+            lot_row["open_ok"] = int((lot_open & lot_focused["_on_time"]).sum())
+            lot_row["open_late"] = int((lot_open & ~lot_focused["_on_time"]).sum())
+            if "_is_blocking" in lot_focused.columns:
+                lot_blk = lot_focused["_is_blocking"]
+                lot_row["open_blocking_ok"] = int((lot_blk & lot_focused["_on_time"]).sum())
+                lot_row["open_blocking_late"] = int((lot_blk & ~lot_focused["_on_time"]).sum())
+                lot_row["open_nb"] = int((lot_open & ~lot_blk).sum())
+        # Recalculate bloc3 totals and donut from overridden lot rows
+        lots = bloc3.get("lots", [])
+        def _sum(key):
+            return int(sum(r.get(key, 0) for r in lots))
+        bloc3["total_row"]["open_ok"] = _sum("open_ok")
+        bloc3["total_row"]["open_late"] = _sum("open_late")
+        bloc3["total_row"]["open_blocking_ok"] = _sum("open_blocking_ok")
+        bloc3["total_row"]["open_blocking_late"] = _sum("open_blocking_late")
+        bloc3["total_row"]["open_nb"] = _sum("open_nb")
+        bloc3["donut_ok"] = _sum("open_blocking_ok")
+        bloc3["donut_late"] = _sum("open_blocking_late")
+        bloc3["donut_total"] = bloc3["donut_ok"] + bloc3["donut_late"]
+        bloc3["donut_nb"] = _sum("open_nb")
 
     # ── Non-saisi GED badge (only for BET merge consultants) ──────────────
-    non_saisi = _build_non_saisi(docs, consultant_name)
+    non_saisi = _build_non_saisi(all_docs, consultant_name)
 
     # ── Focus: build priority strip for this consultant ──────────────
     focus_priority = None

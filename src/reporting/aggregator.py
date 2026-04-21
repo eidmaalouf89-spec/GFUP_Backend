@@ -70,9 +70,11 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
     we = ctx.workflow_engine
     resp = ctx.responsible_parties or {}
 
-    # Apply focus filter if provided
+    # Focus mode: use FULL dernier for visa distribution (historical performance)
+    # Only override "Open" count to reflect focused (actionable) set
+    focused_ids = None
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
-        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        focused_ids = focus_result.focused_doc_ids
 
     # Visa global distribution
     visa_counts = defaultdict(int)
@@ -90,7 +92,11 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
                 except Exception:
                     pass
         else:
-            visa_counts["Open"] += 1
+            if focused_ids is not None:
+                if did in focused_ids:
+                    visa_counts["Open"] += 1
+            else:
+                visa_counts["Open"] += 1
 
     # Building distribution
     building_counts = defaultdict(int)
@@ -211,9 +217,12 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
         return []
 
     we = ctx.workflow_engine
+    # Use FULL dernier for historical avis (VSO/VAO/REF/HM are performance data)
+    # Only the "open" bucket should reflect the focused set
     dernier = ctx.dernier_df
+    focused_ids = None
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
-        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)]
+        focused_ids = focus_result.focused_doc_ids
 
     weekly = defaultdict(lambda: {"vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "total": 0})
 
@@ -236,7 +245,13 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
         elif visa == "SAS REF":
             weekly[week_key]["sas_ref"] += 1
         else:
-            weekly[week_key]["open"] += 1
+            # In focus mode, only count as "open" if doc is in focused set
+            if focused_ids is not None:
+                if did in focused_ids:
+                    weekly[week_key]["open"] += 1
+                # else: open but excluded (stale/not owned) — don't count
+            else:
+                weekly[week_key]["open"] += 1
 
     result = []
     for week in sorted(weekly.keys()):
@@ -272,18 +287,9 @@ def compute_consultant_summary(
         (~resp["approver_raw"].str.startswith("Sollicitation", na=False))
     ]
 
-    # Apply focus filter: restrict to responses on docs in the focused set
-    # Uses focused_doc_ids (not ownership) for the summary list — ownership
-    # filtering happens in the individual fiche builders, not here.
-    # The summary shows aggregate counts across all focused docs.
-    if focus_result is not None and focus_result.stats.get("focus_enabled"):
-        focused_df = getattr(focus_result, 'focused_df', None)
-        if focused_df is not None and "_focus_owner" in focused_df.columns:
-            # For the consultant list, show each consultant's owned count
-            # alongside their total called count for context
-            filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
-        else:
-            filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+    # Focus mode: do NOT filter responses — keep full history for called/answered/VSO/VAO/REF counts
+    # The focus_owned field (computed below) tells the UI how many docs this consultant owns
+    # This way the consultant list shows performance data alongside focus ownership
 
     summaries = []
     for name, grp in filtered.groupby("approver_canonical"):
@@ -428,9 +434,9 @@ def compute_contractor_summary(
     # Group dernier docs by emetteur
     by_emetteur = defaultdict(lambda: {"docs": 0, "vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "lots": set()})
 
+    # Use FULL dernier for historical counts (VSO/VAO/REF/SAS REF are performance data)
+    # The focus_owned field tells the UI how many docs each contractor must act on
     dernier_iter = ctx.dernier_df
-    if focus_result is not None and focus_result.stats.get("focus_enabled"):
-        dernier_iter = ctx.dernier_df[ctx.dernier_df["doc_id"].isin(focus_result.focused_doc_ids)]
 
     for _, row in dernier_iter.iterrows():
         em = _safe_str(row.get("emetteur"))

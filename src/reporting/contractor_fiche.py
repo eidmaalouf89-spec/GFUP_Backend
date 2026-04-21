@@ -64,22 +64,23 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
     if ctx.dernier_df is not None:
         dernier = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code].copy()
 
-    # Focus filter: use ownership columns from focus_ownership.py
+    # Focus filter: compute focused_ids but do NOT filter dernier yet
+    # Charts and tables need full history; only open counts use focused set
     focus_enabled = (focus_result is not None and
                      focus_result.stats.get("focus_enabled"))
+    focused_ids = None
     if focus_enabled and dernier is not None:
         focused_df = getattr(focus_result, 'focused_df', None)
         if focused_df is not None and "_focus_owner_tier" in focused_df.columns:
-            # Get focused doc_ids for this contractor's docs
-            # Include: CONTRACTOR-owned (REF, must resubmit) + open docs still in review
             contractor_focused = focused_df[
                 focused_df["emetteur"] == contractor_code
             ]
             focused_ids = set(contractor_focused["doc_id"].tolist())
-            dernier = dernier[dernier["doc_id"].isin(focused_ids)].copy()
         else:
-            # Fallback to flat focused_doc_ids
-            dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+            focused_ids = set(
+                did for did in focus_result.focused_doc_ids
+                if did in set(dernier["doc_id"].tolist())
+            )
 
     # Metadata
     lots = sorted(set(_safe_str(v) for v in contractor_docs["lot_normalized"].unique() if _safe_str(v) != "?"))
@@ -221,7 +222,11 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
             elif visa == "SAS REF":
                 weekly_visa[wk]["sas_ref"] += 1
             else:
-                weekly_visa[wk]["open"] += 1
+                if focused_ids is not None:
+                    if did in focused_ids:
+                        weekly_visa[wk]["open"] += 1
+                else:
+                    weekly_visa[wk]["open"] += 1
         sorted_wks = sorted(weekly_visa.keys())
         if len(sorted_wks) > 26:
             sorted_wks = sorted_wks[-26:]
@@ -259,6 +264,7 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
                     focus_priority = int(fp)
 
             block3.append({
+                "_doc_id": did,
                 "numero": _safe_str(row.get("numero_normalized")),
                 "indice": _safe_str(row.get("indice")),
                 "titre": _safe_str(row.get("libelle_du_document") or row.get("lib_ll_du_document")),
@@ -273,7 +279,22 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
                 "focus_priority": focus_priority,
             })
 
+    # Focus mode: mark non-focused open docs and filter block3 for display
+    if focus_enabled and focused_ids is not None:
+        for row_dict in block3:
+            is_open = row_dict["status"] == "Open"
+            doc_id_val = row_dict.get("_doc_id")
+            if is_open and doc_id_val and doc_id_val not in focused_ids:
+                row_dict["_excluded_by_focus"] = True
+        # Remove excluded open docs from block3 (keep all resolved docs for history)
+        block3 = [r for r in block3 if not r.get("_excluded_by_focus", False)]
+
     block3.sort(key=lambda x: x["numero"])
+
+    # Clean up internal fields
+    for row_dict in block3:
+        row_dict.pop("_doc_id", None)
+        row_dict.pop("_excluded_by_focus", None)
 
     # ── Block 4: Quality metrics ──────────────────────────────────────
     visa_counts = defaultdict(int)
@@ -309,15 +330,16 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
 
     # Focus summary: how many docs the contractor must act on
     focus_summary = None
-    if focus_enabled and dernier is not None and "_focus_owner_tier" in dernier.columns:
-        contractor_owned = int((dernier["_focus_owner_tier"] == "CONTRACTOR").sum())
+    if focus_enabled and focused_ids is not None and dernier is not None and "_focus_owner_tier" in dernier.columns:
+        focused_dernier = dernier[dernier["doc_id"].isin(focused_ids)]
+        contractor_owned = int((focused_dernier["_focus_owner_tier"] == "CONTRACTOR").sum())
         in_review = int(
-            dernier["_focus_owner_tier"].isin(["PRIMARY", "SECONDARY", "MOEX"]).sum()
+            focused_dernier["_focus_owner_tier"].isin(["PRIMARY", "SECONDARY", "MOEX"]).sum()
         )
         focus_summary = {
             "docs_to_resubmit": contractor_owned,
             "docs_in_review": in_review,
-            "total_focused": len(dernier),
+            "total_focused": len(focused_dernier),
         }
 
     return {
