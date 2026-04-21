@@ -60,6 +60,108 @@ const api = {
 }
 
 /* ── SVG Icons (inline, no deps) ────────────────────────────── */
+function ExportTeamVersionButton() {
+  const [exporting, setExporting] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const handleExport = async () => {
+    setExporting(true)
+    setResult(null)
+    try {
+      const res = await api.call("export_team_version")
+      if (res && res.success) {
+        setResult({ ok: true })
+        api.call("open_file_in_explorer", res.path)
+      } else {
+        setResult({ ok: false, msg: res?.error || "Export failed" })
+      }
+    } catch (e) {
+      setResult({ ok: false, msg: String(e) })
+    } finally {
+      setExporting(false)
+      setTimeout(() => setResult(null), 4000)
+    }
+  }
+
+  return (
+    <button onClick={handleExport} disabled={exporting} style={{
+      background: 'rgba(59,130,246,0.12)', color: T.accent,
+      border: '1px solid rgba(59,130,246,0.25)',
+      borderRadius: 8, padding: '6px 14px',
+      fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+      cursor: exporting ? 'wait' : 'pointer',
+      opacity: exporting ? 0.5 : 1,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+    }}>
+      {exporting ? 'Exporting...' : result ? (result.ok ? 'Exported' : 'Error') : 'Export GF'}
+    </button>
+  )
+}
+
+function DrawerBackdrop({ visible, onClose }) {
+  if (!visible) return null
+  return <div onClick={onClose} style={{
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.42)', zIndex: 999,
+  }} />
+}
+
+function DocDetailDrawer({ visible, onClose, docs, title, loading }) {
+  if (!visible) return null
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: 560,
+      background: '#111113', borderLeft: `1px solid ${T.glassBorder}`,
+      zIndex: 1000, display: 'flex', flexDirection: 'column',
+      boxShadow: '-8px 0 40px rgba(0,0,0,0.5)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${T.glassBorder}` }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{title || 'Documents'}</div>
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{loading ? 'Loading...' : `${(docs || []).length} documents`}</div>
+        </div>
+        <button onClick={onClose} style={{ background: T.glass, border: `1px solid ${T.glassBorder}`, borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: T.muted, fontSize: 16 }}>x</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: T.dim }}>Loading...</div>
+        ) : (!docs || docs.length === 0) ? (
+          <div style={{ padding: 40, textAlign: 'center', color: T.dim }}>No documents</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ position: 'sticky', top: 0, background: '#111113', zIndex: 1 }}>
+                {['Numero', 'Ind', 'Emetteur', 'Soumis', 'Echeance', 'Jours', 'Statut'].map(h => (
+                  <th key={h} style={{ fontSize: 10, fontWeight: 500, color: T.dim, padding: 8, textAlign: 'left', borderBottom: `1px solid ${T.glassBorder}`, whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((d, i) => {
+                const isLate = d.remaining_days != null && d.remaining_days < 0
+                const isUrgent = d.remaining_days != null && d.remaining_days >= 0 && d.remaining_days <= 5
+                return (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)', borderBottom: `1px solid ${T.glassBorder}` }}>
+                    <td style={{ fontSize: 12, color: T.text, padding: 8, fontWeight: 500 }}>{d.numero || '-'}</td>
+                    <td style={{ fontSize: 12, color: T.muted, padding: 8 }}>{d.indice || '-'}</td>
+                    <td style={{ fontSize: 12, color: T.muted, padding: 8 }}>{d.emetteur || '-'}</td>
+                    <td style={{ fontSize: 11, color: T.dim, padding: 8, whiteSpace: 'nowrap' }}>{d.date_soumission || '-'}</td>
+                    <td style={{ fontSize: 11, color: T.dim, padding: 8, whiteSpace: 'nowrap' }}>{d.date_limite || '-'}</td>
+                    <td style={{ fontSize: 12, fontWeight: 600, padding: 8, color: isLate ? T.red : isUrgent ? T.amber : T.green }}>
+                      {d.remaining_days != null ? (d.remaining_days < 0 ? `${Math.abs(d.remaining_days)}j retard` : `${d.remaining_days}j`) : '-'}
+                    </td>
+                    <td style={{ fontSize: 11, color: T.muted, padding: 8 }}>{d.status || 'OPEN'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const icons = {
   Overview: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -622,6 +724,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
       <div style={{ ...glassCard, padding: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: T.text }}>Quick Actions</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <ExportTeamVersionButton />
           {[
             { label: 'Run Pipeline', target: 'Executer' },
             { label: 'View Runs', target: 'Runs' },
@@ -1151,6 +1254,10 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [drawerVisible, setDrawerVisible] = useState(false)
+  const [drawerDocs, setDrawerDocs] = useState([])
+  const [drawerTitle, setDrawerTitle] = useState("")
+  const [drawerLoading, setDrawerLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -1171,6 +1278,26 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
       })
     return () => { cancelled = true }
   }, [consultantName, focusMode, staleDays])
+
+  const handleCellClick = async (filterKey) => {
+    setDrawerVisible(true)
+    setDrawerLoading(true)
+    setDrawerTitle(filterKey)
+    setDrawerDocs([])
+    try {
+      const res = await api.call("get_doc_details", consultantName, filterKey)
+      if (res && res.docs) {
+        setDrawerDocs(res.docs)
+        setDrawerTitle(`${filterKey} - ${res.count} docs`)
+      } else if (res && res.error) {
+        setDrawerTitle(`Error: ${res.error}`)
+      }
+    } catch (e) {
+      setDrawerTitle(`Error: ${e}`)
+    } finally {
+      setDrawerLoading(false)
+    }
+  }
 
   if (loading) {
     return <Spinner text={`Loading fiche for ${consultantName}...`} />
@@ -1204,7 +1331,10 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
           borderRadius: 8, padding: "6px 12px",
           fontFamily: "SF Pro Text", fontSize: 13, cursor: "pointer",
         }}>← Back</button>
-        <ConsultantFicheComponent data={data} lang="fr" />
+        <ExportTeamVersionButton />
+        <ConsultantFicheComponent data={data} lang="fr" onCellClick={handleCellClick} />
+        <DrawerBackdrop visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
+        <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} />
       </div>
     )
   }
@@ -1218,7 +1348,12 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
         borderRadius: 8, padding: "6px 12px",
         fontFamily: "SF Pro Text", fontSize: 13, cursor: "pointer",
       }}>← Back</button>
-      <ConsultantFicheComponent data={data} lang="fr" />
+      <div style={{ position: "fixed", top: 16, left: 288, zIndex: 10 }}>
+        <ExportTeamVersionButton />
+      </div>
+      <ConsultantFicheComponent data={data} lang="fr" onCellClick={handleCellClick} />
+      <DrawerBackdrop visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
+      <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} />
     </div>
   )
 }
@@ -1412,6 +1547,9 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
       <button onClick={onBack} style={{ fontSize: 11, color: T.accent, cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit', marginBottom: 16, padding: 0 }}>
         {'\u2190'} Back to contractors
       </button>
+      <div style={{ marginBottom: 16 }}>
+        <ExportTeamVersionButton />
+      </div>
 
       {/* Title + metadata */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>

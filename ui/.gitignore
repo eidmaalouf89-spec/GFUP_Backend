@@ -9,8 +9,11 @@ lerna-debug.log*
 
 node_modules
 .npm-cache
+npm-cache
+.vite
 dist
 dist-ssr
+coverage
 *.local
 
 # Editor directories and files

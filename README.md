@@ -1,91 +1,73 @@
 # GF Updater v3
 
-Deterministic GED → GF reconstruction, enrichment, and run-tracked baseline engine for the **17&CO Tranche 2** workflow.
+Deterministic GED → GF reconstruction, enrichment, discrepancy analysis, and run-tracked baseline engine for the **17&CO Tranche 2** workflow.
+
+This repository is not a simple Excel updater or ETL script. It is a deterministic operational engine that rebuilds a clean and traceable Grand Fichier (GF) from unstable chantier inputs while preserving consultant truth, run history, lineage, and artifacts across executions.
 
 ---
 
-## Revision status
+## 1. What this repository is
 
-Current UI/revision note for GitHub:
-
-- **Revision**: `Rev 0`
-- **UI Step 1**: done
-- **UI Step 2**: done
-- **UI Step 3**: done
-- **UI Step 4**: done
-- **Major corrections**: still to be done
-- **Reporting**: still not done
-
-This repository state should be treated as an early UI integration milestone, not as a finished reporting release.
-
-### Corrections since the last GitHub push
-
-The changes currently in the worktree extend the consultant reporting layer and workflow prioritization after the previous backend fixes.
-
-- SAS handling was added to reporting with a dedicated MOEX SAS fiche instead of treating SAS as a normal consultant
-- prioritization logic was added so blocking backlog is separated from non-blocking backlog in reporting and dashboard summaries
-- consultant fiche rendering was expanded to expose SAS-specific KPIs, pass/refusal rates, queue state, and contractor-level pressure points
-- workflow and reporting aggregation were updated so blocking pending items are counted against real visa flow instead of being mixed into generic open counts
-- the desktop launcher now supports browser fallback when embedded WebView2 startup fails on this machine
-- the main React shell was repaired after a truncated `App.jsx` tail and now builds again in production mode
-- generated pipeline artifacts and frontend build output are ignored by git
-
-### Still missing
-
-The following items are still not finished and must remain explicit in GitHub history:
-
-- filtering noise still needs reduction
-- backlog still needs cleanup / verification
-
----
-
-## What this system is
-
-GF Updater v3 is **not** a simple ETL script.
-
-It is a deterministic project engine that:
+GF Updater v3 is a single-project, single-team, local operational engine that:
 
 - reads a raw GED export
 - reconstructs document truth and workflow state
 - rebuilds a clean Grand Fichier (GF)
+- compares GED and GF to detect discrepancies
 - persists consultant-report truth across runs
 - persists run history, artifacts, lineage, and baseline state
-- allows future runs to inherit trusted context from previous runs
+- allows future runs to inherit trusted context from previous completed runs
 
-The system is designed for:
+It is intentionally:
 
-- **one project**
-- **one team**
-- **one user / local usage**
-
-It is intentionally **not** multi-project, multi-user, or SaaS-oriented.
-
----
-
-## Current freeze status
-
-Backend status at the time of this README:
-
-- **Run 0 baseline model**: implemented
-- **Report memory persistence**: implemented
-- **Run memory persistence**: implemented
-- **Recursive invalidation / stale propagation**: implemented
-- **Run lifecycle state (`STARTED` / `COMPLETED` / `FAILED`)**: implemented
-- **DB-backed artifact export**: implemented
-- **Run explorer backend**: implemented
-- **Standalone untracked consultant entrypoint**: blocked for production use
-
-This backend is intended to be treated as **frozen/stable** unless a real defect is found.
+- **single project** (17&CO Tranche 2)
+- **single user / local usage**
+- **currently not designed for multi-project usage**
+- **currently not designed for SaaS / multi-tenant use**
 
 ---
 
-## Core business problem
+## 2. Current validated state
+
+The repository has been structurally stabilized and validated after a staged architecture refactor.
+
+Current stable state:
+
+- thin `main.py` entrypoint
+- staged pipeline architecture with explicit `PipelineState`
+- deterministic domain helpers extracted out of the old monolithic pipeline
+- validated baseline reset completed successfully
+- new clean **Run 0** recreated and confirmed equivalent to the historical baseline
+- `report_memory.db` preserved and still contains 1242 persisted consultant responses
+- input signature of new Run 0 matches original baseline exactly
+
+This repository should now be treated as:
+
+> **architecturally stabilized, behaviorally validated, and safe for scoped future development**
+
+UI/reporting remains partially unfinished and should still be considered evolving.
+
+---
+
+## 3. Scope and intended usage
+
+This system is designed to solve one specific operational workflow:
+
+- project: **17&CO Tranche 2**
+- document universe: GED export + GF + consultant reports (118 PDFs)
+- objective: reconstruct and enrich a reliable working GF while preserving lineage and traceability
+
+The repo is not currently intended to be a generic framework for arbitrary projects.
+
+---
+
+## 4. Core business problem
 
 The real-world inputs are inconsistent:
 
 - GED data is fragmented, duplicated, and workflow-oriented
 - the Grand Fichier is manually maintained and may contain errors
-- consultant reports are incomplete, inconsistent, and often arrive outside the GED timing
+- consultant reports are incomplete, inconsistent, and often arrive outside GED timing
 
 The software builds a traceable working truth by combining:
 
@@ -95,272 +77,274 @@ The software builds a traceable working truth by combining:
 
 ---
 
-## Source-of-truth philosophy
+## 5. Source-of-truth model
 
-### 1. GED is the primary operational truth
+### GED is the primary operational truth
 
-GED remains the authoritative base for:
+GED is the authoritative base for document identity, workflow rows, mission calling, and primary lifecycle structure.
 
-- document identity
-- workflow rows
-- mission calling
-- primary lifecycle structure
+### Consultant reports are persistent secondary truth
 
-### 2. Consultant reports are secondary but persistent truth
+Consultant reports are not primary, but once matched and persisted they become reusable project truth across future runs.
 
-Consultant reports are **not primary**, but once matched and persisted they become reusable project truth across future runs.
+Example: GED still shows a consultant as pending, but `report_memory.db` already contains a matched consultant answer — the system upgrades the effective response to `ANSWERED`.
 
-Example:
+### GF is a reconstruction target
 
-- GED still shows a consultant as pending
-- report memory already contains a matched answered consultant response
-- the system upgrades the effective response to `ANSWERED`
-
-### 3. GF is an operational reconstruction target
-
-GF is **not** the truth source.
-It is a rebuilt, enriched working output.
+GF is **not** the truth source. It is a rebuilt, enriched, operational output.
 
 ---
 
-## High-level architecture
+## 6. High-level architecture
 
 ```text
 GED Export
    ↓
-Raw Read / Normalization
+Read / Normalization
    ↓
 Version Engine
    ↓
-Workflow Engine
+Routing / GF structure mapping
    ↓
 Report Memory Merge (effective responses)
    ↓
-Reconciliation Engine (GED ↔ GF)
+Workflow computation
+   ↓
+Reconciliation / discrepancy analysis
    ↓
 GF Reconstruction / Enrichment
    ↓
 Run Memory / Artifact Persistence
 ```
 
-In practice, the system has **three persistent layers**:
+The system has three persistent layers:
 
-### A. Core pipeline
-Builds the operational outputs.
+**A. Core pipeline** — builds the operational outputs.
 
-### B. Report memory
-Persists consultant-derived truth across runs.
+**B. Report memory** — persists consultant-derived truth across runs.
 
-### C. Run memory
-Persists execution history, baseline, artifacts, lineage, and stale propagation.
+**C. Run memory** — persists execution history, baseline, artifacts, lineage, and stale propagation.
 
----
+Long-term architectural direction:
 
-## Main modules
-
-### `read_raw.py`
-Reads GED export and extracts raw rows.
-
-### `normalize.py`
-Normalizes GED fields and response semantics.
-
-Already implements key mission-state semantics:
-
-- empty response field → `NOT_CALLED`
-- `En attente` → `PENDING_IN_DELAY`
-- `Rappel en attente` → `PENDING_LATE`
-- real date → `ANSWERED`
-
-### `version_engine.py`
-Builds document families and index lineage.
-
-Used to determine:
-
-- latest index / current row
-- historical valid rows
-- previous versions
-
-### `workflow_engine.py`
-Computes workflow state per approver and per document.
-
-Includes:
-
-- MOEX/SAS handling
-- `VISA GLOBAL`
-- SAS-stage distinction (`SAS REF` vs final `REF`)
-- document responsibility logic
-
-### `reconciliation_engine.py`
-Compares GED vs GF and classifies discrepancies.
-
-Handles:
-
-- missing in GED
-- missing in GF
-- typo-like mismatches
-- duplicate situations
-- fuzzy/contextual reconciliation
-
-### `report_memory.py`
-Persists report ingestion and matched report responses across runs.
-
-This database is **project memory** for consultant truth.
-
-### `effective_responses.py`
-Builds effective responses by merging:
-
-- GED normalized responses
-- persisted report-memory answers
-
-This merge is intentionally **left-anchored on GED rows**.
-
-Meaning:
-
-- GED `PENDING_*` rows can be upgraded from report memory
-- GED `ANSWERED` rows are preserved
-- GED `NOT_CALLED` rows are not forced into existence by reports
-
-### `run_memory.py`
-Persists run history.
-
-This database stores:
-
-- runs
-- inputs
-- artifacts
-- corrections
-- invalidation log
-
-### `run_orchestrator.py`
-Adds controlled execution modes and inherited GF resolution.
-
-### `run_explorer.py`
-Provides backend functions for:
-
-- listing runs
-- getting run summaries
-- exporting final GF
-- exporting full run bundles
-- comparing runs
+```text
+core deterministic engine
+    ↓
+stable structured output model
+    ↓
+presentation adapters (UI / reports / Excel exports / dashboards)
+```
 
 ---
 
-## Workflow model
+## 7. Current code architecture
 
-The workflow logic is based on real chantier behavior and is already encoded in the system.
+The old monolithic `main.py` has been refactored into a staged architecture.
 
-### SAS phase
-MOEX first-pass compliance control.
+### Entry layer
 
-- `SAS REF` = submission problem / bad dépôt
-- counted against contractor-side quality/process
-- no final MOEX visa yet
+- `main.py` — thin entrypoint
+- `src/run_orchestrator.py` — controlled execution layer with mode resolution and inherited GF logic
 
-### Consultant phase
-Consultants answer in parallel.
+### Pipeline layer
 
-### MOEX final / visa chapeau
-Final MOEX visa closes the loop.
+- `src/pipeline/context.py` — `PipelineState` (shared state across all stages, 77 fields)
+- `src/pipeline/stages/` — ordered pipeline stages (see section 8)
+- `src/pipeline/compute.py` — heavy non-pure pipeline computation (discrepancies, etc.)
 
-### Responsibility logic
-Current responsible party is computed from effective workflow state, using existing normalized workflow outputs.
+### Domain logic
 
-Simplified responsibility rules:
+- `src/domain/normalization.py`
+- `src/domain/discrepancy.py`
+- `src/domain/classification.py`
+- `src/domain/sas_helpers.py`
+- `src/domain/family_builder.py`
+- `src/domain/gf_helpers.py`
 
-- final `REF` → contractor responsible
-- `SAS REF` → contractor responsible
-- pending consultant(s) → consultant(s) responsible
-- no pending consultants and no final visa → MOEX responsible
-- final non-REF visa → closed
+### Persistence
 
----
+- `src/run_memory.py` — run history, inputs, artifacts, corrections, invalidation logs
+- `src/report_memory.py` — consultant report ingestion and matched responses
+- `src/run_explorer.py` — listing runs, summaries, exports, comparisons
 
-## Consultant report integration
+### Existing core business modules
 
-### What consultant reports are used for
-
-They enrich:
-
-- missing consultant statuses
-- missing consultant dates
-- missing observations/comments
-- pending GED workflow rows that already have real consultant responses outside GED
-
-### Important constraint
-
-Consultant reports are dirty and inconsistent.
-
-So matching is explicit and traceable.
-
-### Matching philosophy
-
-The matching layer is GED-anchored.
-
-Typical fields involved:
-
-- document reference / numero
-- indice
-- title
-- lot / emitter context
-- date / consultant context
-
-### Confidence model
-
-The system already uses a confidence strategy and persists matched rows.
-
-Rule of thumb:
-
-- high and medium-confidence matches can be operationally reused
-- low-confidence behavior must remain traceable and controlled
-
-### Current important truth
-
-Report-derived consultant truth is **persisted across runs**.
-
-So if a report was ingested once, future runs can reuse that answer even if the user does not re-import the same report file again.
+- `src/read_raw.py` — GED export reader
+- `src/normalize.py` — GED field and response normalization
+- `src/version_engine.py` — document family and index lineage
+- `src/workflow_engine.py` — workflow state, SAS/MOEX handling, visa logic
+- `src/reconciliation_engine.py` — GED vs GF comparison and discrepancy classification
+- `src/effective_responses.py` — GED + report memory merge (left-anchored on GED rows)
+- `src/routing.py` — GF structure mapping
+- `src/writer.py` — GF output writer
+- `src/debug_writer.py` — debug artifact writer
+- `src/consultant_matcher.py` — report-to-GED matching with confidence model
+- `src/consultant_integration.py` — report ingestion orchestration
 
 ---
 
-## Report memory
+## 8. Pipeline stage flow
 
-Report memory is stored separately from run history.
+Current stage order:
 
-It is meant to preserve:
+1. `stage_init_run` — initialize run history and execution context
+2. `stage_read` — read GED inputs, mapping, and register inputs
+3. `stage_normalize` — normalize GED docs and responses, apply SAS filter
+4. `stage_version` — build version lineage and latest/historical state
+5. `stage_route` — apply routing, exclusions, and read GF structures
+6. `stage_report_memory` — merge persisted consultant truth into effective responses
+7. `stage_write_gf` — compute workflow outputs and write reconstructed GF
+8. `stage_discrepancy` — compute discrepancies and run reconciliation
+9. `stage_diagnosis` — produce diagnosis, insert log, and new-submittal analysis
+10. `stage_finalize_run` — register artifacts, persist summary, finalize run
 
-- which report files have already been ingested
-- matched report-derived consultant responses
-- consultant response truth across future runs
-
-This is critical because users may not re-import the same reports every time.
-
-### What report memory enables
-
-Example:
-
-- Socotec still appears pending in GED
-- a previously ingested report already contains the Socotec answer
-- effective responses upgrade the row to `ANSWERED`
-- workflow / responsibility logic then uses the upgraded truth
+`main.py` coordinates these stages through a shared `PipelineState`.
 
 ---
 
-## Run memory
+## 9. Persistent memory layers
 
-Run memory is the execution history system.
+### Report memory (`data/report_memory.db`)
 
-It stores:
+Purpose: persist ingested consultant files, matched consultant responses, and consultant truth across runs. This is project memory for consultant responses.
 
-- one row per run
-- inputs used by the run
-- artifacts produced by the run
-- corrections registered against a run
-- invalidation propagation logs
+Key behavior: if a report was ingested once, future runs can reuse that answer even if the user does not re-import the same report file again.
+
+### Run memory (`data/run_memory.db`)
+
+Purpose: persist runs, run inputs, run artifacts, corrections, invalidation logs, and baseline/lineage state. This is the execution history system.
+
+---
+
+## 10. Supported execution modes
+
+Supported modes are defined through the orchestrated execution layer (`src/run_orchestrator.py`).
+
+### `GED_ONLY`
+
+User provides: GED. Internal behavior: GF is inherited from the latest valid completed run, otherwise Run 0. Note: the core still requires a GF workbook internally — this mode means the user does not provide one explicitly and the system resolves one from run history.
+
+### `GED_GF`
+
+User provides: GED + GF.
+
+### `GED_REPORT`
+
+User provides: GED + reports. Internal behavior: GF inherited from latest valid completed run or Run 0.
+
+### `FULL`
+
+User provides: GED + reports + GF (directly, or inherited if omitted and resolvable from run history).
+
+### Explicitly not supported
+
+**`REPORT_ONLY`** — not supported. Consultant matching/enrichment depends on a GED-derived document/workflow universe.
+
+### Inherited GF resolution order
+
+If the user does not provide a GF, the orchestrator resolves one: (1) latest run where status = COMPLETED, is_stale = 0, FINAL_GF artifact exists on disk; (2) fallback to Run 0 FINAL_GF; (3) if nothing usable exists, fail clearly.
+
+---
+
+## How to run
+
+Standard production/local execution:
+
+```bash
+python main.py
+```
+
+This runs the orchestrated pipeline using the configured inputs under `input/` and persists outputs, artifacts, and run history.
+
+Important:
+
+- Do not bypass the orchestrated path for production runs.
+- Do not delete `data/report_memory.db` unless performing a deliberate full memory reset.
+
+---
+
+## Repository structure
+
+```text
+main.py                    # thin entrypoint
+src/
+  run_orchestrator.py      # controlled execution layer
+  run_memory.py            # run history persistence
+  report_memory.py         # consultant truth persistence
+  run_explorer.py          # run listing, export, comparison
+  pipeline/
+    context.py             # PipelineState
+    compute.py             # heavy computation
+    stages/                # ordered pipeline stages
+  domain/                  # business logic helpers
+  read_raw.py
+  normalize.py
+  version_engine.py
+  workflow_engine.py
+  reconciliation_engine.py
+  effective_responses.py
+  routing.py
+  writer.py
+  debug_writer.py
+  consultant_matcher.py
+  consultant_integration.py
+input/                     # GED, GF, consultant reports
+output/                    # pipeline outputs (mirrored to runs/)
+runs/                      # run-specific artifact snapshots
+data/                      # report_memory.db, run_memory.db
+docs/                      # project documentation
+```
+
+---
+
+## 11. Inputs
+
+Typical inputs live under `input/`:
+
+- `GED_export.xlsx` — raw GED export
+- `Grandfichier_v3.xlsx` — Grand Fichier workbook
+- `consultant_reports/` — consultant report PDFs (118 files in current baseline)
+
+The pipeline also uses:
+
+- `data/report_memory.db` — persistent consultant memory
+- `data/run_memory.db` — persistent run history
+
+---
+
+## 12. Outputs and artifacts
+
+Typical outputs live under `output/` and are also copied into `runs/run_NNNN/`.
+
+Core artifacts:
+
+- `GF_V0_CLEAN.xlsx` — reconstructed Grand Fichier
+- `DISCREPANCY_REPORT.xlsx` — full discrepancy report
+- `DISCREPANCY_REVIEW_REQUIRED.xlsx` — items requiring manual review
+- `ANOMALY_REPORT.xlsx` — detected anomalies
+- `AUTO_RESOLUTION_LOG.xlsx` — auto-resolved items
+- `IGNORED_ITEMS_LOG.xlsx` — intentionally ignored items
+- `INSERT_LOG.xlsx` — insert operations log
+- `RECONCILIATION_LOG.xlsx` — reconciliation events
+- `MISSING_IN_GED_DIAGNOSIS.xlsx` / `MISSING_IN_GED_TRUE_ONLY.xlsx`
+- `MISSING_IN_GF_DIAGNOSIS.xlsx` / `MISSING_IN_GF_TRUE_ONLY.xlsx`
+- `NEW_SUBMITTAL_ANALYSIS.xlsx`
+- `report_memory.db` — snapshot of report memory at time of run
+- Debug artifacts under `output/debug/`
+
+Artifacts are registered in `run_memory.db`. Future export should come from the run registry, not random loose files.
+
+---
+
+## 13. Run history / baseline model
+
+### Run lifecycle states
+
+Each run can be: `STARTED`, `COMPLETED`, or `FAILED`.
 
 ### Run 0
 
-Run 0 is the **baseline truth**.
-
-It is bootstrapped explicitly and acts as the root baseline for all future runs.
+Run 0 is the baseline truth. When `run_memory.db` is absent, the pipeline auto-assigns the first run as Run 0 (BASELINE). No separate bootstrap script is required in the current stabilized codebase.
 
 ### Later runs
 
@@ -368,179 +352,75 @@ Later runs derive from the baseline and may inherit trusted context from previou
 
 ### Stale propagation
 
-If a correction is applied against Run 0 or any other run, descendant runs can be marked stale recursively.
-
----
-
-## Official execution modes
-
-Only the modes below should be considered supported.
-
-### 1. `GED_ONLY`
-User provides:
-
-- GED
-- Mapping
-
-Internal behavior:
-
-- GF is inherited from the latest valid completed run, otherwise Run 0
-
-Important note:
-
-This is **not** “pure no-GF execution.”
-The core still requires a GF workbook internally for routing/writing.
-The mode means:
-
-> user does not provide GF explicitly; system resolves one from run history
-
-### 2. `GED_GF`
-User provides:
-
-- GED
-- GF
-- Mapping
-
-### 3. `GED_REPORT`
-User provides:
-
-- GED
-- reports
-- Mapping
-
-Internal behavior:
-
-- GF inherited from latest valid completed run or Run 0
-
-### 4. `FULL`
-User provides:
-
-- GED
-- GF (or inherited if omitted by current orchestration contract)
-- reports
-- Mapping
-
-### Explicitly not implemented
-
-#### `REPORT_ONLY`
-Not supported.
-
-Why:
-
-The current consultant matching/enrichment path depends on a fresh GED-derived document/workflow universe.
-There is no honest report-only path yet.
-
----
-
-## Inherited GF behavior
-
-If the user does not provide a GF, the orchestrator resolves one in this order:
-
-1. latest run where:
-   - `status = COMPLETED`
-   - `is_stale = 0`
-   - `FINAL_GF` artifact exists
-   - artifact file still exists on disk
-2. fallback to Run 0 `FINAL_GF`
-3. if nothing usable exists, fail clearly
-
-This is the intended behavior and should not be silently bypassed.
-
----
-
-## Output model
-
-### Core outputs
-Typical artifacts include:
-
-- `GF_V0_CLEAN.xlsx`
-- discrepancy reports
-- anomaly reports
-- reconciliation logs
-- consultant match report
-- consultant enriched stage outputs
-- suspicious rows report
-- debug outputs
-- `report_memory.db` snapshot artifact
-
-### DB-backed artifact model
-
-Successful runs copy artifacts into:
-
-- `runs/run_0000/`
-- `runs/run_0001/`
-- etc.
-
-Artifacts are also registered in `run_memory.db`.
-
-This means future export should come from the run registry, not from random loose files.
-
----
-
-## Run lifecycle states
-
-Each run can be:
-
-- `STARTED`
-- `COMPLETED`
-- `FAILED`
-
-This is important because historical failed runs can exist in DB without being considered valid production runs.
-
----
-
-## Baseline/bootstrap rules
-
-### Official Run 0
-
-Run 0 must be created explicitly by:
-
-- `scripts/bootstrap_run_zero.py`
-
-Normal pipeline execution must **not** silently invent Run 0.
+If a correction is applied against Run 0 or another run, descendant runs can be marked stale recursively.
 
 ### Reset discipline
 
-If run history is reset:
-
-- `runs/` can be deleted
-- `data/run_memory.db` can be deleted
-- `data/report_memory.db` should generally be preserved unless a deliberate full reset is intended
+If run history is reset: `runs/` can be deleted, `output/` can be deleted, `data/run_memory.db` can be deleted. `data/report_memory.db` should generally be **preserved** unless a deliberate full memory wipe is intended.
 
 ---
 
-## Production execution rule
+## 14. Validation baseline
 
-Do **not** use standalone side-entrypoints that bypass run memory.
+A healthy run must prove all of the following: pipeline completes, run row exists, latest run is COMPLETED and current, FINAL_GF exists, run artifacts are registered, report memory snapshot exists, no unexpected regression in operational metrics.
 
-In particular:
+Current validated baseline (Run 0):
 
-- direct production execution of `src/consultant_integration.py` is blocked on purpose
+| Metric | Value |
+|--------|-------|
+| `docs_total` | 6491 |
+| `responses_total` | 545244 |
+| `final_gf_rows` | 4728 |
+| `discrepancies_count` | 3221 |
+| `discrepancies_review_required` | 18 |
+| `reconciliation_events` | 171 |
+| `artifacts_registered_count` | 26 |
+| `consultant_report_memory_rows_loaded` | 1242 |
 
-Production runs must go through:
-
-- `main.py`
-- or the orchestrated execution path that records run history
-
----
-
-## Validation expectations
-
-A healthy run should prove all of the following:
-
-- pipeline completes
-- run row exists
-- latest run is `COMPLETED`
-- latest run is current
-- `FINAL_GF` exists
-- run artifacts are registered
-- run bundle export matches DB artifact rows
-- report memory snapshot exists
-- no value-level unexpected regression in GF output
+All future meaningful changes must be validated against this baseline.
 
 ---
 
-## Critical rules for future AI / Codex / contributors
+## 15. UI / reporting status
+
+The backend and staged architecture are stabilized. UI/reporting status is still transitional.
+
+**Completed:**
+
+- Early UI integration milestone reached
+- React shell repaired and building in production mode
+- Workflow/reporting aggregation improved (blocking pending items counted against real visa flow)
+- SAS handling added to reporting with dedicated MOEX SAS fiche
+- Backlog prioritization split into blocking vs non-blocking
+- Consultant fiche rendering expanded with SAS KPIs, pass/refusal rates, queue state, and pressure indicators
+- Desktop launcher supports browser fallback when embedded WebView2 fails
+
+**Still unfinished:**
+
+- Filtering noise reduction
+- Backlog cleanup / verification
+- Cleaner exploitation layer for rapidly adapting UI/reporting/export logic
+
+**Important limitation:** the backend engine is strong, but UI/report/export exploitation is not yet cleanly separated from internal pipeline knowledge.
+
+---
+
+## 16. Known limitations
+
+- `consultant_match_report.xlsx` is not auto-generated in the main pipeline flow — requires separate `consultant_integration.py` execution
+- `report_memory.db` is a persistent dependency and should not be deleted casually
+- `PipelineState` is large (77 fields) and carries many cross-stage values
+- Discrepancy computation remains a high-complexity area — modify only in small isolated changes
+- Excel file hashes are not stable across runs and cannot be used as regression proof
+- Full validation currently relies on end-to-end execution rather than a formal unit/integration test suite
+- UI/report/export exploitation is not yet cleanly decoupled from backend logic
+- openpyxl date serial warnings are non-blocking and do not affect results
+
+See: `docs/KNOWN_LIMITATIONS.md`
+
+---
+
+## 17. Developer and AI working rules
 
 ### NEVER
 
@@ -549,8 +429,9 @@ A healthy run should prove all of the following:
 - silently invent unsupported modes
 - silently downgrade execution mode
 - bypass run memory for production outputs
+- delete `report_memory.db` casually
 - auto-accept weak consultant matches without traceability
-- force report-only support unless GED anchor really exists
+- perform broad architectural rewrites during normal feature work
 
 ### ALWAYS
 
@@ -559,8 +440,25 @@ A healthy run should prove all of the following:
 - respect Run 0 as baseline
 - use run history for inherited GF resolution
 - use report memory as persisted consultant truth
-- keep artifact registration complete for successful runs
-- mark stale descendants instead of hiding lineage impact
+- keep artifact registration complete
+- validate against the baseline after meaningful changes
+- prefer scoped changes over repo-wide rewrites
+
+See: `docs/DEVELOPMENT_RULES.md`
+
+---
+
+## 18. Project docs
+
+Read these first before important work:
+
+- `docs/ARCHITECTURE.md` — entry points, stages, state model, critical rules
+- `docs/PIPELINE_FLOW.md` — input/output flow and state passing
+- `docs/VALIDATION_BASELINE.md` — reference metrics for regression checks
+- `docs/DEVELOPMENT_RULES.md` — modification workflow and discipline
+- `docs/KNOWN_LIMITATIONS.md` — current rough edges and constraints
+- `docs/CLAUDE.md` — AI assistant working context
+- `docs/CODEX.md` — project codex
 
 ---
 
@@ -568,12 +466,6 @@ A healthy run should prove all of the following:
 
 This codebase should be understood as:
 
-> a deterministic reconstruction and enrichment engine with persistent project memory
+> A deterministic reconstruction and enrichment engine with persistent project memory and validated staged execution.
 
-It is not just:
-
-- an Excel updater
-- a report parser
-- or a reconciliation script
-
-It is a baseline-driven, lineage-aware operational engine for rebuilding and enriching a Grand Fichier from unstable chantier data.
+It is not just an Excel updater, a report parser, a reconciliation script, or a temporary chantier utility. It is a baseline-driven, lineage-aware operational engine for rebuilding and enriching a Grand Fichier from unstable chantier data.

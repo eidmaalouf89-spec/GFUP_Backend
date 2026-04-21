@@ -7,6 +7,8 @@ venv/
 env/
 
 backup/
+backups/
+backup_*/
 runs/
 
 *.log
@@ -19,6 +21,19 @@ data/.fuse_hidden*
 
 input/consultant_reports/
 
+# Local agent/worktree scratch space
+.claude/worktrees/
+
+# Temporary prompt scratch files
+codex prompt.txt
+prompt codex.txt
+prompt claude*.txt
+codex prompts/architecture.md
+codex prompts/pipeline_flow.md
+codex prompts/DEVELOPMENT_RULES.md
+codex prompts/VALIDATION_BASELINE.md
+codex prompts/commitname
+
 # Generated pipeline artifacts
 output/*.xlsx
 output/*.md
@@ -29,4 +44,7 @@ output/repports output/
 
 # Generated frontend build artifacts
 ui/dist/
+ui/node_modules/
+ui/.npm-cache/
+ui/npm-cache/
 data/
