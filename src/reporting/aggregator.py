@@ -272,9 +272,18 @@ def compute_consultant_summary(
         (~resp["approver_raw"].str.startswith("Sollicitation", na=False))
     ]
 
-    # Apply focus filter: restrict to responses whose doc_id is in focused set
+    # Apply focus filter: restrict to responses on docs in the focused set
+    # Uses focused_doc_ids (not ownership) for the summary list — ownership
+    # filtering happens in the individual fiche builders, not here.
+    # The summary shows aggregate counts across all focused docs.
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
-        filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        focused_df = getattr(focus_result, 'focused_df', None)
+        if focused_df is not None and "_focus_owner" in focused_df.columns:
+            # For the consultant list, show each consultant's owned count
+            # alongside their total called count for context
+            filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        else:
+            filtered = filtered[filtered["doc_id"].isin(focus_result.focused_doc_ids)].copy()
 
     summaries = []
     for name, grp in filtered.groupby("approver_canonical"):
@@ -319,6 +328,15 @@ def compute_consultant_summary(
                         blocking += 1
 
         if called > 0:
+            # Focus: count owned docs for this consultant
+            focus_owned = 0
+            if focus_result is not None and focus_result.stats.get("focus_enabled"):
+                focused_df = getattr(focus_result, 'focused_df', None)
+                if focused_df is not None and "_focus_owner" in focused_df.columns:
+                    for _, frow in focused_df.iterrows():
+                        owners = frow.get("_focus_owner", [])
+                        if isinstance(owners, list) and name in owners:
+                            focus_owned += 1
             summaries.append({
                 "name": name,
                 "docs_called": called,
@@ -328,6 +346,7 @@ def compute_consultant_summary(
                 "vso": vso, "vao": vao, "ref": ref, "hm": hm,
                 "open": called - answered,
                 "open_blocking": blocking,
+                "focus_owned": focus_owned,
             })
 
     summaries.sort(key=lambda x: x["docs_called"], reverse=True)
@@ -436,6 +455,16 @@ def compute_contractor_summary(
     result = []
     for em, data in by_emetteur.items():
         total = data["docs"]
+        # Focus: count docs this contractor must resubmit (REF owned)
+        focus_owned = 0
+        if focus_result is not None and focus_result.stats.get("focus_enabled"):
+            focused_df = getattr(focus_result, 'focused_df', None)
+            if focused_df is not None and "_focus_owner_tier" in focused_df.columns:
+                focus_owned = int(
+                    ((focused_df["emetteur"] == em) &
+                     (focused_df["_focus_owner_tier"] == "CONTRACTOR")).sum()
+                )
+
         result.append({
             "name": em,
             "code": em,
@@ -448,6 +477,7 @@ def compute_contractor_summary(
             "visa_open": data["open"],
             "sas_ref_rate": round((data["ref"] + data["sas_ref"]) / max(total, 1), 4),
             "approval_rate": round((data["vso"] + data["vao"]) / max(total, 1), 4),
+            "focus_owned": focus_owned,
         })
 
     result.sort(key=lambda x: x["total_submitted"], reverse=True)

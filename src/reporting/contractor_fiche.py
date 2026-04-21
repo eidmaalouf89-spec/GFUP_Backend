@@ -64,11 +64,22 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
     if ctx.dernier_df is not None:
         dernier = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code].copy()
 
-    # Focus filter
+    # Focus filter: use ownership columns from focus_ownership.py
     focus_enabled = (focus_result is not None and
                      focus_result.stats.get("focus_enabled"))
     if focus_enabled and dernier is not None:
-        dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        focused_df = getattr(focus_result, 'focused_df', None)
+        if focused_df is not None and "_focus_owner_tier" in focused_df.columns:
+            # Get focused doc_ids for this contractor's docs
+            # Include: CONTRACTOR-owned (REF, must resubmit) + open docs still in review
+            contractor_focused = focused_df[
+                focused_df["emetteur"] == contractor_code
+            ]
+            focused_ids = set(contractor_focused["doc_id"].tolist())
+            dernier = dernier[dernier["doc_id"].isin(focused_ids)].copy()
+        else:
+            # Fallback to flat focused_doc_ids
+            dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)].copy()
 
     # Metadata
     lots = sorted(set(_safe_str(v) for v in contractor_docs["lot_normalized"].unique() if _safe_str(v) != "?"))
@@ -234,6 +245,19 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
                     sas_result = _safe_str(sas_rows.iloc[0].get("status_clean"))
 
             created = row.get("created_at")
+            # Add ownership info for focus mode
+            owner_tier = None
+            days_to_dl = None
+            focus_priority = None
+            if focus_enabled and "_focus_owner_tier" in row.index:
+                owner_tier = _safe_str(row.get("_focus_owner_tier"))
+                dtd = row.get("_days_to_deadline")
+                if dtd is not None and not (isinstance(dtd, float) and math.isnan(dtd)):
+                    days_to_dl = int(dtd)
+                fp = row.get("_focus_priority")
+                if fp is not None and not (isinstance(fp, float) and math.isnan(fp)):
+                    focus_priority = int(fp)
+
             block3.append({
                 "numero": _safe_str(row.get("numero_normalized")),
                 "indice": _safe_str(row.get("indice")),
@@ -244,6 +268,9 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
                 "date_submitted": str(created.date()) if created and not pd.isna(created) else "-",
                 "date_visa": str(vdate.date()) if vdate and not pd.isna(vdate) else "-",
                 "status": "Open" if visa is None else visa,
+                "owner_tier": owner_tier,
+                "days_to_deadline": days_to_dl,
+                "focus_priority": focus_priority,
             })
 
     block3.sort(key=lambda x: x["numero"])
@@ -280,6 +307,19 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
         "docs_pending_moex": 0,  # Would need responsible_party computation
     }
 
+    # Focus summary: how many docs the contractor must act on
+    focus_summary = None
+    if focus_enabled and dernier is not None and "_focus_owner_tier" in dernier.columns:
+        contractor_owned = int((dernier["_focus_owner_tier"] == "CONTRACTOR").sum())
+        in_review = int(
+            dernier["_focus_owner_tier"].isin(["PRIMARY", "SECONDARY", "MOEX"]).sum()
+        )
+        focus_summary = {
+            "docs_to_resubmit": contractor_owned,
+            "docs_in_review": in_review,
+            "total_focused": len(dernier),
+        }
+
     return {
         "contractor_name": contractor_code,
         "contractor_code": contractor_code,
@@ -295,4 +335,5 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
         "block3_document_table": block3,
         "block4_quality": block4,
         "focus_enabled": bool(focus_enabled),
+        "focus_summary": focus_summary,
     }

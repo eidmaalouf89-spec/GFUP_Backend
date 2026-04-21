@@ -573,7 +573,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
       {/* Monthly Timeseries */}
       {monthly.length > 0 && (
         <div style={{ ...glassCard, padding: 24, marginBottom: 28 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: T.text }}>Monthly Activity</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: T.text }}>{focusMode ? 'Weekly Activity (Focus)' : 'Monthly Activity'}</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 100, paddingBottom: 20, position: 'relative' }}>
             {monthly.map((m, i) => {
               const maxTotal = Math.max(...monthly.map(x => x.total), 1)
@@ -585,7 +585,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
                     width: '100%', maxWidth: 32, height: h, borderRadius: '4px 4px 0 0',
                     background: `linear-gradient(to top, rgba(59,130,246,0.3), rgba(52,211,153,0.3))`,
                   }} />
-                  <div style={{ fontSize: 9, color: T.dim, transform: 'rotate(-45deg)', transformOrigin: 'center', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: focusMode ? 8 : 9, color: T.dim, transform: 'rotate(-45deg)', transformOrigin: 'center', whiteSpace: 'nowrap' }}>
                     {m.month.slice(5)}
                   </div>
                 </div>
@@ -1147,14 +1147,14 @@ function ExecuterPage({ appState }) {
    Consultant Fiche — wrapper that fetches data and renders
    the Apple/Tesla dark ConsultantFiche component
    ══════════════════════════════════════════════════════════════ */
-function ConsultantFicheView({ consultantName, onBack }) {
+function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    api.call("get_consultant_fiche", consultantName)
+    api.call("get_consultant_fiche", consultantName, focusMode, staleDays)
       .then((d) => {
         if (cancelled) return
         if (d && d.error) {
@@ -1170,7 +1170,7 @@ function ConsultantFicheView({ consultantName, onBack }) {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [consultantName])
+  }, [consultantName, focusMode, staleDays])
 
   if (loading) {
     return <Spinner text={`Loading fiche for ${consultantName}...`} />
@@ -1226,7 +1226,7 @@ function ConsultantFicheView({ consultantName, onBack }) {
 /* ══════════════════════════════════════════════════════════════
    Consultants Page — real data from get_consultant_list
    ══════════════════════════════════════════════════════════════ */
-function ConsultantsPage() {
+function ConsultantsPage({ focusMode, staleDays }) {
   const [consultants, setConsultants] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -1237,7 +1237,7 @@ function ConsultantsPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await api.call("get_consultant_list")
+        const data = await api.call("get_consultant_list", focusMode, staleDays)
         if (Array.isArray(data)) {
           setConsultants(data)
         } else if (data && data.error) {
@@ -1252,11 +1252,11 @@ function ConsultantsPage() {
       }
     }
     load()
-  }, [])
+  }, [focusMode, staleDays])
 
   // If a consultant is selected, show their fiche
   if (selectedConsultant) {
-    return <ConsultantFicheView key={selectedConsultant} consultantName={selectedConsultant} onBack={() => setSelectedConsultant(null)} />
+    return <ConsultantFicheView key={selectedConsultant} consultantName={selectedConsultant} onBack={() => setSelectedConsultant(null)} focusMode={focusMode} staleDays={staleDays} />
   }
 
   if (loading) return <Spinner text="Loading consultants..." />
@@ -1354,7 +1354,7 @@ function ConsultantsPage() {
 /* ══════════════════════════════════════════════════════════════
    Contractor Fiche — detail view for one contractor
    ══════════════════════════════════════════════════════════════ */
-function ContractorFiche({ contractorCode, onBack }) {
+function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
   const [fiche, setFiche] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -1364,7 +1364,7 @@ function ContractorFiche({ contractorCode, onBack }) {
       setLoading(true)
       setError(null)
       try {
-        const data = await api.call("get_contractor_fiche", contractorCode)
+        const data = await api.call("get_contractor_fiche", contractorCode, focusMode, staleDays)
         if (data && data.error) {
           setError(data.error)
         } else if (data) {
@@ -1379,7 +1379,7 @@ function ContractorFiche({ contractorCode, onBack }) {
       }
     }
     load()
-  }, [contractorCode])
+  }, [contractorCode, focusMode, staleDays])
 
   if (loading) return <Spinner text={`Loading fiche for ${contractorCode}...`} />
 
@@ -1560,7 +1560,7 @@ function ContractorFiche({ contractorCode, onBack }) {
 /* ══════════════════════════════════════════════════════════════
    Contractors Page — real data from get_contractor_list
    ══════════════════════════════════════════════════════════════ */
-function ContractorsPage() {
+function ContractorsPage({ focusMode, staleDays }) {
   const [contractors, setContractors] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -1571,7 +1571,7 @@ function ContractorsPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await api.call("get_contractor_list")
+        const data = await api.call("get_contractor_list", focusMode, staleDays)
         if (Array.isArray(data)) {
           setContractors(data)
         } else if (data && data.error) {
@@ -1586,11 +1586,11 @@ function ContractorsPage() {
       }
     }
     load()
-  }, [])
+  }, [focusMode, staleDays])
 
   // If a contractor is selected, show their fiche
   if (selectedContractor) {
-    return <ContractorFiche contractorCode={selectedContractor} onBack={() => setSelectedContractor(null)} />
+    return <ContractorFiche contractorCode={selectedContractor} onBack={() => setSelectedContractor(null)} focusMode={focusMode} staleDays={staleDays} />
   }
 
   if (loading) return <Spinner text="Loading contractors..." />
@@ -1795,9 +1795,9 @@ export default function App() {
       case 'Executer':
         return <ExecuterPage appState={appState} />
       case 'Consultants':
-        return <ConsultantsPage />
+        return <ConsultantsPage focusMode={focusMode} staleDays={staleDays} />
       case 'Contractors':
-        return <ContractorsPage />
+        return <ContractorsPage focusMode={focusMode} staleDays={staleDays} />
       default:
         return <PlaceholderPage name={activePage} />
     }

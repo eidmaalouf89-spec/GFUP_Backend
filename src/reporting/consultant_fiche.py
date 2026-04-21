@@ -170,15 +170,32 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
         return _empty_fiche(consultant_name, ctx,
                             warnings=[f"No GED rows matched consultant '{consultant_name}'"])
 
-    # ── Focus filter: restrict to focused doc_ids ───────────────────────────
+    # ── Focus filter: restrict to docs this consultant OWNS ─────────────────
     focus_enabled = (focus_result is not None and
                      focus_result.stats.get("focus_enabled"))
     if focus_enabled and not docs.empty:
         id_col = "doc_id_resp" if "doc_id_resp" in docs.columns else "doc_id"
-        docs = docs[docs[id_col].isin(focus_result.focused_doc_ids)].copy()
+        # Get the focused DataFrame with ownership columns
+        focused_df = getattr(focus_result, 'focused_df', None)
+        if focused_df is not None and "_focus_owner" in focused_df.columns:
+            # Only keep docs where this consultant is in the _focus_owner list
+            owned_ids = set()
+            for _, frow in focused_df.iterrows():
+                owners = frow.get("_focus_owner", [])
+                if isinstance(owners, list) and consultant_name in owners:
+                    owned_ids.add(frow["doc_id"])
+            # Also include MOEX-owned docs for Maître d'Oeuvre EXE fiche
+            if consultant_name == "Maître d'Oeuvre EXE":
+                for _, frow in focused_df.iterrows():
+                    if frow.get("_focus_owner_tier") == "MOEX":
+                        owned_ids.add(frow["doc_id"])
+            docs = docs[docs[id_col].isin(owned_ids)].copy()
+        else:
+            # Fallback: use focused_doc_ids if ownership columns missing
+            docs = docs[docs[id_col].isin(focus_result.focused_doc_ids)].copy()
         if docs.empty:
             return _empty_fiche(consultant_name, ctx,
-                                warnings=[f"No focused docs for '{consultant_name}'"])
+                                warnings=[f"No owned docs for '{consultant_name}' in focus mode"])
 
     # ── Status label resolution (s1/s2/s3) ───────────────────────────────────
     s1, s2, s3 = _resolve_status_labels(ctx, consultant_name)
@@ -203,8 +220,16 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
     # ── Focus: build priority strip for this consultant ──────────────
     focus_priority = None
     if focus_enabled:
+        # Match by ownership: this consultant appears in the owners list
         my_pq = [item for item in (focus_result.priority_queue or [])
-                 if item.get("responsible") == consultant_name]
+                 if consultant_name in item.get("owners", [])]
+        # Also include MOEX-tier docs for MOEX fiche
+        if consultant_name == "Maître d'Oeuvre EXE":
+            moex_pq = [item for item in (focus_result.priority_queue or [])
+                       if item.get("owner_tier") == "MOEX"]
+            seen = {item["doc_id"] for item in my_pq}
+            my_pq.extend(item for item in moex_pq if item["doc_id"] not in seen)
+            my_pq.sort(key=lambda x: (x["priority"], x.get("delta_days") or 9999))
         p_counts = {}
         for item in my_pq:
             p = item["priority"]
@@ -278,11 +303,17 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
     if merged.empty:
         return _empty_sas_fiche(ctx)
 
-    # Focus filter
+    # Focus filter: SAS fiche shows all focused docs (SAS is a gate, not an owner)
+    # But exclude resolved docs (VISA GLOBAL is terminal)
     focus_enabled = (focus_result is not None and
                      focus_result.stats.get("focus_enabled"))
     if focus_enabled:
-        merged = merged[merged["doc_id"].isin(focus_result.focused_doc_ids)].copy()
+        focused_df = getattr(focus_result, 'focused_df', None)
+        if focused_df is not None:
+            focused_ids = set(focused_df["doc_id"].tolist())
+        else:
+            focused_ids = focus_result.focused_doc_ids
+        merged = merged[merged["doc_id"].isin(focused_ids)].copy()
         if merged.empty:
             return _empty_sas_fiche(ctx)
 
@@ -934,6 +965,11 @@ def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
     if docs.empty:
         return []
 
+    docs = docs.copy()
+    for col in ("_created_date", "_date_answered"):
+        if col in docs.columns:
+            docs[col] = pd.to_datetime(docs[col], errors="coerce")
+
     closed_statuses = {s1, s2, s3, "HM"}
 
     # Collect all ISO weeks represented in created or answered dates
@@ -973,16 +1009,18 @@ def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
         jan4 = date(y, 1, 4)
         week_start = jan4 + timedelta(weeks=w - 1, days=-jan4.weekday())
         week_end = week_start + timedelta(days=6)
+        week_start_ts = pd.Timestamp(week_start)
+        week_end_ts = pd.Timestamp(week_end)
 
         created_in_week = docs[
             docs["_created_date"].notna() &
-            (docs["_created_date"] >= week_start) &
-            (docs["_created_date"] <= week_end)
+            (docs["_created_date"] >= week_start_ts) &
+            (docs["_created_date"] <= week_end_ts)
         ]
         closed_in_week = docs[
             docs["_date_answered"].notna() &
-            (docs["_date_answered"] >= week_start) &
-            (docs["_date_answered"] <= week_end) &
+            (docs["_date_answered"] >= week_start_ts) &
+            (docs["_date_answered"] <= week_end_ts) &
             docs["_status_for_consultant"].isin(closed_statuses)
         ]
 
@@ -998,7 +1036,7 @@ def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
             return round((c / doc_ferme) * 100, 1) if doc_ferme else None
 
         # Open snapshot at end of week
-        snapshot = docs[docs["_created_date"].notna() & (docs["_created_date"] <= week_end)]
+        snapshot = docs[docs["_created_date"].notna() & (docs["_created_date"] <= week_end_ts)]
         try:
             open_at_end = snapshot[snapshot.apply(
                 lambda r: r["_open_at_date"](week_end), axis=1

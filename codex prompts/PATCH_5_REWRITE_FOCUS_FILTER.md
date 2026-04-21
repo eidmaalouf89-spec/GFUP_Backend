@@ -1,3 +1,29 @@
+# PATCH 5 — Rewrite focus_filter.py to Use Pre-Computed Columns
+
+## OBJECTIVE
+
+Replace the current `focus_filter.py` which does per-doc Python loops (slow, O(N×M)) with a version that uses the pre-computed columns from Patches 3+4 (fast, pure DataFrame ops). The `FocusResult` shape stays identical — all downstream consumers (aggregator, app.py) work unchanged.
+
+## RULES
+
+- REPLACE the entire content of `src/reporting/focus_filter.py`
+- Do NOT modify any other file
+- The `FocusConfig` and `FocusResult` dataclass shapes MUST stay identical (same field names, same types)
+- `apply_focus_filter` MUST return the same `FocusResult` shape
+- Do NOT create test files
+
+## PREREQUISITE
+
+Patches 3 and 4 must be applied first. `dernier_df` must have these columns:
+`_visa_global`, `_days_since_last_activity`, `_earliest_deadline`, `_days_to_deadline`, `_focus_priority`, `_focus_owner`, `_focus_owner_tier`
+
+---
+
+## THE PATCH
+
+Replace the ENTIRE content of `src/reporting/focus_filter.py` with:
+
+```python
 """
 focus_filter.py — Focus Mode filter engine (v2)
 
@@ -201,3 +227,24 @@ def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:
     }
 
     return result
+```
+
+---
+
+## VERIFICATION
+
+```bash
+python -c "import ast; ast.parse(open('src/reporting/focus_filter.py').read()); print('focus_filter.py syntax OK')"
+```
+
+```bash
+python -c "
+import sys; sys.path.insert(0, 'src')
+from reporting.focus_filter import apply_focus_filter, FocusConfig, FocusResult
+print('FocusConfig fields:', [f.name for f in FocusConfig.__dataclass_fields__.values()])
+print('FocusResult fields:', [f.name for f in FocusResult.__dataclass_fields__.values()])
+print('apply_focus_filter importable: OK')
+"
+```
+
+Both must pass. The FocusResult must show `focused_df` as a new field alongside the existing ones. Do NOT create test files.
