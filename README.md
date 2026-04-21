@@ -350,7 +350,7 @@ This workflow:
 The UI exposes this artifact as **Tableau de Suivi VISA** from Overview Quick Actions, consultant fiche pages, and the Reports page. The export action copies the registered run artifact to:
 
 ```text
-output/tableau_de_suivi_visa_DD_MM_YYYY.xlsx
+output/Tableau de suivi de visa DD_MM_YYYY.xlsx
 ```
 
 If the artifact is missing, the UI reports that the pipeline must be run first.
@@ -420,6 +420,7 @@ The backend and staged architecture are stabilized. UI/reporting status is still
 
 - Filtering noise reduction
 - Backlog cleanup / verification
+- Drilldown document lists need calibration: source data is still wrong or incomplete in places, the returned lists are not yet fully reliable, and the current behavior is not optimal for production use
 - Cleaner exploitation layer for rapidly adapting UI/reporting/export logic
 
 **Important limitation:** the backend engine is strong, but UI/report/export exploitation is not yet cleanly separated from internal pipeline knowledge.

@@ -1841,7 +1841,7 @@ function ReportsPage() {
           <div style={{ fontSize: 12, color: T.muted }}>
             Exporte le Grand Fichier enrichi (version équipe) avec le nom
             <span style={{ fontFamily: 'monospace', fontSize: 11, marginLeft: 4, color: T.dim }}>
-              tableau_de_suivi_visa_DD_MM_YYYY.xlsx
+              Tableau de suivi de visa DD_MM_YYYY.xlsx
             </span>
           </div>
         </div>
