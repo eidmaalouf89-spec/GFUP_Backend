@@ -454,7 +454,7 @@ class Api:
             traceback.print_exc()
             return _sanitize_for_json({"success": False, "path": None, "error": str(exc)})
 
-    def get_doc_details(self, consultant_name, filter_key, lot_name=None):
+    def get_doc_details(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90):
         """Return document-level detail for a specific consultant fiche KPI cell."""
         import traceback
         try:
@@ -473,6 +473,28 @@ class Api:
             if docs.empty:
                 return _sanitize_for_json({"docs": [], "count": 0})
             docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3, ctx=ctx)
+
+            if focus:
+                from reporting.focus_filter import apply_focus_filter, FocusConfig
+                focus_config = FocusConfig(enabled=True, stale_threshold_days=int(stale_days))
+                focus_result = apply_focus_filter(ctx, focus_config)
+                id_col = "doc_id_resp" if "doc_id_resp" in docs.columns else "doc_id"
+                focused_df = getattr(focus_result, "focused_df", None)
+                if focused_df is not None and "_focus_owner" in focused_df.columns:
+                    owned_ids = set()
+                    for _, frow in focused_df.iterrows():
+                        owners = frow.get("_focus_owner", [])
+                        if isinstance(owners, list) and canonical in owners:
+                            owned_ids.add(frow["doc_id"])
+                    if canonical == "Maître d'Oeuvre EXE":
+                        for _, frow in focused_df.iterrows():
+                            if frow.get("_focus_owner_tier") == "MOEX":
+                                owned_ids.add(frow["doc_id"])
+                else:
+                    owned_ids = focus_result.focused_doc_ids
+                docs = docs[docs[id_col].isin(owned_ids)]
+                if docs.empty:
+                    return _sanitize_for_json({"docs": [], "count": 0})
 
             actual_filter = filter_key
             actual_lot = lot_name
@@ -575,6 +597,105 @@ class Api:
         except Exception as exc:
             traceback.print_exc()
             return _sanitize_for_json({"docs": [], "count": 0, "error": str(exc)})
+
+    def export_drilldown_xlsx(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90):
+        """Export the currently filtered drilldown documents to an Excel file."""
+        import inspect
+        import tempfile
+        import traceback
+        try:
+            sig = inspect.signature(self.get_doc_details)
+            if "focus" in sig.parameters:
+                result = self.get_doc_details(consultant_name, filter_key, lot_name, focus, stale_days)
+            else:
+                result = self.get_doc_details(consultant_name, filter_key, lot_name)
+
+            docs = result.get("docs", []) if isinstance(result, dict) else []
+            if not docs:
+                return _sanitize_for_json({"success": False, "error": "No documents to export"})
+
+            from openpyxl import Workbook
+            from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Drilldown"
+
+            headers = [
+                "Numero", "Indice", "Emetteur", "Titre", "Lot",
+                "Date Soumission", "Date Echeance", "Jours Restants", "Statut",
+            ]
+            keys = [
+                "numero", "indice", "emetteur", "titre", "lot",
+                "date_soumission", "date_limite", "remaining_days", "status",
+            ]
+
+            header_font = Font(name="Calibri", bold=True, size=11, color="FFFFFF")
+            header_fill = PatternFill(start_color="2B579A", end_color="2B579A", fill_type="solid")
+            header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            thin_border = Border(
+                left=Side(style="thin", color="D9D9D9"),
+                right=Side(style="thin", color="D9D9D9"),
+                top=Side(style="thin", color="D9D9D9"),
+                bottom=Side(style="thin", color="D9D9D9"),
+            )
+
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_align
+                cell.border = thin_border
+
+            late_fill = PatternFill(start_color="FFF0F0", end_color="FFF0F0", fill_type="solid")
+            for row_idx, doc in enumerate(docs, 2):
+                is_late = doc.get("remaining_days") is not None and doc["remaining_days"] < 0
+                for col_idx, key in enumerate(keys, 1):
+                    value = doc.get(key)
+                    if value is None:
+                        value = ""
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = thin_border
+                    cell.font = Font(name="Calibri", size=10)
+                    if is_late:
+                        cell.fill = late_fill
+
+            widths = [16, 6, 14, 50, 16, 14, 14, 12, 10]
+            for col_idx, width in enumerate(widths, 1):
+                ws.column_dimensions[chr(64 + col_idx)].width = width
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = f"A1:{chr(64 + len(headers))}{len(docs) + 1}"
+
+            ws_meta = wb.create_sheet("Info")
+            ws_meta["A1"] = "Consultant"
+            ws_meta["B1"] = consultant_name
+            ws_meta["A2"] = "Filtre"
+            ws_meta["B2"] = filter_key
+            ws_meta["A3"] = "Documents"
+            ws_meta["B3"] = len(docs)
+            for row_idx in range(1, 4):
+                ws_meta.cell(row=row_idx, column=1).font = Font(bold=True)
+
+            def _safe_filename(value):
+                return "".join(c if c.isalnum() or c in " _-" else "_" for c in str(value)).strip()
+
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            safe_consultant = _safe_filename(consultant_name)
+            safe_filter = _safe_filename(filter_key)
+            date_str = __import__("datetime").date.today().strftime("%d%m%Y")
+            dest = OUTPUT_DIR / f"Drilldown_{safe_consultant}_{safe_filter}_{date_str}.xlsx"
+
+            with tempfile.NamedTemporaryFile(dir=str(OUTPUT_DIR), suffix=".xlsx", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            wb.save(str(tmp_path))
+            if dest.exists():
+                dest.unlink()
+            tmp_path.rename(dest)
+
+            return _sanitize_for_json({"success": True, "path": str(dest), "count": len(docs)})
+        except Exception as exc:
+            traceback.print_exc()
+            return _sanitize_for_json({"success": False, "error": str(exc)})
 
     def validate_inputs(self, run_mode, ged_path=None, gf_path=None,
                         reports_dir=None):

@@ -106,7 +106,7 @@ function DrawerBackdrop({ visible, onClose }) {
   }} />
 }
 
-function DocDetailDrawer({ visible, onClose, docs, title, loading }) {
+function DocDetailDrawer({ visible, onClose, docs, title, loading, onExport, exporting }) {
   if (!visible) return null
   return (
     <div style={{
@@ -120,7 +120,23 @@ function DocDetailDrawer({ visible, onClose, docs, title, loading }) {
           <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{title || 'Documents'}</div>
           <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{loading ? 'Loading...' : `${(docs || []).length} documents`}</div>
         </div>
-        <button onClick={onClose} style={{ background: T.glass, border: `1px solid ${T.glassBorder}`, borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: T.muted, fontSize: 16 }}>x</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {onExport && docs && docs.length > 0 && !loading && (
+            <button onClick={onExport} disabled={exporting} style={{
+              background: 'rgba(59,130,246,0.12)', color: T.accent,
+              border: '1px solid rgba(59,130,246,0.25)',
+              borderRadius: 8, padding: '6px 12px',
+              fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
+              cursor: exporting ? 'wait' : 'pointer',
+              opacity: exporting ? 0.5 : 1,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              whiteSpace: 'nowrap',
+            }}>
+              {exporting ? 'Export...' : 'Export Excel'}
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: T.glass, border: `1px solid ${T.glassBorder}`, borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: T.muted, fontSize: 16 }}>x</button>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {loading ? (
@@ -1258,6 +1274,8 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
   const [drawerDocs, setDrawerDocs] = useState([])
   const [drawerTitle, setDrawerTitle] = useState("")
   const [drawerLoading, setDrawerLoading] = useState(false)
+  const [drawerFilterKey, setDrawerFilterKey] = useState("")
+  const [drawerExporting, setDrawerExporting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -1284,8 +1302,9 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
     setDrawerLoading(true)
     setDrawerTitle(filterKey)
     setDrawerDocs([])
+    setDrawerFilterKey(filterKey)
     try {
-      const res = await api.call("get_doc_details", consultantName, filterKey)
+      const res = await api.call("get_doc_details", consultantName, filterKey, null, focusMode, staleDays)
       if (res && res.docs) {
         setDrawerDocs(res.docs)
         setDrawerTitle(`${filterKey} - ${res.count} docs`)
@@ -1296,6 +1315,22 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
       setDrawerTitle(`Error: ${e}`)
     } finally {
       setDrawerLoading(false)
+    }
+  }
+
+  const handleExportDrilldown = async () => {
+    setDrawerExporting(true)
+    try {
+      const res = await api.call("export_drilldown_xlsx", consultantName, drawerFilterKey, null, focusMode, staleDays)
+      if (res && res.success) {
+        api.call("open_file_in_explorer", res.path)
+      } else {
+        console.error("Export failed:", res?.error)
+      }
+    } catch (e) {
+      console.error("Export error:", e)
+    } finally {
+      setDrawerExporting(false)
     }
   }
 
@@ -1334,7 +1369,7 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
         <ExportTeamVersionButton />
         <ConsultantFicheComponent data={data} lang="fr" onCellClick={handleCellClick} />
         <DrawerBackdrop visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
-        <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} />
+        <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} onExport={handleExportDrilldown} exporting={drawerExporting} />
       </div>
     )
   }
@@ -1353,7 +1388,7 @@ function ConsultantFicheView({ consultantName, onBack, focusMode, staleDays }) {
       </div>
       <ConsultantFicheComponent data={data} lang="fr" onCellClick={handleCellClick} />
       <DrawerBackdrop visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
-      <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} />
+      <DocDetailDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} docs={drawerDocs} title={drawerTitle} loading={drawerLoading} onExport={handleExportDrilldown} exporting={drawerExporting} />
     </div>
   )
 }
