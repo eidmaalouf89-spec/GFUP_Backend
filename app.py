@@ -441,7 +441,7 @@ class Api:
                 })
             date_str = ctx.data_date.strftime("%d_%m_%Y") if ctx.data_date else __import__("datetime").date.today().strftime("%d_%m_%Y")
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            dest = OUTPUT_DIR / f"Tableau de suivi de visa {date_str}.xlsx"
+            dest = OUTPUT_DIR / f"tableau_de_suivi_visa_{date_str}.xlsx"
             with tempfile.NamedTemporaryFile(dir=str(OUTPUT_DIR), suffix=".xlsx", delete=False) as tmp:
                 tmp_path = Path(tmp.name)
             shutil.copy2(str(team_path), str(tmp_path))

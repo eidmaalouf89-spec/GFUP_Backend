@@ -87,13 +87,13 @@ function ExportTeamVersionButton() {
     <button onClick={handleExport} disabled={exporting} style={{
       background: 'rgba(59,130,246,0.12)', color: T.accent,
       border: '1px solid rgba(59,130,246,0.25)',
-      borderRadius: 8, padding: '6px 14px',
+      borderRadius: 8, padding: '8px 16px',
       fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
       cursor: exporting ? 'wait' : 'pointer',
       opacity: exporting ? 0.5 : 1,
       display: 'inline-flex', alignItems: 'center', gap: 6,
     }}>
-      {exporting ? 'Exporting...' : result ? (result.ok ? 'Exported' : 'Error') : 'Export GF'}
+      {exporting ? 'Export en cours...' : result ? (result.ok ? '✓ Exporté' : '✗ Erreur') : 'Tableau de Suivi VISA'}
     </button>
   )
 }
@@ -724,7 +724,6 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
       <div style={{ ...glassCard, padding: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: T.text }}>Quick Actions</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <ExportTeamVersionButton />
           {[
             { label: 'Run Pipeline', target: 'Executer' },
             { label: 'View Runs', target: 'Runs' },
@@ -749,6 +748,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
               {action.label}
             </button>
           ))}
+          <ExportTeamVersionButton />
         </div>
       </div>
     </div>
@@ -1820,6 +1820,46 @@ function ContractorsPage({ focusMode, staleDays }) {
 }
 
 /* ── Placeholder Pages ──────────────────────────────────────── */
+function ReportsPage() {
+  return (
+    <div style={{ padding: 32, maxWidth: 900 }}>
+      <div style={{ fontSize: 20, fontWeight: 600, color: T.text, marginBottom: 8 }}>
+        Rapports & Exports
+      </div>
+      <div style={{ fontSize: 13, color: T.muted, marginBottom: 32 }}>
+        Générer et exporter les documents de suivi du projet.
+      </div>
+
+      <div style={{
+        ...glassCard, padding: 24, marginBottom: 20,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: T.text, marginBottom: 4 }}>
+            Tableau de Suivi VISA
+          </div>
+          <div style={{ fontSize: 12, color: T.muted }}>
+            Exporte le Grand Fichier enrichi (version équipe) avec le nom
+            <span style={{ fontFamily: 'monospace', fontSize: 11, marginLeft: 4, color: T.dim }}>
+              tableau_de_suivi_visa_DD_MM_YYYY.xlsx
+            </span>
+          </div>
+        </div>
+        <ExportTeamVersionButton />
+      </div>
+
+      <div style={{ ...glassCard, padding: 24, opacity: 0.5 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: T.muted, marginBottom: 4 }}>
+          Autres rapports
+        </div>
+        <div style={{ fontSize: 12, color: T.dim }}>
+          Fiches consultants, bilans entreprises — à venir.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PlaceholderPage({ name }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 12 }}>
@@ -1936,6 +1976,8 @@ export default function App() {
         return <ConsultantsPage focusMode={focusMode} staleDays={staleDays} />
       case 'Contractors':
         return <ContractorsPage focusMode={focusMode} staleDays={staleDays} />
+      case 'Reports':
+        return <ReportsPage />
       default:
         return <PlaceholderPage name={activePage} />
     }

@@ -193,7 +193,7 @@ Current stage order:
 4. `stage_version` — build version lineage and latest/historical state
 5. `stage_route` — apply routing, exclusions, and read GF structures
 6. `stage_report_memory` — merge persisted consultant truth into effective responses
-7. `stage_write_gf` — compute workflow outputs and write reconstructed GF
+7. `stage_write_gf` — compute workflow outputs, write reconstructed GF, and generate the team GF/VISA workbook
 8. `stage_discrepancy` — compute discrepancies and run reconciliation
 9. `stage_diagnosis` — produce diagnosis, insert log, and new-submittal analysis
 10. `stage_finalize_run` — register artifacts, persist summary, finalize run
@@ -319,6 +319,7 @@ Typical outputs live under `output/` and are also copied into `runs/run_NNNN/`.
 Core artifacts:
 
 - `GF_V0_CLEAN.xlsx` — reconstructed Grand Fichier
+- `GF_TEAM_VERSION.xlsx` — team-facing Grand Fichier / Tableau de Suivi VISA generated automatically from the original GF plus `GF_V0_CLEAN.xlsx`
 - `DISCREPANCY_REPORT.xlsx` — full discrepancy report
 - `DISCREPANCY_REVIEW_REQUIRED.xlsx` — items requiring manual review
 - `ANOMALY_REPORT.xlsx` — detected anomalies
@@ -333,6 +334,26 @@ Core artifacts:
 - Debug artifacts under `output/debug/`
 
 Artifacts are registered in `run_memory.db`. Future export should come from the run registry, not random loose files.
+
+### Team GF / Tableau de Suivi VISA workflow
+
+During `stage_write_gf`, the pipeline calls `src/team_version_builder.py` through `build_team_version()`.
+
+This workflow:
+
+- starts from the original `input/Grandfichier_v3.xlsx`
+- applies the clean reconstructed truth from `output/GF_V0_CLEAN.xlsx`
+- writes `output/GF_TEAM_VERSION.xlsx`
+- also writes `output/SUSPICIOUS_ROWS_REPORT.xlsx` for rows that need review
+- registers both artifacts in run memory for the completed run
+
+The UI exposes this artifact as **Tableau de Suivi VISA** from Overview Quick Actions, consultant fiche pages, and the Reports page. The export action copies the registered run artifact to:
+
+```text
+output/tableau_de_suivi_visa_DD_MM_YYYY.xlsx
+```
+
+If the artifact is missing, the UI reports that the pipeline must be run first.
 
 ---
 

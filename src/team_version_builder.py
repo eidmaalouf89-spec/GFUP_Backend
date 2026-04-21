@@ -1124,6 +1124,107 @@ def generate_suspicious_report(report):
 
 # ─── ENTRY POINT ────────────────────────────────────────────────────────────
 
+def build_team_version(ogf_path, clean_path, out_path):
+    """
+    Pipeline-callable entry point.
+    Same logic as main() but with explicit paths instead of module constants.
+    Returns the report dict.
+    """
+    import os
+    import sys
+    import tempfile
+    import warnings
+
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    print("=== GF TEAM VERSION BUILDER ===")
+    print(f"OGF:   {ogf_path}")
+    print(f"Clean: {clean_path}")
+    print(f"Out:   {out_path}")
+    print()
+
+    out_dir = os.path.dirname(os.path.abspath(out_path)) or "."
+    with tempfile.NamedTemporaryFile(dir=out_dir, suffix=".xlsx", delete=False) as work_tmp:
+        work_path = work_tmp.name
+    shutil.copy2(ogf_path, work_path)
+    print(f"Copied OGF to temporary workbook {work_path}")
+
+    print("Loading workbooks...")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb_read = load_workbook(ogf_path, data_only=True)
+        wb_clean = load_workbook(clean_path, data_only=True)
+        wb_write = load_workbook(work_path)
+
+    report = {
+        'total_matched': 0,
+        'total_updated': 0,
+        'total_inserted': 0,
+        'total_suspicious': 0,
+        'skipped_old': 0,
+        'skipped_sheets': [],
+        'suspicious': [],
+        'examples_updated': [],
+        'examples_inserted_a': [],
+        'examples_inserted_chain': [],
+        'examples_inserted_fallback': [],
+    }
+
+    for sheet_name in wb_clean.sheetnames:
+        if sheet_name not in wb_read.sheetnames:
+            print(f"  [SKIP] {sheet_name}: not found in OGF")
+            continue
+        if sheet_name not in wb_write.sheetnames:
+            print(f"  [SKIP] {sheet_name}: not found in output wb")
+            continue
+        ws_read = wb_read[sheet_name]
+        ws_clean = wb_clean[sheet_name]
+        ws_write = wb_write[sheet_name]
+        process_sheet(ws_read, ws_clean, ws_write, sheet_name, report)
+
+    print("\nSetting up page layout...")
+    for sheet_name in wb_write.sheetnames:
+        try:
+            ws = wb_write[sheet_name]
+            setup_page_layout(ws)
+        except Exception as e:
+            print(f"  [WARN] Page layout for {sheet_name}: {e}")
+
+    print(f"\nSaving to {out_path}...")
+    with tempfile.NamedTemporaryFile(dir=out_dir, suffix=".xlsx", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        wb_write.save(tmp_path)
+    finally:
+        for wb in (wb_read, wb_clean, wb_write):
+            try:
+                wb.close()
+            except Exception:
+                pass
+    try:
+        if os.path.exists(out_path):
+            os.chmod(out_path, 0o666)
+    except Exception:
+        pass
+    os.replace(tmp_path, out_path)
+    try:
+        os.unlink(work_path)
+    except Exception:
+        pass
+    print("Saved.")
+
+    generate_suspicious_report(report)
+
+    print(f"\nTeam version: matched={report['total_matched']}, "
+          f"updated={report['total_updated']}, inserted={report['total_inserted']}, "
+          f"suspicious={report['total_suspicious']}")
+    return report
+
+
 def main():
     print("=== GF TEAM VERSION BUILDER ===")
     print(f"OGF:   {OGF_PATH}")

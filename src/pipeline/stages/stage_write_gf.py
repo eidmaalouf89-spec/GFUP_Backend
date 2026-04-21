@@ -149,3 +149,20 @@ def stage_write_gf(ctx, log):
     ctx.gf_to_ged_map = gf_to_ged_map
     ctx.ancien_df = ancien_df
     ctx.gf_sas_lookup = gf_sas_lookup
+
+    # Build GF TEAM VERSION (surgical OGF patch)
+    _team_out = ctx.OUTPUT_GF_TEAM_VERSION
+    if _team_out is not None:
+        try:
+            from team_version_builder import build_team_version
+            log("Building GF_TEAM_VERSION...")
+            _team_report = build_team_version(
+                ogf_path=str(GF_FILE),
+                clean_path=str(OUTPUT_GF),
+                out_path=str(_team_out),
+            )
+            log(f"  -> {_team_out}  (matched={_team_report['total_matched']}, "
+                f"updated={_team_report['total_updated']}, "
+                f"inserted={_team_report['total_inserted']})")
+        except Exception as _tv_err:
+            log(f"  [WARN] GF_TEAM_VERSION build failed (non-fatal): {_tv_err}")
