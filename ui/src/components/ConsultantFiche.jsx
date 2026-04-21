@@ -148,7 +148,7 @@ function BlockHead({ num, title, right }) {
 }
 
 // ── Masthead ────────────────────────────────────────────────────────────────
-function Masthead({ data, t }) {
+function Masthead({ data, t, onCellClick }) {
   const c = data.consultant;
   const h = data.header;
   const isSas = data.is_sas_fiche;
@@ -190,7 +190,12 @@ function Masthead({ data, t }) {
             marginTop: 6,
             background: "linear-gradient(180deg, #FFFFFF 0%, #9A9AA0 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"
-          }}>{fmt(isSas ? (h.checked ?? h.total) : h.total)}</div>
+          }}>
+            <ClickableNum filterKey="total" onClick={onCellClick} style={{
+              background: "inherit", WebkitBackgroundClip: "inherit",
+              WebkitTextFillColor: "inherit",
+            }}>{fmt(isSas ? (h.checked ?? h.total) : h.total)}</ClickableNum>
+          </div>
         </div>
       </div>
     </header>
@@ -198,7 +203,7 @@ function Masthead({ data, t }) {
 }
 
 // ── Hero KPI band — Apple-style glass cards ─────────────────────────────────
-function HeroStats({ data, t }) {
+function HeroStats({ data, t, onCellClick }) {
   const h = data.header;
   const d = data.week_delta || {};
   const isSas = data.is_sas_fiche;
@@ -215,10 +220,11 @@ function HeroStats({ data, t }) {
       eyebrow: t.sasPassed,
       value: fmt((h.vso_count ?? 0) + (h.vao_count ?? 0)),
       chips: [
-        { label: "VSO", n: h.vso_count ?? h.s1_count, tone: TOK.VSO },
-        { label: "VAO", n: h.vao_count ?? h.s2_count, tone: TOK.VAO },
-        { label: "REF", n: h.ref_count ?? h.s3_count, tone: TOK.REF }
+        { label: "VSO", n: h.vso_count ?? h.s1_count, tone: TOK.VSO, filterKey: "s1" },
+        { label: "VAO", n: h.vao_count ?? h.s2_count, tone: TOK.VAO, filterKey: "s2" },
+        { label: "REF", n: h.ref_count ?? h.s3_count, tone: TOK.REF, filterKey: "s3" }
       ],
+      valueFilterKey: "answered",
       delta: (d.vso||0)+(d.vao||0),
       spark: sparkRendered, tone: TOK.VSO
     },
@@ -226,9 +232,10 @@ function HeroStats({ data, t }) {
       eyebrow: t.sasPending,
       value: fmt(h.pending_count ?? h.open_count),
       chips: [
-        { label: t.onTime, n: h.pending_ok ?? h.open_ok, tone: TOK.OPEN },
-        { label: t.late,   n: h.pending_late ?? h.open_late, tone: TOK.REF }
+        { label: t.onTime, n: h.pending_ok ?? h.open_ok, tone: TOK.OPEN, filterKey: "open_ok" },
+        { label: t.late,   n: h.pending_late ?? h.open_late, tone: TOK.REF, filterKey: "open_late" }
       ],
+      valueFilterKey: "open_count",
       delta: d.pending ?? d.open ?? 0, invertDelta: true,
       spark: sparkOpen, tone: TOK.OPEN
     },
@@ -236,7 +243,7 @@ function HeroStats({ data, t }) {
       eyebrow: t.sasPassRate,
       value: `${h.pass_rate ?? 0}%`,
       chips: [
-        { label: `${(h.vso_count??0)+(h.vao_count??0)}/${h.checked??h.answered}`, n: null, tone: TOK.VSO }
+        { label: `${(h.vso_count??0)+(h.vao_count??0)}/${h.checked??h.answered}`, n: null, tone: TOK.VSO, filterKey: "s1" }
       ],
       delta: d.ref_rate != null ? -d.ref_rate : 0, deltaSuffix: "pt", invertDelta: false,
       spark: sparkPass, tone: TOK.VSO
@@ -246,11 +253,12 @@ function HeroStats({ data, t }) {
       eyebrow: t.rendered,
       value: fmt(h.answered),
       chips: [
-        { label: h.s1, n: h.s1_count, tone: TOK.VSO },
-        { label: h.s2, n: h.s2_count, tone: TOK.VAO },
-        { label: h.s3, n: h.s3_count, tone: TOK.REF },
-        { label: "HM", n: h.hm_count, tone: TOK.HM }
+        { label: h.s1, n: h.s1_count, tone: TOK.VSO, filterKey: "s1" },
+        { label: h.s2, n: h.s2_count, tone: TOK.VAO, filterKey: "s2" },
+        { label: h.s3, n: h.s3_count, tone: TOK.REF, filterKey: "s3" },
+        { label: "HM", n: h.hm_count, tone: TOK.HM, filterKey: "hm" }
       ],
+      valueFilterKey: "answered",
       delta: (d.s1||0)+(d.s2||0)+(d.s3||0)+(d.hm||0),
       spark: sparkRendered, tone: TOK.VSO
     },
@@ -258,10 +266,11 @@ function HeroStats({ data, t }) {
       eyebrow: t.pending,
       value: fmt(h.open_blocking ?? h.open_count),
       chips: [
-        { label: t.blocOk,  n: h.open_blocking_ok ?? h.open_ok,   tone: TOK.OPEN },
-        { label: t.blocLate, n: h.open_blocking_late ?? h.open_late, tone: TOK.REF },
-        { label: t.nbShort, n: h.open_non_blocking ?? 0, tone: TOK.NB }
+        { label: t.blocOk,  n: h.open_blocking_ok ?? h.open_ok,   tone: TOK.OPEN, filterKey: "open_blocking_ok" },
+        { label: t.blocLate, n: h.open_blocking_late ?? h.open_late, tone: TOK.REF, filterKey: "open_blocking_late" },
+        { label: t.nbShort, n: h.open_non_blocking ?? 0, tone: TOK.NB, filterKey: "open_non_blocking" }
       ],
+      valueFilterKey: "open_blocking",
       delta: d.open_blocking ?? d.open ?? 0, invertDelta: true,
       spark: sparkOpen, tone: TOK.OPEN
     },
@@ -269,7 +278,7 @@ function HeroStats({ data, t }) {
       eyebrow: t.refus,
       value: `${refusRate}%`,
       chips: [
-        { label: `${h.s3_count}/${h.answered}`, n: null, tone: TOK.REF }
+        { label: `${h.s3_count}/${h.answered}`, n: null, tone: TOK.REF, filterKey: "s3" }
       ],
       delta: d.refus_rate_pct ?? 0, deltaSuffix: "pt", invertDelta: true,
       spark: sparkRefus, tone: TOK.REF
@@ -308,7 +317,11 @@ function HeroStats({ data, t }) {
             fontFamily: FONT_UI, fontWeight: 300, color: C.text,
             fontSize: 72, letterSpacing: "-.035em", lineHeight: 1,
             margin: "14px 0 6px"
-          }}>{s.value}</div>
+          }}>
+            {s.valueFilterKey ? (
+              <ClickableNum filterKey={s.valueFilterKey} onClick={onCellClick}>{s.value}</ClickableNum>
+            ) : s.value}
+          </div>
 
           <Sparkline values={s.spark} color={s.tone.bar}/>
 
@@ -316,7 +329,7 @@ function HeroStats({ data, t }) {
             display:"flex", flexWrap:"wrap", gap: 6, marginTop: 14
           }}>
             {s.chips.map((c, j) => (
-              <Chip key={j} label={c.label} n={c.n} tone={c.tone}/>
+              <Chip key={j} label={c.label} n={c.n} tone={c.tone} filterKey={c.filterKey} onClick={onCellClick}/>
             ))}
           </div>
         </div>
@@ -325,7 +338,7 @@ function HeroStats({ data, t }) {
   );
 }
 
-function Chip({ label, n, tone }) {
+function Chip({ label, n, tone, filterKey, onClick }) {
   return (
     <span style={{
       display:"inline-flex", alignItems:"center", gap: 6,
@@ -338,9 +351,28 @@ function Chip({ label, n, tone }) {
       <Dot c={tone.bar} size={6}/>
       <span>{label}</span>
       {n != null && (
-        <span style={{ fontFamily: FONT_NUM, color: tone.ink, opacity:.85 }}>{n}</span>
+        <ClickableNum filterKey={filterKey} onClick={onClick} style={{ fontFamily: FONT_NUM, color: tone.ink, opacity:.85 }}>{n}</ClickableNum>
       )}
     </span>
+  );
+}
+
+function ClickableNum({ children, filterKey, onClick, style: extraStyle }) {
+  if (!onClick || children == null || children === 0) {
+    return <span style={extraStyle}>{children}</span>;
+  }
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); onClick(filterKey); }}
+      style={{
+        cursor: "pointer",
+        borderBottom: "1px dashed rgba(255,255,255,0.15)",
+        transition: "border-color 0.15s",
+        ...extraStyle,
+      }}
+      onMouseEnter={e => e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.5)"}
+      onMouseLeave={e => e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.15)"}
+    >{children}</span>
   );
 }
 
@@ -701,7 +733,7 @@ function Bloc2({ data, t }) {
 }
 
 // ── Bloc 3 ──────────────────────────────────────────────────────────────────
-function Bloc3({ data, t }) {
+function Bloc3({ data, t, onCellClick }) {
   const b3 = data.bloc3;
   const isSas = data.is_sas_fiche;
   return (
@@ -736,17 +768,27 @@ function Bloc3({ data, t }) {
                   }}>
                     {l.name}
                   </td>
-                  <td style={TD}>{fmt(l.total)}</td>
-                  <td style={{...TD, color:TOK.VSO.ink, fontWeight:500}}>{l[b3.s1]}</td>
-                  <td style={{...TD, color:TOK.VAO.ink, fontWeight:500}}>{l[b3.s2]}</td>
-                  <td style={{...TD, color:TOK.REF.ink, fontWeight:500}}>{l[b3.s3]}</td>
-                  <td style={{...TD, color:TOK.HM.ink}}>{l.HM}</td>
+                  <td style={TD}>
+                    <ClickableNum filterKey={`lot:${l.name}:total`} onClick={onCellClick}>{fmt(l.total)}</ClickableNum>
+                  </td>
+                  <td style={{...TD, color:TOK.VSO.ink, fontWeight:500}}>
+                    <ClickableNum filterKey={`lot:${l.name}:s1`} onClick={onCellClick}>{l[b3.s1]}</ClickableNum>
+                  </td>
+                  <td style={{...TD, color:TOK.VAO.ink, fontWeight:500}}>
+                    <ClickableNum filterKey={`lot:${l.name}:s2`} onClick={onCellClick}>{l[b3.s2]}</ClickableNum>
+                  </td>
+                  <td style={{...TD, color:TOK.REF.ink, fontWeight:500}}>
+                    <ClickableNum filterKey={`lot:${l.name}:s3`} onClick={onCellClick}>{l[b3.s3]}</ClickableNum>
+                  </td>
+                  <td style={{...TD, color:TOK.HM.ink}}>
+                    <ClickableNum filterKey={`lot:${l.name}:hm`} onClick={onCellClick}>{l.HM}</ClickableNum>
+                  </td>
                   <td style={{...TD, padding:"10px 0 10px 18px"}}>
                     <LotHealthBar l={l} keys={b3}/>
                     <span style={{display:"inline-flex", gap:8, fontFamily:FONT_NUM, fontSize:11.5, marginTop:4}}>
-                      <span style={{color:TOK.OPEN.ink}}>{l.open_blocking_ok ?? l.open_ok}</span>
+                      <ClickableNum filterKey={`lot:${l.name}:open_blocking_ok`} onClick={onCellClick} style={{color:TOK.OPEN.ink}}>{l.open_blocking_ok ?? l.open_ok}</ClickableNum>
                       <span style={{color:C.text3}}>·</span>
-                      <span style={{color:TOK.REF.ink}}>{l.open_blocking_late ?? l.open_late}</span>
+                      <ClickableNum filterKey={`lot:${l.name}:open_blocking_late`} onClick={onCellClick} style={{color:TOK.REF.ink}}>{l.open_blocking_late ?? l.open_late}</ClickableNum>
                       {(l.open_nb ?? 0) > 0 && (
                         <>
                           <span style={{color:C.text3}}>|</span>
@@ -956,19 +998,19 @@ function Colophon({ data, t }) {
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
-function ConsultantFiche({ data, lang = "fr" }) {
+function ConsultantFiche({ data, lang = "fr", onCellClick }) {
   const t = L[lang];
   return (
     <article style={{
       maxWidth: 1200, margin: "0 auto", padding: "0 56px 60px",
       background: C.bg, color: C.text, fontFamily: FONT_UI
     }}>
-      <Masthead data={data} t={t}/>
-      <HeroStats data={data} t={t}/>
+      <Masthead data={data} t={t} onCellClick={onCellClick}/>
+      <HeroStats data={data} t={t} onCellClick={onCellClick}/>
       <Narrative data={data} t={t} lang={lang}/>
       <Bloc1 data={data} t={t}/>
       <Bloc2 data={data} t={t}/>
-      <Bloc3 data={data} t={t}/>
+      <Bloc3 data={data} t={t} onCellClick={onCellClick}/>
       <Colophon data={data} t={t}/>
     </article>
   );
