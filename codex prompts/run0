@@ -1,0 +1,179 @@
+TASK — Perform a full pristine baseline reset and recreate a single fresh Run 0
+
+Context:
+This repository has accumulated many test runs, generated exports, hidden temp files, and local DB artifacts during UI work.
+We do NOT want an incremental cleanup.
+We want a **full pristine reset** and then exactly **one fresh Run 0 baseline**.
+
+Goal:
+After this operation:
+
+* all old runs are gone
+* all generated outputs are gone
+* all stale DB/test artifacts are gone
+* consultant report memory is rebuilt from scratch
+* run history is rebuilt from scratch
+* exactly one run exists in `run_memory.db`
+* that run is `Run 0`
+* the baseline includes reports
+
+CRITICAL RULES:
+
+* Preserve source code
+* Preserve `input/`
+* Preserve docs
+* Do NOT delete required baseline input files
+* Do NOT do a partial cleanup
+* This is a full reset, not a normal run-memory reset
+* After cleanup, rerun the full pipeline once in baseline mode including reports
+
+---
+
+## STEP 1 — Identify and delete generated runtime state
+
+Delete these completely if present:
+
+* `runs/`
+* `output/`
+* `data/run_memory.db`
+* `data/report_memory.db`
+
+Also delete DB sidecars anywhere under `data/`:
+
+* `*.db-wal`
+* `*.db-shm`
+* `*.sqlite-wal`
+* `*.sqlite-shm`
+
+Also delete temp/junk files under runtime/output/data areas:
+
+* `.fuse_hidden*`
+* `~$*`
+* `*.tmp`
+* `*.bak`
+
+Also delete Python caches:
+
+* all `__pycache__/` folders under repo
+
+Do NOT delete:
+
+* `input/`
+* source files
+* docs
+* mappings/config actually used as inputs
+
+---
+
+## STEP 2 — Verify clean runtime state
+
+After deletion, confirm:
+
+* `runs/` is absent or empty
+* `output/` is absent or empty
+* `data/run_memory.db` does not exist
+* `data/report_memory.db` does not exist
+* no `.fuse_hidden*` remains under data/output/runs
+* no `__pycache__/` remains
+
+Produce a short before/after summary.
+
+---
+
+## STEP 3 — Execute one fresh full baseline run
+
+Run the pipeline in the mode that includes:
+
+* GED
+* GF
+* reports
+
+Use the actual intended baseline inputs from `input/`.
+
+This run must:
+
+* rebuild consultant report memory from scratch
+* rebuild run memory from scratch
+* become the only run in DB
+* become Run 0
+
+---
+
+## STEP 4 — Post-run verification
+
+Verify all of the following:
+
+1. `run_memory.db` exists
+2. exactly one run exists in run history
+3. that run is `Run 0`
+4. run status is `COMPLETED`
+5. `report_memory.db` exists
+6. outputs were regenerated successfully
+7. artifacts were registered
+8. no stale/test runs remain
+9. no extra runs exist
+
+Also verify the app/runtime still opens and key areas still work:
+
+* Overview
+* Consultants
+* Fiche
+* Runs
+* Executer
+
+---
+
+## STEP 5 — Baseline metrics capture
+
+Capture the new validated baseline metrics from this fresh Run 0:
+
+* docs_total
+* responses_total
+* final_gf_rows
+* discrepancies_count
+* discrepancies_review_required
+* reconciliation_events
+* artifacts_registered_count
+* consultant_report_memory_rows_loaded
+
+Do NOT reuse old metrics blindly.
+Use the actual new Run 0 values.
+
+---
+
+## STEP 6 — Update docs to reflect the new baseline
+
+Update at minimum:
+
+* `VALIDATION_BASELINE.md`
+* `README.md` baseline section
+
+Replace the old baseline references with the new clean Run 0 metrics and state clearly that this is the post-reset baseline.
+
+---
+
+## DELIVERABLE
+
+Provide:
+
+1. exact paths deleted
+2. exact command/path used for the fresh baseline run
+3. proof that only one run exists and it is Run 0
+4. new baseline metrics
+5. list of docs updated
+6. any issue encountered
+
+---
+
+## SUCCESS CRITERIA
+
+At the end:
+
+* repo has no historical test runs
+* no stale output/export clutter remains
+* no hidden fuse/temp artifacts remain
+* `run_memory.db` contains exactly one run
+* that run is Run 0
+* `report_memory.db` was rebuilt cleanly
+* baseline metrics are refreshed in docs
+* repository is in clean post-reset state

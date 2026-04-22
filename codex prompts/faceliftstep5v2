@@ -1,0 +1,62 @@
+Step 5B — Restore semantic color and visual emphasis
+
+Problem:
+The shell facelift went too far into monochrome. The app now feels black-and-white and stripped of visual energy.
+
+Goal:
+Keep the new clean shell, but restore the handoff’s semantic color system and emphasis hierarchy.
+
+Do NOT:
+
+* revert the shell facelift
+* touch backend or data logic
+* redesign layouts
+* create a new UI structure
+
+Tasks:
+
+1. Reintroduce the semantic colors from `UI_FACELIFT_STYLE_GUIDE.md`:
+
+   * `--accent` / `--accent-soft`
+   * `--good` / `--good-soft`
+   * `--warn` / `--warn-soft`
+   * `--bad` / `--bad-soft`
+   * `--neutral` / `--neutral-soft`
+
+2. Apply them to the correct UI elements:
+
+   * active sidebar item → accent blue
+   * focus/important controls → accent blue
+   * positive statuses / good KPIs → green
+   * warning statuses / caution items → yellow
+   * blocking / overdue / refusal / negative items → red
+   * neutral / HM statuses → gray
+
+3. Restore soft color fills where appropriate:
+
+   * status badges
+   * active pills
+   * delta chips
+   * selected/active indicators
+   * subtle section emphasis
+
+4. Restore visual hierarchy:
+
+   * key values must stand out
+   * active navigation must be visibly active
+   * important KPI cards may use a subtle corner halo or accent border treatment
+   * supporting metadata stays muted
+
+5. Do NOT make the UI colorful everywhere.
+
+   * Backgrounds still remain dark and premium
+   * Colors should appear as controlled accents and semantic signals
+   * Keep the Apple/Tesla-like restraint
+
+6. If charts are already visible in the current shell:
+
+   * restore semantic chart colors
+   * do not leave them monochrome
+
+Success criterion:
+The app still feels dark, clean, and premium — but no longer dead/monochrome. Semantic colors and active emphasis are clearly visible again.

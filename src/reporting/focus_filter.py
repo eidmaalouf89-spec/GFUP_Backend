@@ -196,8 +196,29 @@ def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:
         "primary_pending": tier_counts.get("PRIMARY", 0),
         "secondary_pending": tier_counts.get("SECONDARY", 0),
         "excluded_total": len(resolved_ids) + len(stale_ids),
-        "resolved": len(resolved_ids),
-        "stale": len(stale_ids),
     }
+
+    # ── Per-consultant breakdown for UI FocusByConsultant chart ─────
+    by_consultant = []
+    for actor_name, doc_ids in actor_queues.items():
+        if actor_name in ("CONTRACTOR", "MOEX"):
+            continue  # skip non-consultant entries
+        actor_p = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for item in pq_records:
+            if actor_name in item.get("owners", []):
+                actor_p[item["priority"]] += 1
+        total = sum(actor_p.values())
+        if total > 0:
+            by_consultant.append({
+                "name": actor_name,
+                "slug": actor_name.upper().replace(" ", "_").replace("'", "_"),
+                "p1": actor_p[1],
+                "p2": actor_p[2],
+                "p3": actor_p[3],
+                "p4": actor_p[4],
+                "total": total,
+            })
+    by_consultant.sort(key=lambda x: x["total"], reverse=True)
+    result.stats["by_consultant"] = by_consultant
 
     return result

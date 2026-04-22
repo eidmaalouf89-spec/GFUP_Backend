@@ -1,0 +1,80 @@
+Step 4 — Extract design system from handoff (NO UI modification yet)
+
+Context:
+
+* I have rolled back to the original working desktop app
+* I have a `handoff.zip` from Claude Design
+* I only want to use it for visual styling
+* I do NOT want a new frontend or backend architecture
+
+Mission:
+Analyze the handoff and extract a clean design system that can be applied to the existing desktop UI.
+
+Scope of analysis:
+
+* `prototype/jansa/*.jsx`
+* `prototype/jansa/tokens.js`
+* `spec/design-tokens.md`
+* `spec/ux-rules.md`
+
+Tasks:
+
+1. Extract design tokens:
+
+   * color palette (primary, background, text, accent, states)
+   * spacing scale
+   * border radius
+   * shadows
+   * typography (font sizes, weights, hierarchy)
+
+2. Extract component styles:
+
+   * cards
+   * buttons
+   * sidebar
+   * top bar
+   * layout grid
+   * KPI blocks
+   * charts (visual style only)
+
+3. Extract layout principles:
+
+   * spacing between sections
+   * card grouping logic
+   * hierarchy (what is emphasized vs secondary)
+   * navigation structure
+
+4. Map to current app:
+
+   * identify where these styles can be applied in the existing UI
+   * do NOT modify code yet
+   * only describe mapping
+
+5. Identify constraints:
+
+   * what parts of the design cannot be applied directly due to current UI structure
+   * what needs adaptation (not rebuild)
+
+Deliverable:
+Create a file:
+
+`docs/UI_FACELIFT_STYLE_GUIDE.md`
+
+It must include:
+
+* design tokens table
+* component styling rules
+* layout rules
+* mapping to existing UI components
+* list of constraints
+
+Constraints:
+
+* DO NOT modify UI code yet
+* DO NOT create new frontend architecture
+* DO NOT touch backend
+* DO NOT use mock data
+* DO NOT introduce React/Vite if not already used in production UI
+
+Goal:
+Prepare a clear, reusable visual system so that we can restyle the current desktop UI step by step without breaking functionality.

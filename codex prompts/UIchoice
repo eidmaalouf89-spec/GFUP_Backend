@@ -1,0 +1,162 @@
+We are moving to a **single-UI production architecture**.
+
+Decision:
+
+* **JANSA connected UI is now the ONLY production UI**
+* The old Vite/legacy UI must no longer be used at runtime
+* We do NOT want dual-UI behavior anymore
+* We do NOT want `app.py` choosing between two frontends
+* We do NOT want validation confusion (`npm run build` on one UI while `python app.py` launches another)
+
+Mission:
+Refactor the repo so there is exactly **one runtime UI path**: the JANSA connected UI.
+
+CRITICAL RULES:
+
+* Do NOT redesign JANSA
+* Do NOT change backend business logic
+* Do NOT break validated features (Focus, Overview, Consultants, Fiche, Drilldowns, Exports, Runs, Executer, Utilities)
+* Do NOT create a new frontend architecture
+* Do NOT remove old UI files unless necessary — archive/reference is fine
+* Goal is **single production launch path**, not code beautification
+
+---
+
+## TASK 1 — Make JANSA the only runtime UI
+
+Update `app.py` (and any other launcher/entry resolver) so that:
+
+* `python app.py` launches **only** the JANSA connected UI
+* it does NOT prefer or fallback to `ui/dist/index.html`
+* it does NOT switch between old UI and JANSA depending on file presence
+* runtime path is deterministic
+
+Desired behavior:
+
+* one explicit UI path
+* one explicit HTML entry
+* no ambiguity
+
+If needed:
+
+* keep old UI files in repo as archive/reference
+* but they must not be part of runtime selection
+
+---
+
+## TASK 2 — Remove dual-UI ambiguity from launch logic
+
+Search for and remove any logic that implies:
+
+* primary UI vs fallback UI
+* legacy UI vs JANSA UI switching
+* “if dist exists use X else use Y” behavior
+
+The app must have one clear production UI entrypoint.
+
+---
+
+## TASK 3 — Make repo intent explicit
+
+Create or update documentation so the repo clearly says:
+
+* JANSA connected UI is the production frontend
+* old Vite/legacy UI is no longer a runtime target
+* any remaining old UI code is archival/reference only
+
+Create/update:
+`docs/UI_RUNTIME_ARCHITECTURE.md`
+
+Include:
+
+* current runtime entrypoint
+* what is production
+* what is legacy/reference only
+* what should and should not be reviewed going forward
+
+---
+
+## TASK 4 — Clean review surface
+
+Search for places where tooling/review still assumes the old UI is the product.
+
+Examples:
+
+* comments
+* docs
+* scripts
+* runtime assumptions
+
+Do NOT do a giant cleanup.
+Only fix what creates confusion about which UI is the actual product.
+
+---
+
+## TASK 5 — Preserve working JANSA flow
+
+After changes, verify that the following still work through `python app.py`:
+
+* Focus mode
+* Overview
+* Consultants list
+* Consultant fiche
+* Drilldowns
+* Drilldown exports
+* Runs page
+* Executer page
+* Utilities / stale-days gear / reports export
+
+No regression allowed.
+
+---
+
+## TASK 6 — Clarify lint/build expectations
+
+Because the old Vite UI is no longer the production runtime path:
+
+* do NOT treat old UI build/lint issues as release blockers for the JANSA runtime
+* document which validation commands are still meaningful for the actual shipped app
+* if necessary, mark old UI lint/build as legacy/reference only
+
+Do NOT spend time rewriting old UI just to satisfy tooling for a frontend we are no longer shipping.
+
+---
+
+## TASK 7 — Deliverable
+
+Provide:
+
+1. exact files changed
+2. exact runtime path after change
+3. short explanation of how old UI is now treated
+4. confirmation that `python app.py` launches only JANSA
+5. confirmation that no dual-UI runtime selection remains
+
+Also create/update:
+`docs/UI_RUNTIME_ARCHITECTURE.md`
+
+---
+
+## SUCCESS CRITERIA
+
+* There is exactly **one production UI runtime path**
+* `python app.py` launches only JANSA
+* No more dual-UI ambiguity
+* Old UI is clearly marked as non-runtime / legacy-reference
+* Validated JANSA features still work
+* Repo is cleaner and safer for final review/push
+
+---
+
+## IMPORTANT
+
+This task is about **runtime architecture cleanup**, not redesign.
+
+Do NOT:
+
+* rebuild frontend architecture
+* refactor unrelated code
+* touch contractor redesign scope
+* re-open parity work
+
+Keep it minimal, deterministic, and production-safe.

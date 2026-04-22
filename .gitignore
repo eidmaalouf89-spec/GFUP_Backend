@@ -1,27 +1,49 @@
+# Python caches / environments
 __pycache__/
+**/__pycache__/
 *.py[cod]
-src/**/__pycache__/
-
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
 venv/
 env/
 
+# Node / frontend build artifacts
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/dist-ssr/
+ui/.vite/
+ui/.npm-cache/
+ui/npm-cache/
+ui/coverage/
+
+# Runtime pipeline state
+runs/
+output/
+data/run_memory.db
+data/report_memory.db
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal
+data/.fuse_hidden*
+tmp*.db
+
+# Large/local input payloads
+input/consultant_reports/
+
+# Logs, exports, and temporary Office files
+*.log
+*.zip
+~$*
+*.tmp
+*.temp
+
+# Local backups / scratch
 backup/
 backups/
 backup_*/
-runs/
-
-*.log
-*.zip
-
-tmp*.db
-data/run_memory.db
-data/report_memory.db
-data/.fuse_hidden*
-
-input/consultant_reports/
-
-# Local agent/worktree scratch space
 .claude/worktrees/
 
 # Temporary prompt scratch files
@@ -34,17 +56,15 @@ codex prompts/DEVELOPMENT_RULES.md
 codex prompts/VALIDATION_BASELINE.md
 codex prompts/commitname
 
-# Generated pipeline artifacts
-output/*.xlsx
-output/*.md
-output/*.zip
-output/debug/
-output/consultant_reports.xlsx
-output/repports output/
-
-# Generated frontend build artifacts
-ui/dist/
-ui/node_modules/
-ui/.npm-cache/
-ui/npm-cache/
-data/
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
