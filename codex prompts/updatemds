@@ -1,0 +1,134 @@
+TASK — Refresh repository docs to reflect the current post-JANSA state
+
+Context:
+The repository documentation is outdated. It still describes the project mostly as a stabilized backend/pipeline engine with evolving UI, but the repo has since undergone major JANSA UI parity work and now has a real desktop production UI runtime.
+
+We need the main repo docs updated so that if Claude/Codex is linked to the repo later, it immediately understands the CURRENT reality.
+
+IMPORTANT:
+
+* This is a documentation-only task
+* Do NOT change code
+* Do NOT redesign architecture
+* Do NOT delete historical context unless it is misleading
+* Preserve the deterministic backend mental model
+* But update the docs so they describe the CURRENT repo truth
+
+Files to update:
+
+* `README.md`
+* `VALIDATION_BASELINE.md`
+* `ARCHITECTURE.md`
+* `CLAUDE.md`
+* `CODEX.md`
+* `DEVELOPMENT_RULES.md`
+
+Reference docs that reflect the CURRENT state:
+
+* `docs/UI_RUNTIME_ARCHITECTURE.md`
+* `docs/JANSA_PARITY_MASTER_PLAN.md`
+* `docs/JANSA_PARITY_STEP_02_FOCUS.md`
+* `docs/JANSA_PARITY_STEP_03_OVERVIEW.md`
+* `docs/JANSA_PARITY_STEP_04_CONSULTANTS_LIST.md`
+* `docs/JANSA_PARITY_STEP_05_FICHE.md`
+* `docs/JANSA_PARITY_STEP_06_DRILLDOWNS.md`
+* `docs/JANSA_PARITY_STEP_07_EXPORTS.md`
+* `docs/JANSA_PARITY_STEP_09_RUNS.md`
+* `docs/JANSA_PARITY_STEP_10_EXECUTER.md`
+* `docs/JANSA_PARITY_STEP_11_UTILITIES.md`
+* `docs/JANSA_FINAL_AUDIT.md`
+
+Mission:
+Rewrite/update the six listed docs so they accurately describe the current repo state.
+
+What must be reflected:
+
+1. Repository identity
+
+* This is still a deterministic GED → GF reconstruction engine
+* But it now also includes a real JANSA desktop UI runtime for operational usage
+* The backend remains the source of truth
+* UI/report/export now have a much more developed exploitation layer than before
+
+2. Runtime truth
+
+* `main.py` remains the pipeline entrypoint
+* `app.py` is the desktop JANSA launcher
+* JANSA connected UI is the single production UI runtime
+* Old UI should be described as legacy/reference only if still present
+* No dual-UI ambiguity in the docs
+
+3. Current validated scope
+   Document clearly that these areas are implemented and validated:
+
+* Focus mode
+* Overview
+* Consultants list
+* Consultant fiche
+* Drilldowns
+* Drilldown exports
+* Runs page
+* Executer page
+* Utilities / stale-days selector / reports export
+  Also note:
+* Contractors are intentionally deferred for redesign
+* Final audit exists and should be treated as the release truth sheet
+
+4. Architecture reality
+   Update architecture docs so they reflect:
+
+* deterministic backend engine remains primary
+* presentation layer is no longer merely “underdeveloped”
+* JANSA runtime now exists as a real adapter/exploitation layer
+* backend → adapters/bridge → desktop UI is the current mental model
+* contractor area is intentionally outside current validated scope
+
+5. Validation truth
+
+* Keep the original pipeline validation baseline
+* Add a separate note that UI parity validation and final audit now also exist
+* Clarify that pipeline baseline and UI parity validation are different validation layers
+
+6. Claude and Codex instructions
+   Update `CLAUDE.md` and `CODEX.md` so they know:
+
+* which docs to read first
+* that JANSA is the production UI runtime
+* that parity docs and final audit are important source-of-truth documents
+* that contractors are intentionally deferred
+* that old UI/runtime assumptions should not be revived
+* that reviews should focus on the actual production path
+
+7. Development rules
+   Update `DEVELOPMENT_RULES.md` so it distinguishes:
+
+* backend/pipeline changes → full pipeline validation
+* UI/runtime changes → parity/final-audit style validation
+* both layers must stay deterministic and scoped
+
+Deliverable:
+Update all 6 files in place.
+
+Also add a short “Current State Snapshot” section to `README.md` containing:
+
+* backend status
+* production UI status
+* deferred scope
+* which docs are authoritative today
+
+Requirements:
+
+* Make the docs concise but strong
+* Remove misleading old statements
+* Do not overclaim 100% parity
+* Explicitly mention that contractors are deferred
+* Explicitly mention `docs/JANSA_FINAL_AUDIT.md` as the truth sheet before push/review
+
+Success criteria:
+After this update, a fresh Claude/Codex session reading the repo docs should immediately understand:
+
+* what the repo is
+* what runs the product
+* what is validated
+* what is deferred
+* which documents are authoritative

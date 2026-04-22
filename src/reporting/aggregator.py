@@ -266,6 +266,13 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
     return result
 
 
+# Per-consultant status vocabulary (canonical name -> s1/s2/s3 labels).
+# Bureau de Contrôle (SOCOTEC) uses FAV/SUS/DEF instead of VSO/VAO/REF.
+# Source of truth: STATUS_LABELS_BY_CANONICAL in consultant_fiche.py.
+_CONSULTANT_STATUS_VOCAB = {
+    "Bureau de Contrôle": {"s1": "FAV", "s2": "SUS", "s3": "DEF"},
+}
+
 def compute_consultant_summary(
     ctx: RunContext,
     focus_result: Optional["FocusResult"] = None,
@@ -298,9 +305,13 @@ def compute_consultant_summary(
             continue
         called = len(grp[grp["date_status_type"] != "NOT_CALLED"])
         answered = len(grp[grp["date_status_type"] == "ANSWERED"])
-        vso = len(grp[grp["status_clean"] == "VSO"])
-        vao = len(grp[grp["status_clean"] == "VAO"])
-        ref = len(grp[grp["status_clean"] == "REF"])
+        _s_labels = _CONSULTANT_STATUS_VOCAB.get(name, {})
+        _s1 = _s_labels.get("s1", "VSO")
+        _s2 = _s_labels.get("s2", "VAO")
+        _s3 = _s_labels.get("s3", "REF")
+        vso = len(grp[grp["status_clean"] == _s1])
+        vao = len(grp[grp["status_clean"] == _s2])
+        ref = len(grp[grp["status_clean"] == _s3])
         hm = len(grp[grp["status_clean"] == "HM"])
 
         # Avg response time
@@ -350,6 +361,7 @@ def compute_consultant_summary(
                 "response_rate": round(answered / max(called, 1), 4),
                 "avg_response_days": avg_days,
                 "vso": vso, "vao": vao, "ref": ref, "hm": hm,
+                "s1_label": _s1, "s2_label": _s2, "s3_label": _s3,
                 "open": called - answered,
                 "open_blocking": blocking,
                 "focus_owned": focus_owned,

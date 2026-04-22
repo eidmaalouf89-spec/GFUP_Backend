@@ -3,26 +3,48 @@ import ConsultantFicheComponent from './components/ConsultantFiche'
 
 /* ── Design Tokens ──────────────────────────────────────────── */
 const T = {
-  bg:          '#0a0b0f',
-  glass:       'rgba(255,255,255,0.06)',
-  glassBorder: 'rgba(255,255,255,0.08)',
-  text:        '#f0f0f3',
-  muted:       'rgba(255,255,255,0.5)',
-  dim:         'rgba(255,255,255,0.3)',
-  accent:      '#3b82f6',
-  green:       '#34d399',
-  amber:       '#fbbf24',
-  red:         '#f87171',
-  sidebarW:    200,
+  bg:          'var(--bg)',
+  bgElev:      'var(--bg-elev)',
+  bgElev2:     'var(--bg-elev-2)',
+  chip:        'var(--bg-chip)',
+  glass:       'var(--bg-elev)',
+  glassBorder: 'var(--line)',
+  line2:       'var(--line-2)',
+  text:        'var(--text)',
+  muted:       'var(--text-2)',
+  dim:         'var(--text-3)',
+  accent:      'var(--accent)',
+  accentSoft:  'var(--accent-soft)',
+  green:       'var(--good)',
+  amber:       'var(--warn)',
+  red:         'var(--bad)',
+  neutral:     'var(--neutral)',
+  sidebarW:    232,
+}
+
+const S = {
+  accent: 'var(--accent-soft)',
+  good: 'var(--good-soft)',
+  warn: 'var(--warn-soft)',
+  bad: 'var(--bad-soft)',
+  neutral: 'var(--neutral-soft)',
+}
+
+const VISA_TONE = {
+  VSO: { color: T.green, bg: S.good },
+  VAO: { color: T.amber, bg: S.warn },
+  REF: { color: T.red, bg: S.bad },
+  'SAS REF': { color: T.red, bg: S.bad },
+  HM: { color: T.neutral, bg: S.neutral },
+  Open: { color: T.accent, bg: S.accent },
 }
 
 /* ── Shared Styles ──────────────────────────────────────────── */
 const glassCard = {
   background: T.glass,
   border: `1px solid ${T.glassBorder}`,
-  borderRadius: 12,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  borderRadius: 16,
+  boxShadow: 'none',
 }
 
 /* ── PyWebView bridge — waits for .api to be injected ──────── */
@@ -85,8 +107,8 @@ function ExportTeamVersionButton() {
 
   return (
     <button onClick={handleExport} disabled={exporting} style={{
-      background: 'rgba(59,130,246,0.12)', color: T.accent,
-      border: '1px solid rgba(59,130,246,0.25)',
+      background: S.accent, color: T.accent,
+      border: '1px solid var(--accent-border)',
       borderRadius: 8, padding: '8px 16px',
       fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
       cursor: exporting ? 'wait' : 'pointer',
@@ -123,8 +145,8 @@ function DocDetailDrawer({ visible, onClose, docs, title, loading, onExport, exp
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {onExport && docs && docs.length > 0 && !loading && (
             <button onClick={onExport} disabled={exporting} style={{
-              background: 'rgba(59,130,246,0.12)', color: T.accent,
-              border: '1px solid rgba(59,130,246,0.25)',
+              background: S.accent, color: T.accent,
+              border: '1px solid var(--accent-border)',
               borderRadius: 8, padding: '6px 12px',
               fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
               cursor: exporting ? 'wait' : 'pointer',
@@ -238,16 +260,16 @@ function FocusModeToggle({ focusMode, setFocusMode, staleDays, setStaleDays, foc
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '6px 14px', borderRadius: 10,
-        background: focusMode ? 'rgba(59,130,246,0.15)' : T.glass,
-        border: `1px solid ${focusMode ? 'rgba(59,130,246,0.45)' : T.glassBorder}`,
+        background: focusMode ? 'linear-gradient(135deg, var(--accent-soft), rgba(94,92,230,0.12))' : T.bgElev2,
+        border: `1px solid ${focusMode ? 'var(--accent-border)' : T.glassBorder}`,
         cursor: 'pointer',
-        transition: 'all 0.2s',
-        boxShadow: focusMode ? '0 0 12px rgba(59,130,246,0.2)' : 'none',
+        transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s',
+        boxShadow: focusMode ? '0 0 0 4px rgba(10,132,255,0.08), 0 4px 12px -3px rgba(10,132,255,0.3)' : 'none',
       }} onClick={() => setFocusMode(m => !m)}>
         {/* Toggle pill */}
         <div style={{
           width: 32, height: 18, borderRadius: 9,
-          background: focusMode ? T.accent : 'rgba(255,255,255,0.12)',
+          background: focusMode ? T.accent : T.chip,
           position: 'relative', transition: 'background 0.2s', flexShrink: 0,
         }}>
           <div style={{
@@ -274,7 +296,7 @@ function FocusModeToggle({ focusMode, setFocusMode, staleDays, setStaleDays, foc
           style={{
             position: 'absolute', top: -6, right: -6,
             width: 18, height: 18, borderRadius: '50%',
-            background: 'rgba(59,130,246,0.25)', border: `1px solid ${T.accent}`,
+            background: T.accentSoft, border: `1px solid ${T.accent}`,
             color: T.accent, fontSize: 10, cursor: 'pointer', display: 'flex',
             alignItems: 'center', justifyContent: 'center', lineHeight: 1,
             fontFamily: 'inherit',
@@ -289,8 +311,8 @@ function FocusModeToggle({ focusMode, setFocusMode, staleDays, setStaleDays, foc
           position: 'absolute', top: '110%', right: 0, zIndex: 100,
           ...glassCard,
           padding: 20, width: 280,
-          border: `1px solid rgba(59,130,246,0.3)`,
-          background: 'rgba(10,11,15,0.96)',
+          border: `1px solid var(--accent-border)`,
+          background: T.bgElev,
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 14, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Seuil de péremption
@@ -328,11 +350,11 @@ function FocusModeToggle({ focusMode, setFocusMode, staleDays, setStaleDays, foc
 
 /* ── Priority Queue Panel ────────────────────────────────────── */
 const PRIORITY_META = {
-  1: { emoji: '🔴', label: 'EN RETARD', color: '#f87171', bg: 'rgba(248,113,113,0.06)', border: 'rgba(248,113,113,0.2)' },
-  2: { emoji: '🟠', label: 'URGENT ≤5j', color: '#fb923c', bg: 'rgba(251,146,60,0.06)', border: 'rgba(251,146,60,0.2)' },
-  3: { emoji: '🟡', label: 'BIENTÔT ≤15j', color: '#fbbf24', bg: 'rgba(251,191,36,0.06)', border: 'rgba(251,191,36,0.15)' },
-  4: { emoji: '🟢', label: 'OK', color: '#34d399', bg: 'rgba(52,211,153,0.04)', border: 'rgba(52,211,153,0.15)' },
-  5: { emoji: '⚪', label: 'SANS DÉLAI', color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.02)', border: T.glassBorder },
+  1: { emoji: '🔴', label: 'EN RETARD', color: T.red, bg: S.bad, border: 'rgba(255,69,58,0.28)' },
+  2: { emoji: '🟠', label: 'URGENT ≤5j', color: T.red, bg: S.bad, border: 'rgba(255,69,58,0.22)' },
+  3: { emoji: '🟡', label: 'BIENTÔT ≤15j', color: T.amber, bg: S.warn, border: 'rgba(255,214,10,0.22)' },
+  4: { emoji: '🟢', label: 'OK', color: T.green, bg: S.good, border: 'rgba(48,209,88,0.22)' },
+  5: { emoji: '⚪', label: 'SANS DÉLAI', color: T.neutral, bg: S.neutral, border: T.glassBorder },
 }
 
 function PriorityQueuePanel({ queue, stats, setActivePage }) {
@@ -340,8 +362,8 @@ function PriorityQueuePanel({ queue, stats, setActivePage }) {
 
   if (!queue || queue.length === 0) {
     return (
-      <div style={{ ...glassCard, padding: 20, marginBottom: 24, borderColor: 'rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.04)' }}>
-        <div style={{ fontSize: 13, color: '#34d399' }}>✓ Aucune action urgente — tous les documents sont sous contrôle</div>
+      <div style={{ ...glassCard, padding: 20, marginBottom: 24, borderColor: 'rgba(48,209,88,0.24)', background: S.good }}>
+        <div style={{ fontSize: 13, color: T.green }}>✓ Aucune action urgente — tous les documents sont sous contrôle</div>
       </div>
     )
   }
@@ -440,7 +462,7 @@ function PriorityQueuePanel({ queue, stats, setActivePage }) {
                       transition: 'background 0.1s',
                       cursor: 'default',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.06)'}
+                    onMouseEnter={e => e.currentTarget.style.background = S.accent}
                     onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'}
                   >
                     <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
@@ -464,7 +486,7 @@ function PriorityQueuePanel({ queue, stats, setActivePage }) {
                     <span style={{
                       textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600,
                       color: row.delta_days !== null && row.delta_days < 0 ? T.red :
-                             row.delta_days <= 5 ? '#fb923c' : T.muted,
+                             row.delta_days <= 5 ? T.red : T.muted,
                     }}>
                       {row.delta_days !== null ? `${row.delta_days > 0 ? '+' : ''}${row.delta_days}j` : '—'}
                     </span>
@@ -489,17 +511,35 @@ function PriorityQueuePanel({ queue, stats, setActivePage }) {
 
 /* ── KPI Card ───────────────────────────────────────────────── */
 function KpiCard({ label, value, sub, color }) {
+  const toneBg =
+    color === T.accent ? S.accent :
+    color === T.green ? S.good :
+    color === T.amber ? S.warn :
+    color === T.red ? S.bad :
+    color === T.neutral ? S.neutral :
+    'transparent'
+  const isEmphasized = color && color !== T.text && color !== T.dim
   return (
     <div style={{
       ...glassCard,
       padding: '20px 24px',
       flex: '1 1 200px',
       minWidth: 180,
+      position: 'relative',
+      overflow: 'hidden',
+      borderColor: isEmphasized ? color : T.glassBorder,
     }}>
+      {isEmphasized && (
+        <div style={{
+          position: 'absolute', top: -70, right: -70, width: 160, height: 160,
+          background: `radial-gradient(circle, ${toneBg}, transparent 64%)`,
+          pointerEvents: 'none',
+        }} />
+      )}
       <div style={{ fontSize: 12, color: T.muted, marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         {label}
       </div>
-      <div style={{ fontSize: 32, fontWeight: 600, color: color || T.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+      <div style={{ fontSize: 32, fontWeight: 650, color: color || T.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, position: 'relative' }}>
         {value}
       </div>
       {sub && (
@@ -538,7 +578,7 @@ function Spinner({ text }) {
 /* ── Degraded Mode Banner ──────────────────────────────────── */
 function DegradedBanner() {
   return (
-    <div style={{ ...glassCard, padding: '12px 20px', marginBottom: 20, borderColor: 'rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ ...glassCard, padding: '12px 20px', marginBottom: 20, borderColor: 'rgba(255,214,10,0.25)', background: S.warn, display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.amber, boxShadow: `0 0 6px ${T.amber}`, flexShrink: 0 }} />
       <span style={{ fontSize: 13, color: T.amber }}>Limited data — GED provenance could not be verified for this run</span>
     </div>
@@ -550,7 +590,14 @@ function VisaBar({ data }) {
   if (!data || Object.keys(data).length === 0) return null
   const total = Object.values(data).reduce((a, b) => a + b, 0)
   if (total === 0) return null
-  const colorMap = { VSO: T.green, VAO: '#60a5fa', REF: T.red, 'SAS REF': '#f97316', Open: T.muted, HM: '#a78bfa' }
+  const colorMap = {
+    VSO: VISA_TONE.VSO.color,
+    VAO: VISA_TONE.VAO.color,
+    REF: VISA_TONE.REF.color,
+    'SAS REF': VISA_TONE['SAS REF'].color,
+    Open: VISA_TONE.Open.color,
+    HM: VISA_TONE.HM.color,
+  }
   return (
     <div>
       <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
@@ -641,7 +688,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
               label="Urgent ≤5j"
               value={focusStats.p2_urgent ?? 0}
               sub="à traiter rapidement"
-              color={focusStats.p2_urgent > 0 ? '#fb923c' : T.green}
+              color={focusStats.p2_urgent > 0 ? T.red : T.green}
             />
             <KpiCard
               label="Exclus (périmés)"
@@ -701,7 +748,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
                   <div style={{ fontSize: 10, color: T.dim, fontVariantNumeric: 'tabular-nums' }}>{m.total}</div>
                   <div style={{
                     width: '100%', maxWidth: 32, height: h, borderRadius: '4px 4px 0 0',
-                    background: `linear-gradient(to top, rgba(59,130,246,0.3), rgba(52,211,153,0.3))`,
+                    background: 'linear-gradient(to top, var(--accent-soft), var(--good-soft))',
                   }} />
                   <div style={{ fontSize: focusMode ? 8 : 9, color: T.dim, transform: 'rotate(-45deg)', transformOrigin: 'center', whiteSpace: 'nowrap' }}>
                     {m.month.slice(5)}
@@ -725,7 +772,7 @@ function OverviewPage({ appState, setActivePage, focusMode, setFocusMode, staleD
 
       {/* Warnings */}
       {((s.warnings && s.warnings.length > 0) || (kpis.warnings && kpis.warnings.length > 0)) && (
-        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.04)', marginBottom: 28 }}>
+        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(255,214,10,0.22)', background: S.warn, marginBottom: 28 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: T.amber, marginBottom: 10 }}>Warnings</div>
           {[...(s.warnings || []), ...(kpis.warnings || [])].map((w, i) => (
             <div key={i} style={{ fontSize: 13, color: T.muted, marginBottom: 4, paddingLeft: 12, position: 'relative' }}>
@@ -854,12 +901,12 @@ function RunsPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 20,
-              borderColor: isCurrent ? 'rgba(52,211,153,0.25)' : T.glassBorder,
+              borderColor: isCurrent ? 'rgba(48,209,88,0.28)' : T.glassBorder,
             }}>
               {/* Run number badge */}
               <div style={{
                 width: 48, height: 48, borderRadius: 10,
-                background: isBaseline ? 'rgba(59,130,246,0.15)' : isCurrent ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)',
+                background: isBaseline ? S.accent : isCurrent ? S.good : T.chip,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 18, fontWeight: 700, color: isBaseline ? T.accent : isCurrent ? T.green : T.muted,
                 fontVariantNumeric: 'tabular-nums', flexShrink: 0,
@@ -874,12 +921,12 @@ function RunsPage() {
                     {run.run_label || `Run ${run.run_number}`}
                   </span>
                   {isBaseline && (
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(59,130,246,0.15)', color: T.accent, fontWeight: 600, letterSpacing: '0.05em' }}>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: S.accent, color: T.accent, fontWeight: 600, letterSpacing: '0.05em' }}>
                       BASELINE
                     </span>
                   )}
                   {isCurrent && !isBaseline && (
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(52,211,153,0.15)', color: T.green, fontWeight: 600, letterSpacing: '0.05em' }}>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: S.good, color: T.green, fontWeight: 600, letterSpacing: '0.05em' }}>
                       CURRENT
                     </span>
                   )}
@@ -901,10 +948,10 @@ function RunsPage() {
               <div style={{
                 fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 100,
                 color: statusColor,
-                background: statusColor === T.green ? 'rgba(52,211,153,0.12)' :
-                            statusColor === T.amber ? 'rgba(251,191,36,0.12)' :
-                            statusColor === T.red ? 'rgba(248,113,113,0.12)' :
-                            'rgba(59,130,246,0.12)',
+                background: statusColor === T.green ? S.good :
+                            statusColor === T.amber ? S.warn :
+                            statusColor === T.red ? S.bad :
+                            S.accent,
                 letterSpacing: '0.05em', flexShrink: 0,
               }}>
                 {statusLabel}
@@ -1064,7 +1111,7 @@ function ExecuterPage({ appState }) {
               padding: '10px 20px', fontSize: 13, fontWeight: 500,
               border: `1px solid ${runMode === m.value ? T.accent : T.glassBorder}`,
               borderRadius: 8,
-              background: runMode === m.value ? 'rgba(59,130,246,0.12)' : T.glass,
+              background: runMode === m.value ? S.accent : T.glass,
               color: runMode === m.value ? T.accent : T.muted,
               cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
             }}>
@@ -1086,7 +1133,7 @@ function ExecuterPage({ appState }) {
           <div style={inputLabelStyle}>GED</div>
           <div style={{
             ...inputPathStyle,
-            borderColor: gedPath ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)',
+            borderColor: gedPath ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.3)',
           }}>
             {fileName(gedPath) || <span style={{ color: T.dim }}>No file selected</span>}
           </div>
@@ -1101,7 +1148,7 @@ function ExecuterPage({ appState }) {
           <div style={inputLabelStyle}>GF</div>
           <div style={{
             ...inputPathStyle,
-            borderColor: gfPath ? 'rgba(52,211,153,0.3)' : T.glassBorder,
+            borderColor: gfPath ? 'rgba(48,209,88,0.3)' : T.glassBorder,
             opacity: runMode === 'GED_ONLY' ? 0.4 : 1,
           }}>
             {fileName(gfPath) || <span style={{ color: T.dim }}>{runMode === 'GED_ONLY' ? 'Inherited from previous run' : 'No file selected'}</span>}
@@ -1118,7 +1165,7 @@ function ExecuterPage({ appState }) {
           <div style={inputLabelStyle}>Mapping</div>
           <div style={{
             ...inputPathStyle,
-            borderColor: mappingPath ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)',
+            borderColor: mappingPath ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.3)',
           }}>
             {fileName(mappingPath) || <span style={{ color: T.dim }}>No file selected</span>}
           </div>
@@ -1134,7 +1181,7 @@ function ExecuterPage({ appState }) {
             <div style={inputLabelStyle}>Reports</div>
             <div style={{
               ...inputPathStyle,
-              borderColor: reportsDir ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)',
+              borderColor: reportsDir ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.3)',
             }}>
               {reportsDir || <span style={{ color: T.dim }}>No directory selected</span>}
             </div>
@@ -1148,7 +1195,7 @@ function ExecuterPage({ appState }) {
 
       {/* Validation messages */}
       {validation && hasErrors && (
-        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(255,69,58,0.25)', background: S.bad }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: T.red, marginBottom: 8, letterSpacing: '0.04em' }}>VALIDATION ERRORS</div>
           {validation.errors.map((e, i) => (
             <div key={i} style={{ fontSize: 13, color: T.red, marginBottom: 3, paddingLeft: 12, position: 'relative' }}>
@@ -1158,7 +1205,7 @@ function ExecuterPage({ appState }) {
         </div>
       )}
       {validation && hasWarnings && (
-        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.04)' }}>
+        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(255,214,10,0.22)', background: S.warn }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: T.amber, marginBottom: 8, letterSpacing: '0.04em' }}>WARNINGS</div>
           {validation.warnings.map((w, i) => (
             <div key={i} style={{ fontSize: 13, color: T.amber, marginBottom: 3, paddingLeft: 12, position: 'relative' }}>
@@ -1170,7 +1217,7 @@ function ExecuterPage({ appState }) {
 
       {/* Info box for GED_ONLY */}
       {runMode === 'GED_ONLY' && !hasErrors && (
-        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(59,130,246,0.2)', background: 'rgba(59,130,246,0.04)' }}>
+        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'var(--accent-border)', background: S.accent }}>
           <div style={{ fontSize: 13, color: T.accent }}>
             GF will be inherited from the latest completed run.
           </div>
@@ -1186,12 +1233,12 @@ function ExecuterPage({ appState }) {
             style={{
               padding: '12px 32px', fontSize: 14, fontWeight: 600,
               border: 'none', borderRadius: 10,
-              background: hasErrors ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              background: hasErrors ? T.chip : 'linear-gradient(135deg, var(--accent), #5E5CE6)',
               color: hasErrors ? T.dim : '#fff',
               cursor: hasErrors ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', transition: 'all 0.2s',
               letterSpacing: '0.03em',
-              boxShadow: hasErrors ? 'none' : '0 4px 20px rgba(59,130,246,0.3)',
+              boxShadow: hasErrors ? 'none' : '0 4px 20px rgba(10,132,255,0.3)',
             }}
           >
             Lancer le pipeline
@@ -1228,8 +1275,8 @@ function ExecuterPage({ appState }) {
             )}
             <button onClick={() => { setPipelineDone(false); setPipelineMsg(''); setCompletedRun(null) }} style={{
               padding: '8px 20px', fontSize: 12, fontWeight: 500,
-              border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 8,
-              background: 'rgba(52,211,153,0.08)', color: T.green,
+              border: `1px solid rgba(48,209,88,0.3)`, borderRadius: 8,
+              background: S.good, color: T.green,
               cursor: 'pointer', fontFamily: 'inherit',
             }}>
               New run
@@ -1244,13 +1291,13 @@ function ExecuterPage({ appState }) {
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.red, boxShadow: `0 0 8px ${T.red}` }} />
               <span style={{ fontSize: 14, fontWeight: 500, color: T.red }}>Pipeline failed</span>
             </div>
-            <div style={{ fontSize: 13, color: T.red, background: 'rgba(248,113,113,0.06)', padding: 14, borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: T.red, background: S.bad, padding: 14, borderRadius: 8, marginBottom: 12 }}>
               {pipelineError}
             </div>
             <button onClick={() => { setPipelineError(null); setPipelineMsg('') }} style={{
               padding: '8px 20px', fontSize: 12, fontWeight: 500,
-              border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 8,
-              background: 'rgba(248,113,113,0.08)', color: T.red,
+              border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 8,
+              background: S.bad, color: T.red,
               cursor: 'pointer', fontFamily: 'inherit',
             }}>
               Try again
@@ -1434,7 +1481,7 @@ function ConsultantsPage({ focusMode, staleDays }) {
   if (error) {
     return (
       <div style={{ padding: 32 }}>
-        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(255,69,58,0.25)', background: S.bad }}>
           <div style={{ fontSize: 13, color: T.red }}>{error}</div>
         </div>
       </div>
@@ -1498,7 +1545,7 @@ function ConsultantsPage({ focusMode, staleDays }) {
             transition: 'border-color 0.15s',
             borderColor: isSas ? 'rgba(255,214,10,0.15)' : T.glassBorder,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = isSas ? 'rgba(255,214,10,0.35)' : 'rgba(59,130,246,0.3)' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = isSas ? 'rgba(255,214,10,0.35)' : 'var(--accent-border)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = isSas ? 'rgba(255,214,10,0.15)' : T.glassBorder }}
           >
             <span style={{ color: isSas ? '#FFD60A' : T.accent, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isSas ? `◆ ${c.name}` : c.name}</span>
@@ -1511,7 +1558,7 @@ function ConsultantsPage({ focusMode, staleDays }) {
               {c.avg_response_days != null ? `${c.avg_response_days}d` : '\u2014'}
             </span>
             <span style={{ textAlign: 'right', color: T.green, fontVariantNumeric: 'tabular-nums' }}>{c.vso}</span>
-            <span style={{ textAlign: 'right', color: '#60a5fa', fontVariantNumeric: 'tabular-nums' }}>{c.vao}</span>
+            <span style={{ textAlign: 'right', color: T.amber, fontVariantNumeric: 'tabular-nums' }}>{c.vao}</span>
             <span style={{ textAlign: 'right', color: T.red, fontVariantNumeric: 'tabular-nums' }}>{c.ref}</span>
             <span style={{ textAlign: 'right', color: T.amber, fontVariantNumeric: 'tabular-nums' }}>{c.open}</span>
           </div>
@@ -1557,7 +1604,7 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
     return (
       <div style={{ padding: 32 }}>
         <button onClick={onBack} style={{ fontSize: 11, color: T.accent, cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit', marginBottom: 16 }}>{'\u2190'} Back to list</button>
-        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(255,69,58,0.25)', background: S.bad }}>
           <div style={{ fontSize: 13, color: T.red }}>{error}</div>
         </div>
       </div>
@@ -1568,11 +1615,10 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
 
   const q = fiche.block4_quality || {}
   const visaPillStyle = (status) => {
-    const colors = { VSO: T.green, VAO: '#60a5fa', REF: T.red, 'SAS REF': '#f97316', Open: T.muted }
-    const bgs = { VSO: 'rgba(52,211,153,0.12)', VAO: 'rgba(96,165,250,0.12)', REF: 'rgba(248,113,113,0.12)', 'SAS REF': 'rgba(249,115,22,0.12)', Open: 'rgba(255,255,255,0.06)' }
+    const tone = VISA_TONE[status] || { color: T.muted, bg: S.neutral }
     return {
       display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 100,
-      letterSpacing: '0.04em', color: colors[status] || T.muted, background: bgs[status] || 'rgba(255,255,255,0.06)',
+      letterSpacing: '0.04em', color: tone.color, background: tone.bg,
     }
   }
 
@@ -1602,7 +1648,7 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
 
       {/* Warnings */}
       {fiche.warnings && fiche.warnings.length > 0 && (
-        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.04)' }}>
+        <div style={{ ...glassCard, padding: 16, marginBottom: 16, borderColor: 'rgba(255,214,10,0.22)', background: S.warn }}>
           {fiche.warnings.map((w, i) => <div key={i} style={{ fontSize: 12, color: T.amber }}>{w}</div>)}
         </div>
       )}
@@ -1654,10 +1700,10 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
                   <div style={{ fontSize: 9, color: T.dim, fontVariantNumeric: 'tabular-nums' }}>{m.total}</div>
                   <div style={{ width: '100%', maxWidth: 28, height: Math.max(h, 2), borderRadius: '3px 3px 0 0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {m.vso > 0 && <div style={{ height: `${(m.vso / t) * 100}%`, background: T.green }} />}
-                    {m.vao > 0 && <div style={{ height: `${(m.vao / t) * 100}%`, background: '#60a5fa' }} />}
+                    {m.vao > 0 && <div style={{ height: `${(m.vao / t) * 100}%`, background: T.amber }} />}
                     {m.ref > 0 && <div style={{ height: `${(m.ref / t) * 100}%`, background: T.red }} />}
-                    {m.sas_ref > 0 && <div style={{ height: `${(m.sas_ref / t) * 100}%`, background: '#f97316' }} />}
-                    {m.open > 0 && <div style={{ height: `${(m.open / t) * 100}%`, background: 'rgba(255,255,255,0.2)' }} />}
+                    {m.sas_ref > 0 && <div style={{ height: `${(m.sas_ref / t) * 100}%`, background: T.red }} />}
+                    {m.open > 0 && <div style={{ height: `${(m.open / t) * 100}%`, background: T.accent }} />}
                   </div>
                   <div style={{ fontSize: 8, color: T.dim, transform: 'rotate(-45deg)', transformOrigin: 'center', whiteSpace: 'nowrap' }}>
                     {m.month.slice(5)}
@@ -1668,7 +1714,7 @@ function ContractorFiche({ contractorCode, onBack, focusMode, staleDays }) {
           </div>
           {/* Legend */}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
-            {[['VSO', T.green], ['VAO', '#60a5fa'], ['REF', T.red], ['SAS REF', '#f97316'], ['Open', 'rgba(255,255,255,0.3)']].map(([label, color]) => (
+            {[['VSO', T.green], ['VAO', T.amber], ['REF', T.red], ['SAS REF', T.red], ['Open', T.accent]].map(([label, color]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
                 <span style={{ fontSize: 11, color: T.muted }}>{label}</span>
@@ -1771,7 +1817,7 @@ function ContractorsPage({ focusMode, staleDays }) {
   if (error) {
     return (
       <div style={{ padding: 32 }}>
-        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+        <div style={{ ...glassCard, padding: 20, borderColor: 'rgba(255,69,58,0.25)', background: S.bad }}>
           <div style={{ fontSize: 13, color: T.red }}>{error}</div>
         </div>
       </div>
@@ -1832,7 +1878,7 @@ function ContractorsPage({ focusMode, staleDays }) {
             cursor: 'pointer',
             transition: 'border-color 0.15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-border)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = T.glassBorder }}
           >
             <span style={{ color: T.accent, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
@@ -1841,7 +1887,7 @@ function ContractorsPage({ focusMode, staleDays }) {
             </span>
             <span style={{ textAlign: 'right', color: T.muted, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{c.total_submitted}</span>
             <span style={{ textAlign: 'right', color: T.green, fontVariantNumeric: 'tabular-nums' }}>{c.visa_vso}</span>
-            <span style={{ textAlign: 'right', color: '#60a5fa', fontVariantNumeric: 'tabular-nums' }}>{c.visa_vao}</span>
+            <span style={{ textAlign: 'right', color: T.amber, fontVariantNumeric: 'tabular-nums' }}>{c.visa_vao}</span>
             <span style={{ textAlign: 'right', color: T.red, fontVariantNumeric: 'tabular-nums' }}>{c.visa_ref + (c.visa_sas_ref || 0)}</span>
             <span style={{ textAlign: 'right', color: T.amber, fontVariantNumeric: 'tabular-nums' }}>{c.visa_open}</span>
             <span style={{ textAlign: 'right', color: approvalColor, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
@@ -2023,17 +2069,6 @@ export default function App() {
     <div style={{ display: 'flex', height: '100vh', background: T.bg, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Ambient gradient orbs ───────────────────────────── */}
-      <div style={{
-        position: 'fixed', top: -180, left: -180, width: 500, height: 500, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-      <div style={{
-        position: 'fixed', bottom: -200, right: -200, width: 600, height: 600, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside style={{
         width: T.sidebarW,
@@ -2041,19 +2076,29 @@ export default function App() {
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        background: 'rgba(255,255,255,0.03)',
+        background: T.bgElev,
         borderRight: `1px solid ${T.glassBorder}`,
         zIndex: 2,
         position: 'relative',
       }}>
         {/* Brand */}
-        <div style={{ padding: '24px 20px 20px', borderBottom: `1px solid ${T.glassBorder}` }}>
-          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.08em', color: T.text }}>JANSA</div>
-          <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.14em', color: T.accent, marginTop: 2 }}>VISASIST</div>
+        <div style={{ padding: '22px 18px 18px', borderBottom: `1px solid ${T.glassBorder}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: 'linear-gradient(135deg, var(--accent), #5E5CE6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em',
+            }}>J</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', color: T.text, lineHeight: 1 }}>JANSA</div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', color: T.accent, marginTop: 4 }}>VISASIST</div>
+            </div>
+          </div>
         </div>
 
         {/* Nav Items */}
-        <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav style={{ flex: 1, padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {NAV_ITEMS.map(item => {
             const isActive = activePage === item
             const showFocusBadge = item === 'Overview' && focusMode && focusStats && focusStats.focused != null
@@ -2066,26 +2111,27 @@ export default function App() {
                   alignItems: 'center',
                   gap: 10,
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '10px 12px',
                   border: 'none',
-                  borderRadius: 8,
+                  borderRadius: 10,
                   cursor: 'pointer',
                   fontSize: 13,
-                  fontWeight: isActive ? 500 : 400,
-                  color: isActive ? T.text : T.muted,
-                  background: isActive ? 'rgba(59,130,246,0.12)' : 'transparent',
-                  transition: 'all 0.15s',
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? T.accent : T.muted,
+                  background: isActive ? 'linear-gradient(90deg, var(--accent-soft), transparent)' : 'transparent',
+                  boxShadow: isActive ? `inset 3px 0 0 ${T.accent}` : 'inset 3px 0 0 transparent',
+                  transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
                   textAlign: 'left',
                   fontFamily: 'inherit',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                  if (!isActive) e.currentTarget.style.background = T.bgElev2
                 }}
                 onMouseLeave={e => {
                   if (!isActive) e.currentTarget.style.background = 'transparent'
                 }}
               >
-                <span style={{ opacity: isActive ? 1 : 0.5, display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: isActive ? T.accent : T.dim, display: 'flex', alignItems: 'center' }}>
                   {icons[item]}
                 </span>
                 <span style={{ flex: 1 }}>{item}</span>
@@ -2093,7 +2139,7 @@ export default function App() {
                   <span style={{
                     fontSize: 10, fontWeight: 700, color: T.accent,
                     fontVariantNumeric: 'tabular-nums',
-                    background: 'rgba(59,130,246,0.18)', borderRadius: 100,
+                    background: T.accentSoft, borderRadius: 100,
                     padding: '1px 6px',
                   }}>
                     {focusStats.focused}
@@ -2105,7 +2151,7 @@ export default function App() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div style={{ padding: '16px 16px 20px', borderTop: `1px solid ${T.glassBorder}` }}>
+        <div style={{ padding: '16px 16px 20px', borderTop: `1px solid ${T.glassBorder}`, background: T.bgElev }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <div style={{
               width: 6, height: 6, borderRadius: '50%',
@@ -2135,14 +2181,16 @@ export default function App() {
 
         {/* Top Bar */}
         <header style={{
-          height: 52,
-          minHeight: 52,
+          height: 60,
+          minHeight: 60,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 28px',
           borderBottom: `1px solid ${T.glassBorder}`,
-          background: 'rgba(255,255,255,0.02)',
+          background: 'var(--blur-bg)',
+          backdropFilter: 'saturate(1.4) blur(20px)',
+          WebkitBackdropFilter: 'saturate(1.4) blur(20px)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 16, fontWeight: 600, color: T.text }}>{activePage}</span>
@@ -2151,7 +2199,7 @@ export default function App() {
                 fontSize: 11,
                 padding: '3px 10px',
                 borderRadius: 100,
-                background: 'rgba(52,211,153,0.12)',
+                background: S.good,
                 color: T.green,
                 fontWeight: 500,
                 fontVariantNumeric: 'tabular-nums',

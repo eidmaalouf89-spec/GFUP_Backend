@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>JANSA · VisaSist — P17&CO</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: #0A0A0B;
+      font-family: 'SF Pro Display','Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;
+    }
+    #root { width: 100%; height: 100%; }
+    /* Preload font faces for Inter (optional — SF Pro available on macOS) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React 18 from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel standalone for JSX compilation (acceptable for desktop app) -->
+  <script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Design tokens (CSS variables, fonts, theme switcher) -->
+  <script src="jansa/tokens.js"></script>
+
+  <!-- Data bridge (replaces static data.js — calls pywebview backend) -->
+  <script src="jansa/data_bridge.js"></script>
+
+  <!-- Apply dark theme immediately -->
+  <script>window.applyJansaTheme('dark');</script>
+
+  <!-- Visual components (unchanged from prototype) -->
+  <script type="text/babel" src="jansa/fiche_base.jsx"></script>
+  <script type="text/babel" src="jansa/overview.jsx"></script>
+  <script type="text/babel" src="jansa/consultants.jsx"></script>
+  <script type="text/babel" src="jansa/fiche_page.jsx"></script>
+  <script type="text/babel" src="jansa/runs.jsx"></script>
+  <script type="text/babel" src="jansa/executer.jsx"></script>
+  <script type="text/babel" src="jansa/shell.jsx"></script>
+
+  <!-- Mount app -->
+  <script type="text/babel">
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

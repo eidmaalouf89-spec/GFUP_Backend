@@ -35,26 +35,17 @@ sys.path.insert(0, str(BASE_DIR / "src"))
 
 # ── UI resolution ────────────────────────────────────────────
 def _resolve_ui():
-    """Returns URL for PyWebView to load."""
-    # Dev mode: check for Vite dev server
-    if "--dev" in sys.argv:
-        return "http://localhost:5173"
-    # Production: load built files
-    dist = BASE_DIR / "ui" / "dist" / "index.html"
-    if dist.exists():
-        return str(dist)
-    # Fallback: try frozen bundle
-    if getattr(sys, 'frozen', False):
-        frozen_dist = Path(sys._MEIPASS) / "ui" / "dist" / "index.html"
-        if frozen_dist.exists():
-            return str(frozen_dist)
+    """Return the single production UI entrypoint for PyWebView."""
+    jansa = BASE_DIR / "ui" / "jansa-connected.html"
+    if jansa.exists():
+        return str(jansa)
     raise FileNotFoundError(
-        "UI not found. Run 'cd ui && npm run build' or use '--dev' flag."
+        "JANSA production UI not found: ui/jansa-connected.html"
     )
 
 
 def _ui_target_for_browser(ui_url: str) -> str:
-    """Return a browser-openable target for local dist files or dev URLs."""
+    """Return a browser-openable target for the JANSA HTML entrypoint."""
     if ui_url.startswith("http://") or ui_url.startswith("https://"):
         return ui_url
     return Path(ui_url).resolve().as_uri()
@@ -762,6 +753,55 @@ class Api:
                 if "grandfichier" in f.name.lower():
                     return str(f)
         return None
+
+    # ── JANSA Dashboard UI adapter methods ──────────────────────
+
+    def get_overview_for_ui(self, focus=False, stale_days=90):
+        """Return OVERVIEW payload shaped for JANSA standalone dashboard."""
+        try:
+            dashboard = self.get_dashboard_data(focus, stale_days)
+            if isinstance(dashboard, dict) and "error" in dashboard:
+                return _sanitize_for_json(dashboard)
+            app_state = self.get_app_state()
+            from reporting.ui_adapter import adapt_overview
+            return _sanitize_for_json(adapt_overview(dashboard, app_state))
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(exc)}
+
+    def get_consultants_for_ui(self, focus=False, stale_days=90):
+        """Return CONSULTANTS list shaped for JANSA standalone dashboard."""
+        try:
+            raw = self.get_consultant_list(focus, stale_days)
+            if isinstance(raw, dict) and "error" in raw:
+                return _sanitize_for_json(raw)
+            from reporting.ui_adapter import adapt_consultants
+            return _sanitize_for_json(adapt_consultants(raw))
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(exc)}
+
+    def get_contractors_for_ui(self, focus=False, stale_days=90):
+        """Return CONTRACTORS + CONTRACTORS_LIST for JANSA standalone dashboard."""
+        try:
+            raw = self.get_contractor_list(focus, stale_days)
+            if isinstance(raw, dict) and "error" in raw:
+                return _sanitize_for_json(raw)
+            from reporting.ui_adapter import adapt_contractors_lookup, adapt_contractors_list
+            return _sanitize_for_json({
+                "lookup": adapt_contractors_lookup(raw),
+                "list": adapt_contractors_list(raw),
+            })
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(exc)}
+
+    def get_fiche_for_ui(self, consultant_name, focus=False, stale_days=90):
+        """Return FICHE_DATA for one consultant — already shaped correctly."""
+        return self.get_consultant_fiche(consultant_name, focus, stale_days)
 
 # ── Main ─────────────────────────────────────────────────────
 def main():

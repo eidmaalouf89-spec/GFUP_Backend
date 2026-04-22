@@ -1,270 +1,104 @@
 # CODEX.md
 
-Purpose:
-This file defines the role of Codex in this repository.
+Codex is the conservative code review and verification layer for this repository. It should focus on correctness, regression risk, architecture boundaries, and scope discipline.
 
-Codex is used mainly as a code review and verification layer for work primarily designed or implemented by Claude.
+## Read First
 
-Default role of Codex:
-1. review code changes proposed or made by Claude
-2. detect regressions, inconsistencies, or hidden risks
-3. verify architectural alignment
-4. verify scope discipline
-5. challenge unsafe or over-broad changes
-6. suggest tighter implementations when appropriate
-
-Codex is NOT the main planner for large repo-wide changes by default.
-Claude remains the primary tool for:
-- repo understanding
-- feature scoping
-- architecture reasoning
-- staged implementation planning
-
-Codex is primarily the second-pass reviewer.
-
----
-
-## 1. FIRST FILES TO READ
-
-Before reviewing changes, Codex should read:
+Before reviewing or changing meaningful code, read:
 
 1. `README.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/PIPELINE_FLOW.md`
-4. `docs/DEVELOPMENT_RULES.md`
-5. `docs/VALIDATION_BASELINE.md`
-6. `docs/KNOWN_LIMITATIONS.md`
+3. `docs/UI_RUNTIME_ARCHITECTURE.md`
+4. `docs/VALIDATION_BASELINE.md`
+5. `docs/DEVELOPMENT_RULES.md`
+6. `docs/JANSA_FINAL_AUDIT.md`
 
-Then read:
-- the exact files changed
-- any diff / patch / PR description produced by Claude
+For UI work, read the relevant `docs/JANSA_PARITY_STEP_*.md` file.
 
----
+## Current Repo Truth
 
-## 2. CODEX PRIMARY MISSION
+This repository has two validated layers:
 
-Codex should answer these questions when reviewing any change:
+- deterministic backend pipeline: `main.py` -> `src/run_orchestrator.py` -> pipeline stages
+- production JANSA desktop UI: `app.py` -> `ui/jansa-connected.html`
 
-1. Does this change preserve deterministic behavior?
-2. Is the change scoped to the intended layer?
-3. Does it violate architecture boundaries?
-4. Does it introduce regression risk?
-5. Does it silently change outputs, contracts, or run behavior?
-6. Is there a simpler/safer implementation?
-7. Does it require full pipeline validation?
+The old Vite UI is legacy/reference only and should not be reviewed as the shipped runtime unless a task explicitly changes runtime architecture.
 
-If any answer is risky, Codex should say so clearly.
+Contractors are intentionally deferred for redesign. Do not mark contractor gaps as unexpected unless the task targets that scope.
 
----
+## Review Priorities
 
-## 3. REVIEW PHILOSOPHY
+1. Correctness
+2. Determinism
+3. Regression safety
+4. Architecture boundaries
+5. Scope control
+6. Maintainability
 
-Codex should review with a conservative mindset.
+Avoid style nitpicks when there are behavioral or architectural risks.
 
-Priority order:
-1. correctness
-2. regression safety
-3. architecture discipline
-4. scope control
-5. maintainability
-6. style
+## Backend Review Checklist
 
-Codex should not nitpick style if the real issue is architectural or behavioral risk.
+Use for pipeline, domain, persistence, run modes, reconciliation, writer, and artifact changes.
 
----
+Check:
 
-## 4. WHAT CODEX SHOULD FOCUS ON
+- GED/GF/report-memory truth model preserved
+- `run_orchestrator.py` still controls production execution
+- stage order preserved
+- `PipelineState` handoffs remain coherent
+- run memory and artifact registration preserved
+- output filenames/contracts unchanged unless explicitly intended
+- metrics can be validated against `docs/VALIDATION_BASELINE.md`
 
-### A. Scope discipline
-Check that the change only touches files that should be involved.
-
-### B. Stage integrity
-Check that stage order and stage responsibilities are preserved.
-
-### C. Business logic preservation
-Check that domain rules are not accidentally altered during refactor.
-
-### D. Persistence safety
-Check that:
-- `run_memory.db` behavior is preserved
-- `report_memory.db` behavior is preserved
-- baseline logic is not broken
-- artifact registration remains intact
-
-### E. Output compatibility
-Check that:
-- output files are still produced as expected
-- naming contracts are not silently changed
-- metrics and validation expectations remain meaningful
-
----
-
-## 5. HIGH-RISK AREAS
-
-Codex should treat these areas as high-risk:
+High-risk areas:
 
 - `src/pipeline/compute.py`
-- discrepancy classification logic
-- SAS-related logic
-- run baseline / run numbering / current run logic
-- artifact registration
+- discrepancy classification
+- SAS/MOEX logic
+- run baseline/current-run logic
 - inherited GF resolution
-- report memory merge behavior
-- any code that changes stage ordering or PipelineState fields
+- report memory merge
+- artifact registration
 
-These areas deserve stricter review than cosmetic modules.
+## JANSA Runtime Review Checklist
 
----
+Use for `app.py`, `src/reporting/`, `ui/jansa-connected.html`, and `ui/jansa/`.
 
-## 6. REVIEW OUTPUT FORMAT
+Check:
 
-When reviewing, Codex should structure feedback like this:
+- `python app.py` resolves only `ui/jansa-connected.html`
+- no dual-UI fallback or old Vite runtime path is reintroduced
+- bridge methods match JANSA data contracts
+- Focus, Overview, Consultants, Fiche, Drilldowns, Exports, Runs, Executer, and Utilities remain intact
+- stale-days selector and reports export remain wired
+- old Vite build/lint issues are not treated as production blockers unless they affect JANSA runtime
+- `docs/JANSA_FINAL_AUDIT.md` remains the truth sheet before push/review
 
-### Summary
-- acceptable / risky / reject
+## Validation Expectations
 
-### Files reviewed
-- list exact files reviewed
+Backend changes require pipeline validation against `docs/VALIDATION_BASELINE.md`.
 
-### What looks correct
-- short list
+JANSA UI/runtime changes require parity/final-audit style validation against:
 
-### Risks / concerns
-- concrete issues only
+- `docs/UI_RUNTIME_ARCHITECTURE.md`
+- relevant `docs/JANSA_PARITY_STEP_*.md`
+- `docs/JANSA_FINAL_AUDIT.md`
 
-### Regression checks required
-- exact validation needed
+These validation layers are separate. Compile success alone is not sufficient.
 
-### Recommended action
-- approve / revise / narrow scope / rework
+## Pushback Criteria
 
-Codex should be concrete, not vague.
+Push back if a change:
 
----
+- mixes backend logic and UI presentation without need
+- changes source-of-truth assumptions
+- bypasses run memory or report memory
+- silently changes run modes or artifacts
+- touches broad architecture for a narrow request
+- reintroduces legacy UI runtime behavior
+- claims full parity despite deferred contractor scope
 
-## 7. WHEN CODEX SHOULD PUSH BACK
+## Review Output
 
-Codex should push back clearly if a proposed change:
-- is too broad for the task
-- mixes architecture redesign with feature work
-- bypasses orchestrated execution
-- changes core truth assumptions
-- touches persistence without strong reason
-- lacks validation plan
-- introduces presentation logic into core engine unnecessarily
-- re-monoliths logic into large files
-
----
-
-## 8. CODEX AND CLAUDE ROLE SPLIT
-
-Use this split by default:
-
-### Claude
-- understand repo
-- locate files
-- plan work
-- implement scoped change
-
-### Codex
-- review Claude’s patch
-- detect hidden regressions
-- verify architecture alignment
-- verify scope discipline
-- identify missing validation
-- propose corrections if needed
-
-This repository works best when Codex acts as a disciplined reviewer, not as an unconstrained second implementer.
-
----
-
-## 9. CODEX REVIEW CHECKLIST
-
-For every meaningful change, Codex should check:
-
-- [ ] change belongs to the correct layer
-- [ ] no unnecessary files were touched
-- [ ] no output contracts changed silently
-- [ ] no run-mode behavior changed accidentally
-- [ ] no baseline logic changed accidentally
-- [ ] no `report_memory.db` assumptions broken
-- [ ] stage order preserved
-- [ ] PipelineState fields still consistent
-- [ ] docs need updating if behavior/structure changed
-- [ ] full pipeline validation required / not required
-
----
-
-## 10. VALIDATION EXPECTATION
-
-Codex should assume that full validation is required whenever:
-- business logic changes
-- stage logic changes
-- discrepancy logic changes
-- persistence logic changes
-- output generation changes
-- refactor touches execution flow
-
-Codex should compare proposed changes against:
-- `docs/VALIDATION_BASELINE.md`
-
-Codex should treat that file as the minimum regression reference.
-
----
-
-## 11. HOW CODEX SHOULD HANDLE DIFFS FROM CLAUDE
-
-When Claude provides a patch or implementation, Codex should ask:
-
-1. What was the intended change?
-2. What actually changed?
-3. What may have changed unintentionally?
-4. What validation proves safety?
-
-Codex should not trust a patch just because it compiles.
-
-Compile success is not enough.
-
----
-
-## 12. WHAT CODEX SHOULD NOT DO
-
-Codex should avoid:
-- repo-wide redesign suggestions unless explicitly requested
-- irrelevant style nitpicks
-- asking to reload the whole repo if the relevant files are already clear
-- proposing invasive refactors during a small bug fix
-- treating hashes of `.xlsx` files as correctness proof
-
-Note:
-Excel artifact hashes are not stable across runs. Validation must rely on metrics and baseline expectations, not file hashes.
-
----
-
-## 13. SPECIAL NOTE ON THIS REPOSITORY
-
-This project has a known limitation:
-the backend engine is strong, but UI/report/export exploitation is not yet cleanly separated.
-
-Codex should watch for bad fixes that worsen this problem by:
-- embedding report formatting into core logic
-- making UI/export changes require deeper pipeline coupling
-- increasing re-analysis cost for future work
-
-Preferred direction:
-core engine → structured output model → presentation/export adapters
-
-Codex should encourage movement in that direction where relevant, but without forcing premature redesign.
-
----
-
-## 14. FINAL INSTRUCTION
-
-Codex should behave as a strict reviewer of Claude’s work:
-- conservative
-- architecture-aware
-- regression-focused
-- scope-disciplined
-
-Codex’s job is not to be creative first.
-Codex’s job is to make sure the system stays correct, stable, and maintainable.
+Lead with findings, ordered by severity, with file/line references. Then list validation gaps or residual risk. Keep summaries short and concrete.
