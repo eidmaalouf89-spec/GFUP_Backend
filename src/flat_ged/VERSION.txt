@@ -1,0 +1,9 @@
+flat_ged_builder snapshot
+source_commit: no-git-history (builder folder has no git repo; synced manually from GED_FLAT_Builder/)
+snapshot_date: 2026-04-23
+contract_version: v1.0   (matches docs/FLAT_GED_CONTRACT.md)
+source_of_truth_location: GED_FLAT_Builder/ged_flat_builder/ (local folder mounted at /mnt/GED_FLAT_Builder)
+
+DO NOT edit business rules in this folder.
+Bug fixes flow upstream first (fix in GED_FLAT_Builder/ged_flat_builder/), then a new snapshot is taken.
+Adapter changes go in src/pipeline/stages/stage_read_flat.py, never here.

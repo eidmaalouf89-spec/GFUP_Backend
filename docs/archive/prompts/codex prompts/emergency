@@ -1,0 +1,93 @@
+# TASK: Restore truncated src/report_memory.py and src/run_memory.py from a clean git worktree
+
+## Context
+Local working tree has TWO truncated Python files caused by a prior agent session
+hitting token limits during full-file rewrites. SQLite DBs are intact (integrity
+checked, 1245 rows in report_memory.db, 1 run in run_memory.db). Pipeline fails
+at stage_report_memory because the Python modules are incomplete, NOT because
+the DBs are corrupt.
+
+Authoritative line counts (verified from origin/main):
+- src/report_memory.py → 368 lines (local has 315 → 53 missing from end)
+- src/run_memory.py    → 893 lines (local has 783 → 110 missing from end)
+
+An earlier edit to src/pipeline/stages/stage_finalize_run.py MUST be preserved.
+It adds a `responses_cells_total` field and filters `responses_total` by
+`date_status_type != "NOT_CALLED"`. Do not touch that file.
+
+## Scope — STRICT
+Touch ONLY these two files:
+1. src/report_memory.py
+2. src/run_memory.py
+
+Do NOT touch: any .db file, any other .py file, any doc, any config.
+Do NOT run the pipeline. Do NOT run pytest. Do NOT install anything.
+Do NOT git add / git commit / git push.
+
+## Step 1 — Locate clean worktrees
+Run from repo root (Windows PowerShell):
+
+    git worktree list
+
+Expected: a list of worktrees including the main repo and several feature
+worktrees (names like "dazzling-ardinghelli-6679ce" etc.).
+
+Pick the FIRST worktree other than the main repo and capture its absolute path
+into a variable. Do not proceed until you have a concrete path.
+
+## Step 2 — Verify the candidate worktree has intact copies
+Before copying, confirm the source files are the right size:
+
+    (Get-Content <WORKTREE>\src\report_memory.py | Measure-Object -Line).Lines
+    (Get-Content <WORKTREE>\src\run_memory.py    | Measure-Object -Line).Lines
+
+Required:
+    report_memory.py = 368
+    run_memory.py    = 893
+
+If either number differs, STOP. Try the next worktree. If no worktree has both
+correct sizes, STOP and report the line counts of every worktree candidate.
+
+## Step 3 — Copy only after verification passes
+Once a worktree has BOTH files at correct size:
+
+    Copy-Item <WORKTREE>\src\report_memory.py src\report_memory.py -Force
+    Copy-Item <WORKTREE>\src\run_memory.py    src\run_memory.py    -Force
+
+## Step 4 — Confirm post-restore state
+Run all four checks. Paste raw output:
+
+    (Get-Content src\report_memory.py | Measure-Object -Line).Lines
+    (Get-Content src\run_memory.py    | Measure-Object -Line).Lines
+    python -c "import ast; ast.parse(open('src/report_memory.py', encoding='utf-8').read()); print('report_memory OK')"
+    python -c "import ast; ast.parse(open('src/run_memory.py',    encoding='utf-8').read()); print('run_memory OK')"
+
+Required output:
+    368
+    893
+    report_memory OK
+    run_memory OK
+
+## Step 5 — Confirm Edit 1 survived in stage_finalize_run.py
+Do NOT modify that file. Only verify:
+
+    Select-String -Path "src\pipeline\stages\stage_finalize_run.py" -Pattern "responses_cells_total"
+    Select-String -Path "src\pipeline\stages\stage_finalize_run.py" -Pattern "_responses_meaningful"
+
+BOTH must print at least one match. If either prints nothing, STOP and report —
+Edit 1 was lost and needs to be re-applied separately.
+
+## Step 6 — Report and STOP
+Paste, in this order:
+    1. The worktree path you chose
+    2. The four line-count + AST outputs from Step 4
+    3. The two Select-String outputs from Step 5
+
+Then STOP. Do not run main.py. Do not modify any other file. Do not commit.
+The human will review and authorize the next step manually.
+
+## Hard rules
+- No loops. No retries beyond "try next worktree" in Step 2.
+- If anything unexpected happens, STOP and paste the raw error. Do not improvise.
+- No "while I'm at it" fixes. Every file you touch must be in the Scope list above.
+- Do not touch data/*.db under any circumstance.

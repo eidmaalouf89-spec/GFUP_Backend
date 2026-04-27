@@ -1,0 +1,78 @@
+# Python caches / environments
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Node / frontend build artifacts
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/dist-ssr/
+ui/.vite/
+ui/.npm-cache/
+ui/npm-cache/
+ui/coverage/
+
+# Runtime pipeline state
+runs/
+output/
+data/run_memory.db
+data/report_memory.db
+data/*.bak
+data/*.malformed_bak
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal
+data/.fuse_hidden*
+tmp*.db
+
+# Large/local input payloads
+input/consultant_reports/
+input/FLAT_GED.xlsx
+
+# Logs, exports, and temporary Office files
+*.log
+*.zip
+~$*
+input/~$*
+*.tmp
+*.temp
+pytest-cache-files-*/
+
+# Local backups / scratch
+backup/
+backups/
+backup_*/
+.claude/worktrees/
+.trash/
+
+# Temporary prompt scratch files
+codex prompt.txt
+prompt codex.txt
+prompt claude*.txt
+codex prompts/architecture.md
+codex prompts/pipeline_flow.md
+codex prompts/DEVELOPMENT_RULES.md
+codex prompts/VALIDATION_BASELINE.md
+codex prompts/commitname
+codex prompts/emergency
+codex prompts/emergency2
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

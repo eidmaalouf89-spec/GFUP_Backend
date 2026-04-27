@@ -1,0 +1,90 @@
+Step 5 — Apply shell facelift only (NO data or logic changes)
+
+Context:
+
+* The current desktop app is the source of truth and must remain fully functional
+* `docs/UI_FACELIFT_STYLE_GUIDE.md` defines the visual system
+* I want to start applying the design safely, step by step
+
+Mission:
+Apply the design system to the **application shell only**, without touching business logic or data bindings.
+
+Scope:
+ONLY modify:
+
+* global background / canvas
+* base text colors
+* card surfaces
+* sidebar styling
+* topbar styling (if exists)
+
+DO NOT modify:
+
+* backend
+* API
+* data structures
+* event handling
+* navigation logic
+* screen content logic
+* charts data
+* consultant calculations
+
+Tasks:
+
+1. Introduce design tokens into the current UI layer:
+
+   * map colors (`--bg`, `--bg-elev`, `--text`, `--line`, etc.)
+   * map spacing scale
+   * map border radius
+   * do NOT import React/Tailwind/Vite
+
+2. Apply global styling:
+
+   * main background → `--bg`
+   * text → `--text`
+   * secondary text → `--text-2`
+   * borders → `--line`
+
+3. Restyle cards:
+
+   * background → `--bg-elev`
+   * border → `1px solid var(--line)`
+   * radius → `16-18px`
+   * padding → `20-24px`
+
+4. Restyle sidebar (if present):
+
+   * width ≈ 232px
+   * background → `--bg-elev`
+   * border-right → `var(--line)`
+   * active item:
+
+     * accent color
+     * left indicator bar
+     * soft highlight background
+
+5. Restyle topbar (if present):
+
+   * height ≈ 60px
+   * subtle background (no heavy colors)
+   * align controls cleanly
+
+6. Keep layout structure EXACTLY the same:
+
+   * do not move components
+   * do not add new sections
+   * do not remove anything
+
+7. Ensure:
+
+   * app still runs via `python app.py`
+   * no UI functionality breaks
+   * no data changes
+
+Deliverable:
+
+* visually upgraded shell
+* same screens, same data, new look
+
+Success criterion:
+When launching the app, it immediately looks like the handoff style, even before touching dashboard or fiche.

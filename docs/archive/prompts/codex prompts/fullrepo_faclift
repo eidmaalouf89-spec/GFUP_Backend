@@ -1,0 +1,5 @@
+Perform full repository review using the checklist in JANSA_FINAL_AUDIT.md
+Focus on P0 and P1 issues only
+Do NOT refactor architecture
+Do NOT add features
+Only flag real risks or bugs

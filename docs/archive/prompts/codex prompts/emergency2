@@ -1,0 +1,57 @@
+# TASK: Verify repo integrity using Python (not PowerShell) to confirm no real truncation exists
+
+## Context
+Diagnostic proved that `Measure-Object -Line` undercounts lines on this system.
+The actual files in git and on disk are intact. Before running the pipeline,
+verify file sizes and syntactic validity using Python, not PowerShell.
+
+## Scope — STRICT
+Read-only. No modifications, no fetches, no git operations that change state.
+
+## Step 1 — Line counts via Python (authoritative)
+Run this one-liner from repo root:
+
+    python -c "import os; [print(f'{p}: {sum(1 for _ in open(os.path.join(r,f), encoding=\"utf-8\", errors=\"replace\"))}') for r, d, fs in os.walk('src') for f in fs if f.endswith('.py') for p in [os.path.join(r,f)]]"
+
+Paste the output. Compare against expected (from origin/main):
+  src/run_memory.py       ≈ 893
+  src/report_memory.py    ≈ 368
+  src/run_explorer.py     ≈ 245
+  src/read_raw.py         ≈ 143 (approx — verify on GitHub if needed)
+  src/normalize.py        ≈ 423
+
+## Step 2 — AST parse every .py file under src/
+Python's AST parser is the definitive truncation detector — truncated Python
+files fail to parse. This catches anything the line counts miss.
+
+    python -c "
+    import ast, os, sys
+    fails = []
+    for r, d, fs in os.walk('src'):
+        for f in fs:
+            if f.endswith('.py'):
+                p = os.path.join(r, f)
+                try:
+                    ast.parse(open(p, encoding='utf-8').read())
+                except SyntaxError as e:
+                    fails.append((p, str(e)))
+    if fails:
+        print('FAILURES:')
+        for p, e in fails:
+            print(f'  {p}: {e}')
+        sys.exit(1)
+    else:
+        print('All .py files under src/ parse cleanly.')
+    "
+
+Paste the output.
+
+## Step 3 — Confirm Edit 1 is still in place
+    python -c "
+    txt = open('src/pipeline/stages/stage_finalize_run.py', encoding='utf-8').read()
+    print('responses_cells_total present:', 'responses_cells_total' in txt)
+    print('_responses_meaningful present:', '_responses_meaningful' in txt)
+    "
+
+## Step 4 — Report and STOP
+Paste outputs from Steps 1, 2, 3. Do nothing else. Do not run main.py.

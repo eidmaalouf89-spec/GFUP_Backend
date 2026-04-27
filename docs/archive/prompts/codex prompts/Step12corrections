@@ -1,0 +1,179 @@
+TASK — Recover truncated `consultant_fiche.py` from .pyc and restore source safely
+
+Context:
+
+* The file `src/reporting/consultant_fiche.py` is currently **truncated mid-string** and does NOT parse.
+* The app still works locally because Python is using cached `.pyc` files from `__pycache__`.
+* On a clean environment (CI / fresh clone), this WILL break the entire fiche + drilldown system.
+* Similar truncations were already fixed in other files (focus_filter.py, run_memory.py, run_orchestrator.py).
+
+Mission:
+Recover the missing tail of `consultant_fiche.py` from the compiled `.pyc` and restore a valid, complete, parsable Python file.
+
+CRITICAL RULES:
+
+* Do NOT refactor the file
+* Do NOT change logic
+* Do NOT rename functions
+* Do NOT modify existing working code
+* Only restore the missing tail
+* Preserve exact behavior as cached `.pyc`
+* This is a recovery, NOT a rewrite
+
+---
+
+## STEP 1 — Locate compiled file
+
+Find:
+
+* `src/reporting/__pycache__/consultant_fiche*.pyc`
+
+Select the `.pyc` matching current Python version.
+
+---
+
+## STEP 2 — Extract code from .pyc
+
+Use one of the following approaches:
+
+### Preferred (Python-native):
+
+Use `marshal` + `dis`:
+
+```python
+import marshal, dis
+
+with open("consultant_fiche.cpython-XXX.pyc", "rb") as f:
+    f.seek(16)  # skip header
+    code = marshal.load(f)
+
+dis.dis(code)
+```
+
+### OR decompile tool:
+
+* `uncompyle6` or `pycdc`
+  (These tools can reconstruct readable Python from `.pyc` bytecode ([Xygeni AI-Powered AppSec Platform][1]))
+
+Goal:
+
+* Recover the missing function tail (likely `_build_non_saisi` or similar)
+* Identify the correct return structure and closing logic
+
+---
+
+## STEP 3 — Reconstruct missing tail
+
+Append ONLY the missing portion to `consultant_fiche.py`
+
+Requirements:
+
+* Close any open string literals
+* Complete the function body
+* Ensure return dict structure is correct
+* Preserve indentation
+* Do NOT modify earlier parts of file
+
+---
+
+## STEP 4 — Validate syntax
+
+Run:
+
+```python
+import ast
+ast.parse(open("consultant_fiche.py").read())
+```
+
+Result must be:
+
+* NO SyntaxError
+
+---
+
+## STEP 5 — Remove cache dependency
+
+Delete all caches:
+
+```bash
+rm -rf src/reporting/__pycache__/
+```
+
+Then re-import:
+
+```bash
+python -c "import reporting.consultant_fiche"
+```
+
+Result must:
+
+* Import successfully from SOURCE (not .pyc)
+
+---
+
+## STEP 6 — Functional validation
+
+Run the app and verify:
+
+1. Consultant fiche loads
+2. Drilldowns open
+3. Drilldown exports work
+4. Bureau de Contrôle (SOCOTEC) still uses:
+
+   * FAV / SUS / DEF / HM
+5. Focus mode still works
+
+---
+
+## STEP 7 — Safety check
+
+Search for similar truncations:
+
+* run `ast.parse` on ALL:
+
+  * `src/**/*.py`
+* ensure zero syntax errors across repo
+
+---
+
+## DELIVERABLE
+
+Provide:
+
+1. Exact code block that was restored
+2. Confirmation:
+
+   * file parses cleanly
+   * cache removed
+   * app works without `.pyc`
+3. Any ambiguity encountered during reconstruction
+
+---
+
+## SUCCESS CRITERIA
+
+* `consultant_fiche.py` parses cleanly
+* app runs with NO reliance on `.pyc`
+* fiche + drilldowns + exports fully functional
+* behavior identical to pre-fix state
+* no unintended modifications
+
+---
+
+## IMPORTANT
+
+This is a **critical pre-push blocker**.
+
+Do NOT:
+
+* partially fix
+* rewrite logic
+* skip validation
+
+The fix must be:
+
+```text
+minimal + exact + deterministic
+```
+
+[1]: https://xygeni.io/blog/how-to-decompile-a-compiled-python-file-and-why-its-a-security-risk/?utm_source=chatgpt.com "How to Decompile a Compiled Python File"

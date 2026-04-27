@@ -1,0 +1,125 @@
+CLEAN Step 16 — Performance + Reliability Hardening
+
+Context:
+
+Step 15 is complete and PASS.
+
+Current production state:
+
+- python main.py completes successfully
+- latest run = 10 COMPLETED
+- Flat GED auto-build works
+- artifacts register correctly
+- TEAM_GF auto-generated
+- UI uses artifact-first loader
+- repo structurally stable
+
+This step is NOT architecture redesign.
+This step is NOT feature expansion.
+
+This is production hardening.
+
+Repo:
+C:\Users\GEMO 050224\Desktop\cursor\GF updater v3
+
+==================================================
+READ FIRST
+==================================================
+
+1. docs/STEP15_FINAL_COMPLETION_REPORT.md
+2. docs/STEP15_FORENSIC_STABILIZATION_REPORT.md
+3. docs/STEP15_LATE_FAILURE_FIX_REPORT.md
+4. src/run_orchestrator.py
+5. src/reporting/data_loader.py
+6. src/flat_ged_runner.py
+7. app.py
+8. src/run_memory.py
+9. README.md
+
+==================================================
+OBJECTIVES
+==================================================
+
+Improve reliability, maintainability, operator experience.
+
+Focus only high-value items.
+
+==================================================
+TASKS
+==================================================
+
+A. Startup / Runtime Performance
+
+1. Identify repeated expensive file reads
+2. Detect unnecessary Excel reloads
+3. Detect duplicate DB opens
+4. Improve safe caching where obvious
+
+B. Reliability
+
+5. Better locked-file errors (Excel open by user)
+6. Better sqlite locked handling
+7. Retry consistency for generated outputs
+8. Ensure partial failed runs become FAILED not STARTED
+9. Validate all terminal stages are null-safe
+
+C. Operator Experience
+
+10. Cleaner console logs
+11. Better error summaries
+12. Explicit mode banner:
+   FLAT MODE / RAW FALLBACK
+
+D. Hygiene
+
+13. Remove dead code references if tiny/safe
+14. Add missing trailing newlines
+15. Small defensive guards only
+
+==================================================
+STRICT RULES
+==================================================
+
+Do NOT rewrite business logic.
+Do NOT redesign pipeline stages.
+Do NOT touch src/flat_ged business rules.
+Do NOT create big refactors.
+Do NOT break Step 15 pass state.
+
+Prefer small surgical edits.
+
+==================================================
+DELIVERABLES
+==================================================
+
+Create:
+
+docs/STEP16_HARDENING_REPORT.md
+
+Include:
+
+- files changed
+- improvements made
+- measurable gains
+- reliability score /10
+- remaining risks
+
+Update tracker:
+Step 16 DONE if successful
+
+==================================================
+VALIDATION
+==================================================
+
+1. py_compile changed files
+2. python main.py smoke run OR dry validation if full run too long
+3. confirm no regression to artifact registration
+
+==================================================
+FINAL RESPONSE
+==================================================
+
+1. Files changed
+2. Reliability score
+3. Performance notes
+4. Can Step 17 begin?
