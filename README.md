@@ -37,9 +37,10 @@ This repository is not a generic Excel updater. It is a single-project operation
 | Gate 2 | Logical GF Fidelity (REAL_REGRESSION = 0) | ✅ PASS |
 | Gate 3 | UI Parity (REAL_DIVERGENCE = 0, 242 checks) | ✅ PASS |
 | Clean Steps 1–16 | Repo health → hardening validation | ✅ COMPLETE |
+| Chain + Onion Steps 04–14 | Portfolio intelligence layer — built and validated | ✅ COMPLETE |
+| G1 — Final Acceptance Gate | Live portfolio run against real output artifacts | ⏳ PENDING |
 
-**Next active phase:** Clean Step 17
-**Not yet started:** Chain + Onion (pending Gate 4)
+**Next active phase:** G1 live run confirmation → Clean Step 17
 
 ---
 
@@ -168,6 +169,17 @@ output/                         Latest user-facing deliverables
     FLAT_GED.xlsx                 Auto-generated from GED
     DEBUG_TRACE.csv               Builder debug output
     flat_ged_run_report.json      Builder run metadata
+  chain_onion/                  Chain + Onion portfolio intelligence outputs
+    CHAIN_REGISTER.csv            One row per family
+    CHAIN_VERSIONS.csv            All document versions
+    CHAIN_EVENTS.csv              Full event timeline
+    CHAIN_METRICS.csv             Staleness and pressure metrics
+    ONION_LAYERS.csv              Per-layer evidence rows
+    ONION_SCORES.csv              Chain-level scores and ranks
+    CHAIN_NARRATIVES.csv          Management summaries
+    dashboard_summary.json        Portfolio KPI snapshot
+    top_issues.json               Top 20 priority chains
+    CHAIN_ONION_SUMMARY.xlsx      11-sheet management workbook
   debug/                        Debug outputs
   exports/                      Run bundle exports
 
@@ -183,6 +195,18 @@ src/                            Source code
   pipeline/                       Staged pipeline engine
   flat_ged/                       Frozen builder snapshot (DO NOT MODIFY)
   reporting/                      UI data adapters
+  chain_onion/                    Chain + Onion portfolio intelligence layer
+    source_loader.py                Step 04 — source file loader
+    family_grouper.py               Step 05 — family grouper
+    chain_builder.py                Step 06 — timeline builder
+    chain_classifier.py             Step 07 — state / bucket classifier
+    chain_metrics.py                Step 08 — pressure and staleness metrics
+    onion_engine.py                 Step 09 — per-layer evidence builder
+    onion_scoring.py                Step 10 — chain-level impact scoring
+    narrative_engine.py             Step 11 — management narrative generator
+    exporter.py                     Step 12 — CSV / JSON / XLSX export engine
+    query_hooks.py                  Step 13 — 26 query functions (QueryContext)
+    validation_harness.py           Step 14 — 40-check acceptance harness
   ...
 
 ui/                             User interface
@@ -192,6 +216,118 @@ ui/                             User interface
 docs/                           Documentation
 scripts/                        Developer tools
 ```
+
+---
+
+## Chain + Onion Portfolio Intelligence Layer
+
+The Chain + Onion system is an analytical backend built on top of the GED pipeline. It groups document families into **chains** (one logical file = one chain across all its versions and events), scores each chain by operational impact through a layered **Onion** model, generates management narratives, and exports a complete portfolio intelligence package.
+
+It is entirely read-only relative to the GED pipeline — it consumes finalized pipeline outputs and does not modify any source data.
+
+### What a Chain Is
+
+A **chain** is the full lifecycle of one administrative file across all its GED versions, consultant reports, SAS decisions, and MOEX interventions. Every document submitted, revised, rejected, corrected, or approved belongs to a single chain identified by `family_key`.
+
+### What the Onion Is
+
+The **Onion** is a six-layer impact scoring model. Each layer represents a distinct source of operational friction:
+
+| Layer | Code | Theme |
+|-------|------|-------|
+| L1 | Contractor quality issues | `contractor_impact_score` |
+| L2 | SAS gate friction | `sas_impact_score` |
+| L3 | Primary consultant delay | `consultant_primary_impact_score` |
+| L4 | Secondary consultant delay | `consultant_secondary_impact_score` |
+| L5 | MOEX arbitration delay | `moex_impact_score` |
+| L6 | Data / report contradiction | `contradiction_impact_score` |
+
+Each layer is scored by: `severity_weight × confidence_factor × pressure_factor × recency_factor × evidence_factor`. Layer scores sum to a `total_onion_score` normalized to `normalized_score_100` (0–100). Chains are ranked by `action_priority_rank` (rank 1 = most operationally impacted).
+
+### Module Map (`src/chain_onion/`)
+
+| Module | Step | Role |
+|--------|------|------|
+| `source_loader.py` | 04 | Loads GED, consultant report, and SAS source files |
+| `family_grouper.py` | 05 | Groups all GED rows into families by document identity |
+| `chain_builder.py` | 06 | Builds timeline events per family |
+| `chain_classifier.py` | 07 | Assigns `current_state` and `portfolio_bucket` to each chain |
+| `chain_metrics.py` | 08 | Computes `stale_days`, pressure index, activity dates |
+| `onion_engine.py` | 09 | Builds per-layer evidence rows (`ONION_LAYERS`) |
+| `onion_scoring.py` | 10 | Aggregates layer scores into chain-level `ONION_SCORES` |
+| `narrative_engine.py` | 11 | Generates neutral management summaries (`CHAIN_NARRATIVES`) |
+| `exporter.py` | 12 | Exports all artifacts to `output/chain_onion/` |
+| `query_hooks.py` | 13 | 26 query functions over `QueryContext` for UI / dashboard use |
+| `validation_harness.py` | 14 | 40-check acceptance harness for system integrity |
+
+### Portfolio Buckets
+
+Every chain is assigned exactly one `portfolio_bucket`:
+
+| Bucket | Meaning |
+|--------|---------|
+| `LIVE_OPERATIONAL` | Active chains with open workflow steps |
+| `LEGACY_BACKLOG` | Old open chains with no recent activity |
+| `ARCHIVED_HISTORICAL` | Terminal chains (closed, void, or dead at SAS) |
+
+Terminal states: `CLOSED_VAO`, `CLOSED_VSO`, `VOID_CHAIN`, `DEAD_AT_SAS_A`.
+
+### Output Artifacts (`output/chain_onion/`)
+
+| Artifact | Description |
+|----------|-------------|
+| `CHAIN_REGISTER.csv` | One row per family — identity and state |
+| `CHAIN_VERSIONS.csv` | All document versions per family |
+| `CHAIN_EVENTS.csv` | Full timeline of events per family |
+| `CHAIN_METRICS.csv` | Pressure index, stale days, activity dates |
+| `ONION_LAYERS.csv` | Per-layer evidence rows |
+| `ONION_SCORES.csv` | Chain-level scores, ranks, escalation flags |
+| `CHAIN_NARRATIVES.csv` | Management summaries with urgency/confidence labels |
+| `dashboard_summary.json` | Portfolio KPI snapshot (totals, ratios, top theme) |
+| `top_issues.json` | Top 20 chains by `action_priority_rank` |
+| `CHAIN_ONION_SUMMARY.xlsx` | 11-sheet management workbook |
+
+### Running the Chain + Onion Layer
+
+The system is invoked after a full pipeline run. All required inputs are read from `output/chain_onion/` or passed as in-memory DataFrames.
+
+**Validation only (no pipeline re-run):**
+```python
+from src.chain_onion.validation_harness import run_chain_onion_validation
+report = run_chain_onion_validation(output_dir="output/chain_onion")
+print(report["status"])  # PASS / WARN / FAIL
+```
+
+**Query hooks (UI / dashboard):**
+```python
+from src.chain_onion.query_hooks import QueryContext, get_top_issues, get_live_operational
+ctx = QueryContext(output_dir="output/chain_onion")
+top = get_top_issues(ctx, limit=20)
+live = get_live_operational(ctx)
+```
+
+### Validation Harness (Step 14)
+
+`run_chain_onion_validation()` runs 40 checks across 8 categories and returns a structured report:
+
+```
+status          PASS / WARN / FAIL
+total_checks    64
+passed_checks   ...
+warning_checks  ...
+failed_checks   ...
+critical_failures  [list of FAIL messages]
+warnings           [list of WARN messages]
+portfolio_snapshot {total_chains, live_chains, legacy_chains, archived_chains, ...}
+```
+
+Quality signals that trigger WARN (not FAIL):
+- `dormant_ghost_ratio > 0.50` — high archive proportion
+- Escalated chains > 25% of live chains
+- Zero-score chains > 40% of all chains
+- Contradiction rows > 10% of all chains
+
+**Test suite:** `tests/test_validation_harness.py` — 47 passed, 1 skipped (live run).
 
 ---
 
@@ -401,6 +537,10 @@ Always:
 - `docs/UI_LOADER_PRODUCTIZATION_AUDIT.md` — Step 10 UI loader audit
 - `docs/CLEAN_IO_FINALIZATION_REPORT.md` — Step 12 IO finalization report
 - `GFUP_STEP_TRACKER.md` — step execution tracker (Gates 1–3 + Clean Steps 1–12)
+- `docs/CHAIN_ONION_STEP_TRACKER.md` — Chain + Onion step tracker (Steps 04–14, G1)
+- `docs/CHAIN_ONION_MASTER_STRATEGY.md` — Chain + Onion design strategy and data contracts
+- `docs/CHAIN_ONION_ACCEPTANCE.md` — Step 14 executive acceptance report
+- `docs/STEP04_VALIDATION.md` through `docs/STEP14_VALIDATION.md` — per-step validation records for the Chain + Onion system
 
 ### Archive / Historical Validation Records
 
@@ -421,6 +561,6 @@ Always:
 
 This codebase is:
 
-> A deterministic reconstruction and enrichment engine with persistent project memory, validated staged execution, automatic Flat GED normalization, artifact-first UI loading, and a production JANSA desktop UI runtime.
+> A deterministic reconstruction and enrichment engine with persistent project memory, validated staged execution, automatic Flat GED normalization, artifact-first UI loading, a production JANSA desktop UI runtime, and a Chain + Onion portfolio intelligence layer that scores, ranks, and narrates the full operational state of every active document chain.
 
 It is not just an Excel updater, report parser, reconciliation script, or temporary chantier utility.
