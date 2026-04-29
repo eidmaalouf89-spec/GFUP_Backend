@@ -1,0 +1,48 @@
+artifact,producer_stage,producer_module,consumer,format,notes
+GF_V0_CLEAN.xlsx,stage_write_gf,writer.GFWriter.write,stage_build_team_version + data_loader (FINAL_GF artifact),xlsx,Internal reconstructed GF
+GF_TEAM_VERSION.xlsx,stage_build_team_version,team_version_builder.build_team_version,app.Api.export_team_version (UI),xlsx,Surgical patch of OGF using GF_V0_CLEAN as truth
+Tableau de suivi de visa DD_MM_YYYY.xlsx,app.Api.export_team_version (UI on-demand),"shutil.copy2 of GF_TEAM_VERSION",user (open in Explorer),xlsx,Dated team export
+DISCREPANCY_REPORT.xlsx,stage_discrepancy,writer.write_discrepancy_report,(none in UI today),xlsx,All discrepancies with severity
+DISCREPANCY_REVIEW_REQUIRED.xlsx,stage_discrepancy,writer.write_discrepancy_report (REVIEW_REQUIRED only),(none in UI today),xlsx,Curated review queue
+ANOMALY_REPORT.xlsx,stage_write_gf,writer.write_anomaly_report,(none),xlsx,Lifecycle anomalies
+AUTO_RESOLUTION_LOG.xlsx,stage_write_gf,writer.write_auto_resolution_log,(none),xlsx,Silent reconciler fixes
+IGNORED_ITEMS_LOG.xlsx,stage_write_gf and stage_discrepancy (append),"writer.write_ignored_items_log + pandas append",(none),xlsx,Excluded rows + BENTIN_LEGACY_EXCEPTION
+RECONCILIATION_LOG.xlsx,stage_discrepancy,reconciliation_engine.write_reconciliation_outputs,(none),xlsx,Patch F fuzzy reconciliation
+MISSING_IN_GED_DIAGNOSIS.xlsx,stage_diagnosis,pipeline.compute._write_missing_in_ged_diagnosis,(none),xlsx,Diagnosis layer A
+MISSING_IN_GED_TRUE_ONLY.xlsx,stage_diagnosis,pipeline.compute._write_missing_in_ged_diagnosis,(none),xlsx,Confirmed misses
+MISSING_IN_GF_DIAGNOSIS.xlsx,stage_diagnosis,pipeline.compute._write_missing_in_gf_diagnosis,(none),xlsx,Diagnosis layer B
+MISSING_IN_GF_TRUE_ONLY.xlsx,stage_diagnosis,pipeline.compute._write_missing_in_gf_diagnosis,(none),xlsx,Confirmed misses
+INSERT_LOG.xlsx,stage_diagnosis,writer.write_insert_log,(none),xlsx,Rows newly inserted by reconstruction
+NEW_SUBMITTAL_ANALYSIS.xlsx,stage_diagnosis,writer.write_new_submittal_analysis + domain.family_builder._build_new_submittal_analysis,(none),xlsx,New documents per family
+SUSPICIOUS_ROWS_REPORT.xlsx,stage_diagnosis,writer,(none),xlsx,Suspicious GF rows
+consultant_match_report.xlsx,stage_route or consultant_integration,consultant_match_report + consultant_matcher,stage_report_memory (next run),xlsx,Per-consultant match details
+consultant_reports.xlsx,consultant_ingest run (when reports_dir provided),consultant_ingest.consultant_excel_exporter,(none direct),xlsx,Standardised consultant reports
+FLAT_GED.xlsx,flat_ged_runner.build_flat_ged_artifacts (pre-pipeline),src/flat_ged builder,stage_read_flat + chain_onion.source_loader + data_loader,xlsx,GED_RAW_FLAT + GED_OPERATIONS sheets
+DEBUG_TRACE.csv,flat_ged builder (batch mode),src/flat_ged.cli.run_batch,chain_onion.source_loader,csv,Builder debug
+flat_ged_run_report.json,flat_ged_runner,src/flat_ged builder + runner rename,(none direct),json,Builder run metadata
+debug/coarse_groups.xlsx,stage_diagnosis,debug_writer.write_all_debug,(none),xlsx,Coarse grouping by lot
+debug/discrepancy_sample.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Sample for review
+debug/exclusion_summary.xlsx,stage_route,config_loader.ExclusionConfig.write_exclusion_summary,(none),xlsx,ExclusionConfig stats
+debug/family_clusters.xlsx,stage_diagnosis,debug_writer,(none),xlsx,family_builder clusters
+debug/gf_duplicates.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Duplicate rows in GF
+debug/gf_sheet_schema.xlsx,stage_route,routing.read_all_gf_sheet_structures (debug write),(none),xlsx,Per-sheet schema
+debug/lifecycle_resolution.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Lifecycle decisions
+debug/missing_in_ged_summary.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Aggregate
+debug/missing_in_gf_summary.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Aggregate
+debug/new_submittal_summary.xlsx,stage_diagnosis,debug_writer,(none),xlsx,Aggregate
+debug/reconciliation_summary.xlsx,stage_discrepancy,reconciliation_engine.write_reconciliation_outputs,(none),xlsx,Aggregate
+debug/routing_summary.xlsx,stage_route,routing.write_routing_summary,(none),xlsx,Per-doc routing decision
+chain_onion/CHAIN_REGISTER.csv,run_chain_onion (Step 05+07),family_grouper + chain_classifier,chain_onion.query_hooks + app._build_live_operational_numeros,csv,One row per family
+chain_onion/CHAIN_VERSIONS.csv,run_chain_onion (Step 05),family_grouper.build_chain_versions,query_hooks + validation_harness,csv,All document versions
+chain_onion/CHAIN_EVENTS.csv,run_chain_onion (Step 06),chain_builder.build_chain_events,validation_harness,csv,Full event timeline
+chain_onion/CHAIN_METRICS.csv,run_chain_onion (Step 08),chain_metrics.build_chain_metrics,query_hooks + validation_harness,csv,Pressure / staleness
+chain_onion/ONION_LAYERS.csv,run_chain_onion (Step 09),onion_engine.build_onion_layers,query_hooks + validation_harness,csv,Per-layer evidence
+chain_onion/ONION_SCORES.csv,run_chain_onion (Step 10),onion_scoring.build_onion_scores,query_hooks + app._build_live_operational_numeros,csv,Chain-level scores + ranks
+chain_onion/CHAIN_NARRATIVES.csv,run_chain_onion (Step 11),narrative_engine.build_chain_narratives,query_hooks,csv,Management summaries
+chain_onion/CHAIN_ONION_SUMMARY.xlsx,run_chain_onion (Step 12),exporter.export_chain_onion_outputs,(manual),xlsx,11-sheet management workbook
+chain_onion/dashboard_summary.json,run_chain_onion (Step 12),exporter,query_hooks.get_dashboard_summary,json,Portfolio KPI snapshot
+chain_onion/top_issues.json,run_chain_onion (Step 12),exporter,query_hooks.get_top_issues,json,Top 20 priority chains
+data/run_memory.db,stage_init_run + stage_finalize_run + run_orchestrator,run_memory.*,app.Api.* + data_loader + run_explorer,sqlite,Run / artifact registry
+data/report_memory.db,stage_report_memory,report_memory.*,stage_report_memory + chain_onion.source_loader,sqlite,Persistent consultant truth
+runs/run_NNNN/*,stage_finalize_run,run_memory.copy_artifact_to_run_dir,run_explorer.export_run_bundle,many,Immutable per-run snapshot
+output/exports/run_N_bundle.zip,app.Api.export_run_bundle,run_explorer.export_run_bundle,user (Explorer),zip,Per-run ZIP

@@ -439,15 +439,15 @@ def _check_d(
         results.append(_fail("D18", "ONION", "D18 skipped: evidence_count column missing"))
 
     # D19 — severity vocabulary valid
-    if "severity" in df.columns:
-        invalid = df[~df["severity"].isin(_VALID_SEVERITY)]
+    if "severity_raw" in df.columns:
+        invalid = df[~df["severity_raw"].isin(_VALID_SEVERITY)]
         if invalid.empty:
-            results.append(_pass("D19", "ONION", "All severity values are valid"))
+            results.append(_pass("D19", "ONION", "All severity_raw values are valid"))
         else:
-            bad_vals = invalid["severity"].unique().tolist()
-            results.append(_fail("D19", "ONION", f"Invalid severity values: {bad_vals}"))
+            bad_vals = invalid["severity_raw"].unique().tolist()
+            results.append(_fail("D19", "ONION", f"Invalid severity_raw values: {bad_vals}"))
     else:
-        results.append(_fail("D19", "ONION", "D19 skipped: severity column missing"))
+        results.append(_fail("D19", "ONION", "D19 skipped: severity_raw column missing"))
 
     # D20 — confidence range 10–100
     if "confidence_raw" in df.columns:

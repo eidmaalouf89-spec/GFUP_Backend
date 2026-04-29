@@ -235,20 +235,39 @@ def _apply_sas_filter_flat(
         open_doc["submittal_date"], errors="coerce"
     ).dt.year
 
-    exclude_pairs: set[tuple] = set()
-    for _, row in open_doc.iterrows():
-        pair = (str(row["numero"]).strip(), str(row["indice"]).strip())
-        if pair in rappel_pairs and pd.notna(row["_year"]) and int(row["_year"]) < 2026:
-            exclude_pairs.add(pair)
+    # Vectorized: build key column, filter in one pass — replaces iterrows loop
+    rappel_keys = {f"{n}|{i}" for n, i in rappel_pairs}
+    open_doc["_key"] = (
+        open_doc["numero"].astype(str).str.strip()
+        + "|"
+        + open_doc["indice"].astype(str).str.strip()
+    )
+    excl_mask = (
+        open_doc["_key"].isin(rappel_keys)
+        & open_doc["_year"].notna()
+        & (open_doc["_year"].astype(float) < 2026)
+    )
+    excl_sub = open_doc.loc[excl_mask]
+    exclude_pairs: set[tuple] = set(
+        zip(
+            excl_sub["numero"].astype(str).str.strip(),
+            excl_sub["indice"].astype(str).str.strip(),
+        )
+    )
 
     if not exclude_pairs:
         return ops_df, raw_df, 0
 
+    # Vectorized exclusion filter — replaces df.apply row-by-row
+    excl_keys = {f"{n}|{i}" for n, i in exclude_pairs}
+
     def _not_excluded(df: pd.DataFrame) -> pd.Series:
-        return ~df.apply(
-            lambda r: (str(r["numero"]).strip(), str(r["indice"]).strip()) in exclude_pairs,
-            axis=1,
+        keys = (
+            df["numero"].astype(str).str.strip()
+            + "|"
+            + df["indice"].astype(str).str.strip()
         )
+        return ~keys.isin(excl_keys)
 
     ops_out = ops_df[_not_excluded(ops_df)].copy().reset_index(drop=True)
     raw_out = raw_df[_not_excluded(raw_df)].copy().reset_index(drop=True)
@@ -433,46 +452,36 @@ def _build_docs_df(
     """
     open_docs = ops_df[ops_df["step_type"] == "OPEN_DOC"].copy()
 
-    records = []
-    for _, row in open_docs.iterrows():
-        numero = str(row["numero"]).strip()
-        indice = str(row["indice"]).strip()
-        doc_id = doc_code_to_id.get((numero, indice))
-        if doc_id is None:
-            continue
+    # Vectorized doc_id assignment via key map — replaces iterrows loop
+    id_map = {f"{n}|{i}": v for (n, i), v in doc_code_to_id.items()}
+    open_docs["_key"] = (
+        open_docs["numero"].astype(str).str.strip()
+        + "|"
+        + open_docs["indice"].astype(str).str.strip()
+    )
+    open_docs["doc_id"] = open_docs["_key"].map(id_map)
+    open_docs = open_docs[open_docs["doc_id"].notna()].copy()
 
-        submittal_raw = str(row.get("submittal_date", "")).strip()
-        try:
-            cree_le_ts = pd.Timestamp(submittal_raw) if submittal_raw else None
-        except Exception:
-            cree_le_ts = None
-
-        records.append({
-            # ── Core identity ─────────────────────────────────
-            "doc_id":               doc_id,
-            "numero":               numero,
-            "indice":               indice,
-            "lot":                  str(row.get("lot",      "") or ""),
-            "emetteur":             str(row.get("emetteur", "") or ""),
-            # libelle_du_document: VersionEngine reads this field name
-            "libelle_du_document":  str(row.get("titre",   "") or ""),
-            # cree_le: normalize_docs searches for this column to create created_at
-            "cree_le":              cree_le_ts,
-            # ── Reference date (BACKEND_SEMANTIC_CONTRACT Concept 6D) ─
-            "data_date":            str(row.get("data_date", "") or ""),
-            # ── Fields absent from flat GED — set to None ─────
-            # VersionEngine handles None grouping columns gracefully (line 227–233).
-            "type_de_doc":          None,
-            "zone":                 None,
-            "niveau":               None,
-            "affaire":              None,
-            "projet":               None,
-            "batiment":             None,
-            "phase":                None,
-            "specialite":           None,
-        })
-
-    return pd.DataFrame(records)
+    return pd.DataFrame({
+        "doc_id":              open_docs["doc_id"].values,
+        "numero":              open_docs["numero"].astype(str).str.strip().values,
+        "indice":              open_docs["indice"].astype(str).str.strip().values,
+        "lot":                 open_docs["lot"].fillna("").astype(str).values       if "lot"      in open_docs.columns else "",
+        "emetteur":            open_docs["emetteur"].fillna("").astype(str).values  if "emetteur" in open_docs.columns else "",
+        # libelle_du_document: VersionEngine reads this field name
+        "libelle_du_document": open_docs["titre"].fillna("").astype(str).values     if "titre"    in open_docs.columns else "",
+        # cree_le: normalize_docs creates created_at from this
+        "cree_le":             pd.to_datetime(
+                                   open_docs["submittal_date"].astype(str).str.strip()
+                                   if "submittal_date" in open_docs.columns else pd.Series(dtype=str),
+                                   errors="coerce",
+                               ).values,
+        # Reference date (BACKEND_SEMANTIC_CONTRACT Concept 6D)
+        "data_date":           open_docs["data_date"].fillna("").astype(str).values if "data_date" in open_docs.columns else "",
+        # Fields absent from flat GED — None; VersionEngine handles gracefully
+        "type_de_doc": None, "zone": None, "niveau": None, "affaire": None,
+        "projet":      None, "batiment": None, "phase": None, "specialite": None,
+    }).reset_index(drop=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -509,115 +518,129 @@ def _build_responses_df(
     Extra flat_* columns are appended for parity harness use (Step 5) and are
     ignored by all legacy stage functions.
     """
-    # Build SAS RAPPEL proxy lookup from GED_RAW_FLAT
-    # key: (numero, indice) → "PENDING_LATE" | "PENDING_IN_DELAY" | "ANSWERED" | ""
-    sas_dst_lookup: dict[tuple, str] = {}
+    # Build SAS RAPPEL proxy lookup from GED_RAW_FLAT (vectorized)
+    # key: "numero|indice" → "PENDING_LATE" | "PENDING_IN_DELAY" | "ANSWERED" | ""
+    sas_dst_lookup: dict[str, str] = {}
     if "is_sas" in raw_df.columns:
-        for _, r in raw_df[raw_df["is_sas"] == True].iterrows():
-            key = (str(r["numero"]).strip(), str(r["indice"]).strip())
-            sas_dst_lookup[key] = str(r.get("date_status_type", "")).strip()
+        sas_raw = raw_df[raw_df["is_sas"] == True].copy()
+        if not sas_raw.empty:
+            sas_raw["_key"] = (
+                sas_raw["numero"].astype(str).str.strip()
+                + "|"
+                + sas_raw["indice"].astype(str).str.strip()
+            )
+            sas_dst_lookup = (
+                sas_raw.set_index("_key")["date_status_type"]
+                .astype(str).str.strip().to_dict()
+            )
 
     # Only process non-OPEN_DOC rows
     step_rows = ops_df[ops_df["step_type"] != "OPEN_DOC"].copy()
 
-    records = []
-    for _, row in step_rows.iterrows():
-        numero    = str(row["numero"]).strip()
-        indice    = str(row["indice"]).strip()
-        doc_id    = doc_code_to_id.get((numero, indice))
-        if doc_id is None:
-            continue
+    # ── Vectorized doc_id assignment ──────────────────────────────────────────
+    id_map = {f"{n}|{i}": v for (n, i), v in doc_code_to_id.items()}
+    step_rows["_key"] = (
+        step_rows["numero"].astype(str).str.strip()
+        + "|"
+        + step_rows["indice"].astype(str).str.strip()
+    )
+    step_rows["doc_id"] = step_rows["_key"].map(id_map)
+    step_rows = step_rows[step_rows["doc_id"].notna()].copy()
 
-        step_type     = str(row.get("step_type",            "") or "").strip()
-        is_completed  = row.get("is_completed") is True
-        is_blocking   = row.get("is_blocking")  is True
-        retard_status = str(row.get("retard_avance_status", "") or "").strip()
-        phase_dl      = str(row.get("phase_deadline",       "") or "").strip()
-        resp_date     = str(row.get("response_date",        "") or "").strip()
+    if step_rows.empty:
+        return pd.DataFrame()
 
-        # ── approver_raw ─────────────────────────────────────
-        # Force "0-SAS" for SAS steps so _apply_sas_filter() fires correctly.
-        if step_type == "SAS":
-            approver_raw = "0-SAS"
-        else:
-            approver_raw = str(row.get("actor_raw", "") or "").strip()
+    # ── Normalise string columns once ─────────────────────────────────────────
+    def _col(df, name, default=""):
+        return df[name].fillna(default).astype(str).str.strip() if name in df.columns \
+               else pd.Series(default, index=df.index)
 
-        # ── TEMPORARY_COMPAT_LAYER — begin ───────────────────────
-        # Problem: normalize_responses() still runs in flat mode and calls
-        # interpret_date_field() on response_date_raw.  To produce the correct
-        # date_status_type without modifying stage_normalize, we reconstruct
-        # the legacy text strings that interpret_date_field() expects.
-        # This is flat GED → fake raw text → re-parsed: backward engineering.
-        #
-        # REMOVAL: When stage_normalize is updated for flat mode (Step 8),
-        # replace this entire block with direct injection of:
-        #   date_status_type, date_limite, date_reponse
-        # and drop response_date_raw from the flat responses_df entirely.
-        # The flat_* pass-through columns are already the clean foundation.
-        # ─────────────────────────────────────────────────────────────────
-        deadline_fmt = phase_dl.replace("-", "/") if phase_dl else None
+    step_type     = _col(step_rows, "step_type")
+    retard_status = _col(step_rows, "retard_avance_status")
+    phase_dl      = _col(step_rows, "phase_deadline")
+    resp_date     = _col(step_rows, "response_date")
+    actor_raw     = _col(step_rows, "actor_raw")
 
-        if is_completed:
-            try:
-                response_date_raw = pd.Timestamp(resp_date) if resp_date else None
-            except Exception:
-                response_date_raw = None
+    is_completed = step_rows["is_completed"] == True
+    is_blocking  = step_rows["is_blocking"]  == True
 
-        elif is_blocking:
-            # Decide RAPPEL vs EN_ATTENTE
-            if step_type == "SAS":
-                # Use GED_RAW_FLAT date_status_type as RAPPEL proxy (Concept 7G)
-                is_rappel = sas_dst_lookup.get((numero, indice), "") == "PENDING_LATE"
-            else:
-                # Use retard_avance_status from GED_OPERATIONS (Concept 6)
-                is_rappel = (retard_status == "RETARD")
+    # approver_raw: "0-SAS" for SAS steps, else actor_raw
+    import numpy as np
+    approver_raw = np.where(step_type == "SAS", "0-SAS", actor_raw)
 
-            if is_rappel:
-                base = _RAPPEL_PREFIX
-            else:
-                base = _EN_ATTENTE_PREFIX
+    # ── TEMPORARY_COMPAT_LAYER — vectorized ───────────────────────────────────
+    # Reconstruct response_date_raw strings expected by normalize_responses().
+    # See removal plan in module docstring (Step 8).
+    deadline_fmt = phase_dl.str.replace("-", "/", regex=False)
 
-            response_date_raw = (
-                f"{base} ({deadline_fmt})" if deadline_fmt else base
-            )
+    # SAS RAPPEL proxy: lookup sas_dst_lookup by key
+    sas_is_rappel = step_rows["_key"].map(sas_dst_lookup).fillna("") == "PENDING_LATE"
+    non_sas_rappel = retard_status == "RETARD"
+    is_rappel = np.where(step_type == "SAS", sas_is_rappel, non_sas_rappel)
 
-        else:
-            # is_blocking=False AND is_completed=False:
-            # Post-MOEX de-flagged consultant (Concept 2) → NOT_CALLED
-            response_date_raw = None
-        # ── TEMPORARY_COMPAT_LAYER — end ─────────────────────────
+    rappel_str = np.where(
+        deadline_fmt != "",
+        _RAPPEL_PREFIX + " (" + deadline_fmt + ")",
+        _RAPPEL_PREFIX,
+    )
+    en_attente_str = np.where(
+        deadline_fmt != "",
+        _EN_ATTENTE_PREFIX + " (" + deadline_fmt + ")",
+        _EN_ATTENTE_PREFIX,
+    )
 
-        # ── response_status_raw ──────────────────────────────
-        # Use status_raw (preserves leading dots); fall back to status_clean.
-        status_raw_val = str(row.get("status_raw",   "") or "").strip()
-        status_clean   = str(row.get("status_clean", "") or "").strip()
-        response_status_raw = status_raw_val or status_clean or None
+    # Build response_date_raw as object array (Timestamp | str | None)
+    rdraw = pd.array([None] * len(step_rows), dtype=object)
+    comp_idx  = is_completed.values
+    block_idx = (~is_completed & is_blocking).values
+    rdraw[comp_idx] = pd.to_datetime(
+        resp_date[is_completed], errors="coerce"
+    ).values
+    rdraw[block_idx] = np.where(
+        is_rappel[block_idx], rappel_str[block_idx], en_attente_str[block_idx]
+    )
+    # ── End TEMPORARY_COMPAT_LAYER ────────────────────────────────────────────
 
-        # ── Assemble record ───────────────────────────────────
-        records.append({
-            # ── Standard stage_read schema ────────────────────
-            "doc_id":              doc_id,
-            "approver_raw":        approver_raw,
-            "response_date_raw":   response_date_raw,
-            "response_status_raw": response_status_raw,
-            "response_comment":    str(row.get("observation", "") or "").strip(),
-            "pj_flag":             _safe_int(row.get("pj_flag", 0)),
-            # ── Flat GED pass-through (for parity harness, Step 5) ──
-            # Prefixed flat_* so they never collide with legacy column names.
-            "flat_is_blocking":             is_blocking,
-            "flat_is_completed":            is_completed,
-            "flat_step_type":               step_type,
-            "flat_actor_clean":             str(row.get("actor_clean", "") or "").strip(),
-            "flat_phase_deadline":          phase_dl,
-            "flat_retard_avance_status":    retard_status,
-            "flat_step_delay_days":         _safe_int(row.get("step_delay_days")),
-            "flat_delay_contribution_days": _safe_int(row.get("delay_contribution_days")),
-            "flat_cumulative_delay_days":   _safe_int(row.get("cumulative_delay_days")),
-            "flat_delay_actor":             str(row.get("delay_actor", "") or "").strip(),
-            "flat_data_date":               str(row.get("data_date",   "") or "").strip(),
-        })
+    # response_status_raw: prefer status_raw, fall back to status_clean
+    status_raw_col   = _col(step_rows, "status_raw")
+    status_clean_col = _col(step_rows, "status_clean")
+    response_status_raw = np.where(
+        status_raw_col != "", status_raw_col,
+        np.where(status_clean_col != "", status_clean_col, None),
+    )
 
-    return pd.DataFrame(records)
+    # pj_flag: vectorized safe-int
+    if "pj_flag" in step_rows.columns:
+        pj_flag = pd.to_numeric(step_rows["pj_flag"], errors="coerce").fillna(0).astype(int).values
+    else:
+        pj_flag = np.zeros(len(step_rows), dtype=int)
+
+    def _int_col(name):
+        if name not in step_rows.columns:
+            return np.zeros(len(step_rows), dtype=int)
+        return pd.to_numeric(step_rows[name], errors="coerce").fillna(0).astype(int).values
+
+    return pd.DataFrame({
+        # ── Standard stage_read schema ────────────────────────────────────────
+        "doc_id":              step_rows["doc_id"].values,
+        "approver_raw":        approver_raw,
+        "response_date_raw":   rdraw,
+        "response_status_raw": response_status_raw,
+        "response_comment":    _col(step_rows, "observation").values,
+        "pj_flag":             pj_flag,
+        # ── Flat GED pass-through (parity harness, Step 5) ───────────────────
+        "flat_is_blocking":             is_blocking.values,
+        "flat_is_completed":            is_completed.values,
+        "flat_step_type":               step_type.values,
+        "flat_actor_clean":             _col(step_rows, "actor_clean").values,
+        "flat_phase_deadline":          phase_dl.values,
+        "flat_retard_avance_status":    retard_status.values,
+        "flat_step_delay_days":         _int_col("step_delay_days"),
+        "flat_delay_contribution_days": _int_col("delay_contribution_days"),
+        "flat_cumulative_delay_days":   _int_col("cumulative_delay_days"),
+        "flat_delay_actor":             _col(step_rows, "delay_actor").values,
+        "flat_data_date":               _col(step_rows, "data_date").values,
+    })
 
 
 # ─────────────────────────────────────────────────────────────

@@ -744,6 +744,12 @@ function OverviewPage({ focusMode, onNavigate }) {
       {/* Focus panel (replaces cue list) */}
       {focusMode && <FocusPanel data={data} onNavigate={onNavigate}/>}
 
+      {focusMode && window.OVERVIEW && window.OVERVIEW.legacy_backlog_count > 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
+          Backlog hors scope&nbsp;: <b style={{ color: 'var(--text)' }}>{window.OVERVIEW.legacy_backlog_count}</b>
+        </div>
+      )}
+
       {/* Visa flow + Weekly activity */}
       <div style={{ display:'grid', gridTemplateColumns: focusMode ? '1fr' : '1.2fr 1fr', gap: 14, marginBottom: 20 }}>
         {!focusMode && <VisaFlow data={data}/>}
@@ -756,6 +762,9 @@ function OverviewPage({ focusMode, onNavigate }) {
         <SystemStatusCard status={data.system_status}/>
       </div>
 
+      {/* Chain+Onion intelligence panel */}
+      <ChainOnionPanel/>
+
       {/* Warnings */}
       <OvWarnings warnings={data.warnings}/>
 
@@ -765,4 +774,181 @@ function OverviewPage({ focusMode, onNavigate }) {
   );
 }
 
-Object.assign(window, { OverviewPage });
+/* ── Chain+Onion Intelligence Panel ── */
+const _coUrgencyStyle = {
+  CRITICAL: { color: 'var(--bad)',    bg: 'var(--bad-soft)' },
+  HIGH:     { color: '#FF9500',       bg: 'rgba(255,149,0,0.15)' },
+  MEDIUM:   { color: '#FFD60A',       bg: 'rgba(255,214,10,0.12)' },
+  LOW:      { color: 'var(--good)',   bg: 'var(--good-soft)' },
+  NONE:     { color: 'var(--text-3)', bg: 'var(--bg-chip)' },
+};
+
+const _coStateLabel = {
+  CHRONIC_REF_CHAIN:                    'Rejets répétés',
+  WAITING_CORRECTED_INDICE:             'Attente indice corrigé',
+  OPEN_WAITING_MIXED_CONSULTANTS:       'Attente multi-consultants',
+  OPEN_WAITING_PRIMARY_CONSULTANT:      'Attente consultant principal',
+  OPEN_WAITING_SECONDARY_CONSULTANT:    'Attente consultant secondaire',
+  OPEN_WAITING_MOEX:                    'Attente MOEX',
+  VOID_CHAIN:                           'Chaîne vide',
+  DEAD_AT_SAS_A:                        'Bloquée SAS A',
+  ABANDONED_CHAIN:                      'Abandonnée',
+  CLOSED_VAO:                           'Clôturée VAO',
+  CLOSED_VSO:                           'Clôturée VSO',
+  UNKNOWN_CHAIN_STATE:                  '—',
+};
+
+function CoSummaryPill({ label, value, color }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+      padding: '6px 12px', borderRadius: 10,
+      background: 'var(--bg-elev-2)', border: '1px solid var(--line)',
+      minWidth: 72,
+    }}>
+      <span style={{ fontSize: 17, fontWeight: 600, color, fontFamily: ovFonts.num, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+        {value}
+      </span>
+      <span style={{ fontSize: 9.5, color: 'var(--text-3)', letterSpacing: '.07em', textTransform: 'uppercase', marginTop: 2, whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function ChainOnionPanel() {
+  const intel = window.CHAIN_INTEL;
+  if (!intel) return null;
+
+  const summary = intel.summary || {};
+  const allIssues = intel.top_issues || [];
+  if (!allIssues.length && !summary.total_chains) return null;
+
+  const visible = allIssues.slice(0, 15);
+  const overflow = allIssues.length - visible.length;
+
+  return (
+    <OvCard style={{ marginBottom: 20 }}>
+      {/* Subtle accent halo */}
+      <div style={{
+        position: 'absolute', top: -60, right: -60, width: 180, height: 180,
+        background: 'radial-gradient(circle, rgba(191,90,242,0.12), transparent 65%)',
+        pointerEvents: 'none',
+      }}/>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <OvEyebrow>Chain + Onion · Intelligence opérationnelle</OvEyebrow>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginTop: 5, letterSpacing: '-.01em' }}>
+            Top priorités — chaînes actives
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {summary.live_chains != null && (
+            <CoSummaryPill label="Live" value={summary.live_chains.toLocaleString('fr-FR')} color="var(--accent)"/>
+          )}
+          {summary.escalated_chain_count != null && (
+            <CoSummaryPill label="Escaladées" value={summary.escalated_chain_count.toLocaleString('fr-FR')} color="var(--bad)"/>
+          )}
+          {summary.avg_pressure_live != null && (
+            <CoSummaryPill label="Pression moy." value={Number(summary.avg_pressure_live).toFixed(1)} color="#FF9500"/>
+          )}
+          {summary.top_theme_by_impact && (
+            <CoSummaryPill label="Thème principal" value={summary.top_theme_by_impact} color="var(--text-2)"/>
+          )}
+        </div>
+      </div>
+
+      {/* Column headers */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '32px 76px 84px 180px 110px 1fr',
+        gap: 8, padding: '0 8px 6px',
+        borderBottom: '1px solid var(--line)',
+        marginBottom: 4,
+      }}>
+        {['#', 'Numéro', 'Urgence', 'État', 'Score', 'Synthèse'].map((h, i) => (
+          <div key={i} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{h}</div>
+        ))}
+      </div>
+
+      {/* Issue rows */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {visible.map((issue, i) => {
+          const uc = _coUrgencyStyle[issue.urgency_label] || _coUrgencyStyle.NONE;
+          const score = Math.round(issue.normalized_score_100 || 0);
+          const scoreColor = score >= 80 ? 'var(--bad)' : score >= 60 ? '#FF9500' : 'var(--accent)';
+          const state = _coStateLabel[issue.current_state] || (issue.current_state || '—').replace(/_/g, ' ');
+          return (
+            <div
+              key={issue.family_key + i}
+              onClick={() => {
+                if (window.openDocumentCommandCenter) {
+                  window.openDocumentCommandCenter(issue.family_key, null);
+                }
+              }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '32px 76px 84px 180px 110px 1fr',
+                alignItems: 'center', gap: 8,
+                padding: '7px 8px', borderRadius: 8,
+                background: 'transparent',
+                transition: 'background 0.13s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elev-2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {/* Rank */}
+              <div style={{ fontSize: 10.5, color: 'var(--text-3)', fontFamily: ovFonts.num, textAlign: 'right' }}>
+                #{issue.action_priority_rank}
+              </div>
+              {/* Numero */}
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace', letterSpacing: '.01em' }}>
+                {issue.numero}
+              </div>
+              {/* Urgency badge */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                padding: '2px 7px', borderRadius: 99, width: 'fit-content',
+                background: uc.bg, color: uc.color,
+                fontSize: 9.5, fontWeight: 700, letterSpacing: '.07em',
+              }}>
+                {issue.urgency_label}
+              </span>
+              {/* State */}
+              <div style={{ fontSize: 11, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {state}
+              </div>
+              {/* Score bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ flex: 1, height: 3, borderRadius: 99, background: 'var(--bg-chip)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: score + '%', borderRadius: 99,
+                    background: scoreColor, transition: 'width 0.6s ease',
+                  }}/>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: ovFonts.num, minWidth: 26, textAlign: 'right' }}>
+                  {score}
+                </span>
+              </div>
+              {/* Summary */}
+              <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {issue.executive_summary}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {overflow > 0 && (
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-3)', textAlign: 'center', padding: '6px 0' }}>
+          +{overflow} autre{overflow > 1 ? 's' : ''} chaîne{overflow > 1 ? 's' : ''} prioritaire{overflow > 1 ? 's' : ''}
+        </div>
+      )}
+    </OvCard>
+  );
+}
+
+Object.assign(window, { OverviewPage, ChainOnionPanel });

@@ -74,6 +74,7 @@
         window.CONTRACTORS = {};
         window.CONTRACTORS_LIST = [];
         window.FICHE_DATA = null;
+        window.CHAIN_INTEL = { top_issues: [], summary: {} };
         bridge.error = "Backend not connected. Running in preview mode.";
         bridge.ready = true;
         return;
@@ -120,6 +121,57 @@
       }
     },
 
+    /**
+     * Search documents by query string.
+     * @param {string}  query
+     * @param {boolean} focusMode
+     * @param {number}  staleDays  stale-threshold in days (default 30)
+     * @returns {Promise<Array>}
+     */
+    searchDocuments: async function (query, focusMode, staleDays) {
+      if (!bridge.api) return [];
+      try {
+        var r = await bridge.api.search_documents(
+          String(query || ""), !!focusMode,
+          staleDays != null ? staleDays : 30, 50
+        );
+        if (r && r.error) {
+          console.error("[data_bridge] searchDocuments error:", r.error);
+          return [];
+        }
+        return Array.isArray(r) ? r : [];
+      } catch (e) {
+        console.error("[data_bridge] searchDocuments exception:", e);
+        return [];
+      }
+    },
+
+    /**
+     * Load full Document Command Center payload for one document.
+     * @param {string}       numero
+     * @param {string|null}  indice
+     * @param {boolean}      focusMode
+     * @param {number}       staleDays  stale-threshold in days (default 30)
+     * @returns {Promise<object|null>}
+     */
+    loadDocumentCommandCenter: async function (numero, indice, focusMode, staleDays) {
+      if (!bridge.api) return null;
+      try {
+        var r = await bridge.api.get_document_command_center(
+          String(numero), indice == null ? null : String(indice),
+          !!focusMode, staleDays != null ? staleDays : 30
+        );
+        if (r && r.error) {
+          console.error("[data_bridge] loadDocumentCommandCenter error:", r.error);
+          return r;  // return the error dict — UI will show fallback
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] loadDocumentCommandCenter exception:", e);
+        return null;
+      }
+    },
+
     // ── Internal ──────────────────────────────────────────────────
 
     _loadCoreData: async function (focus, staleDays) {
@@ -127,11 +179,12 @@
       var stale = staleDays != null ? staleDays : 90;
       var gen = ++bridge._loadGen;  // claim a generation number
 
-      // Fire all three requests in parallel
+      // Fire all requests in parallel
       var results = await Promise.allSettled([
         api.get_overview_for_ui(focus, stale),
         api.get_consultants_for_ui(focus, stale),
         api.get_contractors_for_ui(focus, stale),
+        api.get_chain_onion_intel(20),
       ]);
 
       // If a newer _loadCoreData was launched while we were waiting, discard this result
@@ -167,6 +220,15 @@
         console.error("[data_bridge] Contractors load failed:", ct.reason || (ct.value && ct.value.error));
         window.CONTRACTORS = {};
         window.CONTRACTORS_LIST = [];
+      }
+
+      // Chain Onion Intel
+      var ci = results[3];
+      if (ci && ci.status === "fulfilled" && ci.value && !ci.value.error) {
+        window.CHAIN_INTEL = ci.value;
+      } else {
+        if (ci) console.warn("[data_bridge] Chain intel load failed:", ci.reason || (ci.value && ci.value.error));
+        window.CHAIN_INTEL = window.CHAIN_INTEL || { top_issues: [], summary: {} };
       }
     },
   };

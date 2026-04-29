@@ -193,7 +193,18 @@ function ConsultantFichePage({ consultant, onBack, focusMode }) {
         onBack={onBack}
         onDrilldown={handleDrilldown}
       />
-      <window.DrilldownDrawer state={drilldown} onClose={closeDrilldown} onExport={handleExport}/>
+      <window.DrilldownDrawer
+        state={drilldown ? {
+          ...drilldown,
+          onRowClick: (doc) => {
+            if (window.openDocumentCommandCenter) {
+              window.openDocumentCommandCenter(doc.numero, doc.indice);
+            }
+          },
+        } : null}
+        onClose={closeDrilldown}
+        onExport={handleExport}
+      />
     </div>
   );
 }

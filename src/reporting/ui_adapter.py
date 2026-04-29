@@ -232,6 +232,7 @@ def adapt_overview(dashboard_data: dict, app_state: dict) -> dict:
         # --- Utilities parity (Step 11) ---
         # Priority queue (top-50 focus documents) — populated only when focus=True
         "priority_queue": list(dashboard_data.get("priority_queue", [])),
+        "legacy_backlog_count": dashboard_data.get("legacy_backlog_count", 0),
     }
 
 

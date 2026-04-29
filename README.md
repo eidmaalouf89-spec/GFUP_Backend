@@ -96,13 +96,14 @@ It is intentionally:
 
 GF is a reconstruction target. It is not the source of truth. Never treat the GF as authoritative for document identity or workflow state.
 
+> **Note — `Mapping.xlsx`:** The UI exposes a mapping-file picker, but `run_pipeline_async` in `app.py` does not currently pass the selection to the pipeline. `Mapping.xlsx` is informational only at this time (see `executer.jsx:277` and `app.py:run_pipeline_async`).
+
 ---
 
 ## Remaining Temporary Layers
 
 - `FLAT_GED_MODE = "raw"` default in `paths.py` — overridden to `"flat"` by orchestrator at runtime. Default not yet flipped to avoid breaking scripts that import paths.py directly.
 - `stage_read_flat.py` carries `TEMPORARY_COMPAT_LAYER` markers — cosmetic, to be cleaned in a future step.
-- `scripts/_run_one_mode.py` hardcodes `input/FLAT_GED.xlsx` — developer tool, obsolete. Archive candidate.
 - Legacy raw GED rebuild path in `data_loader.py` — fallback only, fires when FLAT_GED artifact missing.
 
 ---
@@ -150,6 +151,8 @@ ui/jansa-connected.html
 
 There is no production fallback to `ui/dist/index.html` or a Vite dev server. See `docs/UI_RUNTIME_ARCHITECTURE.md`.
 
+**Browser mode (`--browser` flag):** `python app.py --browser` opens the same HTML in the system default browser. The PyWebView JS bridge is unavailable in this mode — `data_bridge.js` times out after 5 seconds and renders placeholder data only. No backend calls succeed. Use only for CSS/layout development; it does not show real project data.
+
 ---
 
 ## Folder Structure
@@ -169,7 +172,9 @@ output/                         Latest user-facing deliverables
     FLAT_GED.xlsx                 Auto-generated from GED
     DEBUG_TRACE.csv               Builder debug output
     flat_ged_run_report.json      Builder run metadata
-  chain_onion/                  Chain + Onion portfolio intelligence outputs
+    CHAIN_TIMELINE_ATTRIBUTION.json  Per-chain delay attribution (refreshed at app startup; not in run_memory.db)
+    CHAIN_TIMELINE_ATTRIBUTION.csv   Same data, tabular form
+  chain_onion/                  Chain + Onion portfolio intelligence outputs (produced by run_chain_onion.py; NOT registered as run-keyed artifacts in run_memory.db)
     CHAIN_REGISTER.csv            One row per family
     CHAIN_VERSIONS.csv            All document versions
     CHAIN_EVENTS.csv              Full event timeline
@@ -214,6 +219,7 @@ ui/                             User interface
   jansa/                          Production UI components
 
 docs/                           Documentation
+context/                        Living operational repo map — machine-readable maps (software_tree.json, module_dependency_map.csv, ui_endpoint_map.csv) and runtime/data-flow docs used for maintenance and AI-assisted development
 scripts/                        Developer tools
 ```
 
@@ -331,6 +337,72 @@ Quality signals that trigger WARN (not FAIL):
 
 ---
 
+## Document Command Center
+
+The Document Command Center (DCC) is a search and inspection panel embedded in the JANSA UI. Backend: `src/reporting/document_command_center.py`. Frontend: `ui/jansa/document_panel.jsx`.
+
+**Search mode:** full-text search over `dernier_df` — `numero`, `titre`, `emetteur`, `lot`, `indice`. Returns a ranked list of matching documents.
+
+**Document panel — 7 sections:**
+
+| Section | Content |
+|---|---|
+| Header | Document identity and latest status |
+| Responses | All workflow responses for the selected indice |
+| Comments | Decisive responses with associated comments |
+| Revision history | All indices for the same family |
+| Chronologie | Chain timeline with delay attribution (from `CHAIN_TIMELINE_ATTRIBUTION.json`) |
+| Tags | Primary ownership tag + secondary signal tags |
+| Warnings | Data quality flags |
+
+**Tag taxonomy:**
+- Primary (exactly one per document): `Att Entreprise — Dans les délais`, `Att Entreprise — Hors délais`, `Att BET Primaire`, `Att BET Secondaire`, `Att MOEX — Facile`, `Att MOEX — Arbitrage`, `Clos / Visé`
+- Secondary (multi-valued, optional): `Refus multiples`, `Commentaire manquant`, `Secondaire expiré`, `Très ancien`, `Cycle dépassé`, `Chaîne longue`
+
+All tag computation is in the backend. The frontend renders backend payload without business logic.
+
+**API endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `search_documents(query, focus, stale_days, limit)` | Full-text search; returns match list |
+| `get_document_command_center(numero, indice, focus, stale_days)` | Full panel payload including chronologie |
+| `get_chain_timeline(numero)` | Standalone chain timeline endpoint |
+
+Triggered from any JANSA page via `window.openDocumentCommandCenter(numero, indice)`.
+
+---
+
+## Contractors Page
+
+`ui/jansa/contractors.jsx` is an active JANSA page populated at UI init by `get_contractors_for_ui`. The bridge populates:
+
+- `window.CONTRACTORS_LIST` — top-N enriched contractors with KPIs (doc count, pass rate)
+- `window.CONTRACTORS` — full code→name lookup for all emetteurs
+
+The page renders enriched KPI cards for contractors with ≥5 documents and plain name chips for all others.
+
+**Not yet wired:** `get_contractor_fiche` exists in `src/reporting/contractor_fiche.py` but the bridge call from the UI is not wired. Contractor fiche drill-down is a future step.
+
+---
+
+## Chain Timeline Attribution
+
+`src/reporting/chain_timeline_attribution.py` reads Chain + Onion CSV outputs (`CHAIN_EVENTS`, `CHAIN_REGISTER`, `CHAIN_VERSIONS`) and produces per-chain timing and delay responsibility data for every document family.
+
+It applies a secondary consultant delay cap (10 days) not present in the raw chain_onion outputs and re-attributes excess delay to synthetic `MOEX_CAP_REATTRIBUTED` rows. The original chain_onion CSVs are never modified.
+
+**Output artifacts** (written to `output/intermediate/`, not registered in `run_memory.db`):
+
+| Artifact | Content |
+|---|---|
+| `CHAIN_TIMELINE_ATTRIBUTION.json` | Structured per-chain attribution: `family_key`, `numero`, `totals`, `chain_long`, `cycle_depasse`, `attribution_breakdown` |
+| `CHAIN_TIMELINE_ATTRIBUTION.csv` | Same data, tabular form |
+
+These artifacts are refreshed at desktop app startup inside `app.py`'s `_prewarm_cache` thread. The DCC chronologie section and the `Cycle dépassé` / `Chaîne longue` secondary tags consume this data.
+
+---
+
 ## Backend Architecture
 
 ```text
@@ -368,7 +440,9 @@ Important modules:
 - `src/report_memory.py` — persisted consultant truth
 - `src/query_library.py` — 22-function query API over Flat GED context (Step 9c)
 - `src/effective_responses.py` — effective response composer (report_memory + GED)
-- `src/reporting/` — JANSA/reporting data adapters and fiche builders
+- `src/reporting/` — JANSA/reporting data adapters, fiche builders, Document Command Center, Chain Timeline Attribution
+- `src/reporting/document_command_center.py` — `search_documents` + `build_document_command_center`; sole source of tag computation and panel payload for the DCC
+- `src/reporting/chain_timeline_attribution.py` — per-chain timing and delay attribution; reads chain_onion CSVs; writes `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.{json,csv}`
 
 ---
 
@@ -393,9 +467,27 @@ Validated JANSA areas:
 - Consultant fiche
 - Drilldowns
 - Drilldown exports
+- Contractors page (active — enriched KPI cards for top contractors + chip list for all others; fiche drill-down not yet wired)
+- Document Command Center (search by numero / titre / lot / emetteur; document panel with 7 sections; triggered via `window.openDocumentCommandCenter`)
 - Runs page
 - Executer page
 - Utilities / stale-days selector / reports export
+
+Active UI modules (`ui/jansa/`):
+
+| File | Role |
+|---|---|
+| `shell.jsx` | App root, sidebar/topbar/router |
+| `overview.jsx` | Dashboard KPIs |
+| `consultants.jsx` | Consultants list (3-tier) |
+| `fiche_base.jsx` | Fiche layout primitives + DrilldownDrawer |
+| `fiche_page.jsx` | Consultant fiche wrapper |
+| `contractors.jsx` | Contractors page — enriched cards + chip list |
+| `document_panel.jsx` | Document Command Center drawer (search mode + doc mode) |
+| `runs.jsx` | Run history page |
+| `executer.jsx` | Pipeline launcher |
+| `data_bridge.js` | PyWebView bridge; populates `window.OVERVIEW/CONSULTANTS/CONTRACTORS/FICHE_DATA` |
+| `tokens.js` | JANSA design tokens (fonts/theme) |
 
 Old Vite UI files under `ui/src/`, `ui/index.html`, and generated `ui/dist/` output are archival/reference only.
 

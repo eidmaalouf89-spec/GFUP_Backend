@@ -1,0 +1,80 @@
+module,depends_on,purpose
+app.py,"webview, src/run_explorer, src/run_orchestrator, src/reporting/data_loader, src/reporting/aggregator, src/reporting/focus_filter, src/reporting/consultant_fiche, src/reporting/contractor_fiche, src/reporting/ui_adapter, src/chain_onion/query_hooks",PyWebView shell + Api class exposing methods to JS bridge
+main.py,"src/pipeline/paths, src/pipeline/runner, src/run_orchestrator, src/run_memory",Pipeline entrypoint (headless); module-level mutable globals are written by orchestrator
+run_chain_onion.py,"src/chain_onion/source_loader, family_grouper, chain_builder, chain_classifier, chain_metrics, onion_engine, onion_scoring, narrative_engine, exporter, validation_harness",Standalone Chain+Onion runner
+src/run_orchestrator.py,"src/run_explorer, src/run_memory, src/flat_ged_runner, main (mutated)","Controlled execution layer (modes, validation, FLAT GED auto-build)"
+src/pipeline/runner.py,"src/pipeline/context, src/pipeline/utils, src/pipeline/stages.*",Reads paths from main module namespace; runs 11 stages
+src/pipeline/paths.py,(none),Default path constants; relative to main.py
+src/pipeline/context.py,(none),PipelineState dataclass passed across stages
+src/pipeline/utils.py,(none),console + logging helpers
+src/pipeline/compute.py,pandas,Discrepancy + missing-diagnosis writers
+src/pipeline/stages/stage_init_run.py,src/run_memory,Init DB; create runs row + run dir
+src/pipeline/stages/stage_read.py,"src/read_raw, src/normalize, src/run_memory, src/domain/gf_helpers",Raw GED read path (fallback)
+src/pipeline/stages/stage_read_flat.py,src/normalize,Flat GED -> docs_df / responses_df adapter
+src/pipeline/stages/stage_normalize.py,"src/normalize, src/domain/sas_helpers",Normalize + SAS RAPPEL pre-2026 filter
+src/pipeline/stages/stage_version.py,src/version_engine,VersionEngine
+src/pipeline/stages/stage_route.py,"src/routing, src/config_loader",Routing + ExclusionConfig
+src/pipeline/stages/stage_report_memory.py,"src/report_memory, src/effective_responses, src/run_memory",Report memory ingestion + composition
+src/pipeline/stages/stage_write_gf.py,"src/workflow_engine, src/routing, src/domain/sas_helpers, src/writer",GF_V0_CLEAN writer
+src/pipeline/stages/stage_build_team_version.py,"src/team_version_builder, src/run_memory",GF_TEAM_VERSION builder
+src/pipeline/stages/stage_discrepancy.py,"src/pipeline/compute, src/reconciliation_engine, src/domain/discrepancy, src/writer",Discrepancy + Part H-1 BENTIN exception
+src/pipeline/stages/stage_diagnosis.py,"src/pipeline/compute, src/writer, src/domain/family_builder, src/debug_writer",Missing diagnoses + insert log + new submittal + debug
+src/pipeline/stages/stage_finalize_run.py,src/run_memory,Register artifacts; mark run current
+src/flat_ged/__init__.py,flat_ged.cli,Frozen builder wrapper
+src/flat_ged/cli.py,"reader, resolver, transformer, validator, writer, utils, config",Builder driver
+src/flat_ged/transformer.py,"input/source_main/consultant_mapping, status_mapping",Apply mappings
+src/flat_ged_runner.py,src.flat_ged,Safe wrapper; produces FLAT_GED + DEBUG_TRACE + run_report
+src/normalize.py,"pandas, openpyxl",Lot/status/date normalization + approver mapping (legacy duplicate of flat_ged mapping)
+src/read_raw.py,"pandas, openpyxl",Read GED raw xlsx (fallback path)
+src/version_engine.py,src/normalize,Lifecycle reconstruction
+src/routing.py,"src/normalize, src/config_loader",Routing decisions + sheet structure read
+src/workflow_engine.py,src/normalize,Per-doc workflow state
+src/effective_responses.py,"pandas, src/report_memory",Compose GED responses with persisted memory
+src/reconciliation_engine.py,"pandas, src/normalize",Patch F fuzzy match
+src/team_version_builder.py,openpyxl,Surgical OGF patch
+src/writer.py,"pandas, openpyxl",GFWriter + various log writers
+src/debug_writer.py,"pandas, openpyxl",debug/* xlsx writers
+src/config_loader.py,(none),Exclusion + emetteur filter
+src/domain/classification.py,(none),Domain classification helpers
+src/domain/discrepancy.py,(none),Severity classification
+src/domain/family_builder.py,pandas,New submittal analysis
+src/domain/gf_helpers.py,(none),GF input signature etc.
+src/domain/normalization.py,(none),Domain helpers
+src/domain/sas_helpers.py,pandas,SAS filter + lookup
+src/run_memory.py,"sqlite3, hashlib",Run + artifact registry schema and helpers
+src/run_explorer.py,"sqlite3, src/run_memory",Read-only queries + bundle export
+src/report_memory.py,"sqlite3, hashlib",Report memory schema and helpers
+src/reporting/data_loader.py,"src/read_raw, src/normalize, src/version_engine, src/workflow_engine, src/effective_responses, src/report_memory, src/reporting/focus_ownership",Load RunContext from registered artifacts
+src/reporting/aggregator.py,"src/reporting/data_loader, src/reporting/focus_filter",compute_*_summary KPIs
+src/reporting/focus_filter.py,src/reporting/data_loader,Focus mode filter engine
+src/reporting/focus_ownership.py,pandas,Six-rule ownership classifier
+src/reporting/consultant_fiche.py,"src/reporting/data_loader, src/reporting/focus_filter",build_consultant_fiche + build_sas_fiche
+src/reporting/contractor_fiche.py,src/reporting/data_loader,build_contractor_fiche
+src/reporting/ui_adapter.py,(none),Flatten aggregator output -> window globals shape
+src/reporting/document_command_center.py,"src/reporting/data_loader, src/reporting/focus_filter, src/reporting/focus_ownership, src/reporting/chain_timeline_attribution","Document Command Center backend: search_documents + build_document_command_center; sole source of tag computation and panel payload"
+src/reporting/chain_timeline_attribution.py,"pandas, output/chain_onion/*.csv","Per-chain timing + delay attribution; reads CHAIN_EVENTS/CHAIN_REGISTER/CHAIN_VERSIONS; writes output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.{json,csv}"
+src/reporting/bet_report_merger.py,(retired),Pre-Step 8 module; not imported any more (commented out in data_loader)
+src/chain_onion/source_loader.py,"pandas, src/effective_responses",Step 04
+src/chain_onion/family_grouper.py,pandas,Steps 05
+src/chain_onion/chain_builder.py,pandas,Step 06
+src/chain_onion/chain_classifier.py,pandas,Step 07
+src/chain_onion/chain_metrics.py,pandas,Step 08
+src/chain_onion/onion_engine.py,pandas,Step 09
+src/chain_onion/onion_scoring.py,pandas,Step 10
+src/chain_onion/narrative_engine.py,pandas,Step 11
+src/chain_onion/exporter.py,"pandas, openpyxl",Step 12
+src/chain_onion/query_hooks.py,pandas,Step 13 (read-only queries; consumed by app.py for Focus narrowing)
+src/chain_onion/validation_harness.py,pandas,Step 14 (40 acceptance checks)
+src/chain_onion/chain_models.py,(dataclasses),Type definitions
+ui/jansa-connected.html,"(CDN React, Babel; ui/jansa/* scripts)",Production HTML host
+ui/jansa/data_bridge.js,window.pywebview.api,Bridge to backend; populates window.OVERVIEW/CONSULTANTS/CONTRACTORS/FICHE_DATA
+ui/jansa/tokens.js,(none),JANSA design tokens (fonts/theme)
+ui/jansa/shell.jsx,"data_bridge, tokens, all other JSX",App root; sidebar/topbar/router
+ui/jansa/overview.jsx,"window.OVERVIEW, jansaBridge.api.export_team_version, open_file_in_explorer",Dashboard
+ui/jansa/consultants.jsx,window.CONSULTANTS,Consultants list (3-tier)
+ui/jansa/fiche_base.jsx,(visual base),Fiche layout primitives + DrilldownDrawer
+ui/jansa/fiche_page.jsx,"window.FICHE_DATA, jansaBridge.api.get_doc_details, export_drilldown_xlsx, export_team_version, open_file_in_explorer",Consultant fiche wrapper
+ui/jansa/runs.jsx,"jansaBridge.api.get_all_runs, export_run_bundle",Run history page
+ui/jansa/executer.jsx,"jansaBridge.api.get_app_state, validate_inputs, run_pipeline_async, get_pipeline_status, select_file",Pipeline launcher
+ui/jansa/contractors.jsx,"window.CONTRACTORS_LIST, window.CONTRACTORS",Contractors page — enriched cards (≥5 docs) + plain chips; no fiche drill-down yet
+ui/jansa/document_panel.jsx,"jansaBridge.searchDocuments, jansaBridge.loadDocumentCommandCenter, window.JANSA_FONTS","Document Command Center drawer — search mode + doc mode (7 sections); triggered via window.openDocumentCommandCenter(numero, indice)"

@@ -70,6 +70,76 @@ def clear_cache():
     _resolve_artifact_file.cache_clear()
 
 
+# ── Flat GED pickle cache (Option A) ─────────────────────────────────────────
+# Caches normalized docs_df + responses_df from stage_read_flat so the 30-second
+# xlsx re-parse is skipped on every hot load. Cache is invalidated automatically
+# when FLAT_GED.xlsx is newer than the cache files (i.e. after a pipeline run).
+
+def _flat_cache_paths(flat_ged_path: str):
+    """Return (docs_pkl, resp_pkl, meta_json) paths alongside FLAT_GED.xlsx."""
+    base = Path(flat_ged_path).with_suffix("")
+    return (
+        Path(str(base) + "_cache_docs.pkl"),
+        Path(str(base) + "_cache_resp.pkl"),
+        Path(str(base) + "_cache_meta.json"),
+    )
+
+
+def _flat_cache_is_fresh(flat_ged_path: str) -> bool:
+    """Return True if all cache files exist and are newer than the xlsx."""
+    try:
+        xlsx_mtime = Path(flat_ged_path).stat().st_mtime
+        for p in _flat_cache_paths(flat_ged_path):
+            if not p.exists() or p.stat().st_mtime <= xlsx_mtime:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _save_flat_normalized_cache(flat_ged_path: str, docs_df, responses_df,
+                                 approver_names: list, flat_doc_meta: dict) -> None:
+    """Write pickle + json cache alongside FLAT_GED.xlsx (non-fatal on error)."""
+    import pickle
+    docs_p, resp_p, meta_p = _flat_cache_paths(flat_ged_path)
+    try:
+        with open(str(docs_p), "wb") as f:
+            pickle.dump(docs_df, f, protocol=5)
+        with open(str(resp_p), "wb") as f:
+            pickle.dump(responses_df, f, protocol=5)
+        meta_p.write_text(
+            json.dumps({"approver_names": approver_names, "flat_doc_meta": flat_doc_meta},
+                       ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        logger.info("[FLAT_CACHE] Cache written: %s", docs_p.parent)
+    except Exception as exc:
+        logger.warning("[FLAT_CACHE] Cache write failed (non-fatal): %s", exc)
+
+
+def _load_flat_normalized_cache(flat_ged_path: str):
+    """
+    Load (docs_df, responses_df, approver_names, flat_doc_meta) from cache.
+    Returns (None, None, None, None) on miss or any error.
+    """
+    import pickle
+    if not _flat_cache_is_fresh(flat_ged_path):
+        return None, None, None, None
+    docs_p, resp_p, meta_p = _flat_cache_paths(flat_ged_path)
+    try:
+        with open(str(docs_p), "rb") as f:
+            docs_df = pickle.load(f)
+        with open(str(resp_p), "rb") as f:
+            responses_df = pickle.load(f)
+        raw = json.loads(meta_p.read_text(encoding="utf-8"))
+        logger.info("[FLAT_CACHE] Cache hit — skipping xlsx parse")
+        return docs_df, responses_df, raw["approver_names"], raw["flat_doc_meta"]
+    except Exception as exc:
+        logger.warning("[FLAT_CACHE] Cache load failed (non-fatal): %s", exc)
+        return None, None, None, None
+# ── End Flat GED pickle cache ─────────────────────────────────────────────────
+
+
 def _sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -320,18 +390,24 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
         from types import SimpleNamespace
         from pipeline.stages.stage_read_flat import stage_read_flat
 
-        # Parse FLAT_GED.xlsx via stage_read_flat (reuses all flat adapter logic)
-        mock_ctx = SimpleNamespace(FLAT_GED_FILE=flat_ged_path)
-        stage_read_flat(mock_ctx, log=lambda msg: logger.debug(msg))
+        mapping = load_mapping()
 
-        docs_df = mock_ctx.docs_df
-        responses_df = mock_ctx.responses_df
-        approver_names = mock_ctx.ged_approver_names
-        mapping = mock_ctx.mapping
+        # ── Option A: pickle cache (skip 30s xlsx re-parse on hot loads) ─────
+        docs_df, responses_df, approver_names, flat_doc_meta = \
+            _load_flat_normalized_cache(flat_ged_path)
 
-        # Normalize (adds approver_canonical, date_status_type, lot_normalized, etc.)
-        docs_df = normalize_docs(docs_df, mapping)
-        responses_df = normalize_responses(responses_df, mapping)
+        if docs_df is None:
+            # Cache miss — parse xlsx, normalize, then persist cache for next load
+            mock_ctx = SimpleNamespace(FLAT_GED_FILE=flat_ged_path)
+            stage_read_flat(mock_ctx, log=lambda msg: logger.debug(msg))
+            docs_df = normalize_docs(mock_ctx.docs_df, mapping)
+            responses_df = normalize_responses(mock_ctx.responses_df, mapping)
+            approver_names = mock_ctx.ged_approver_names
+            flat_doc_meta = mock_ctx.flat_ged_doc_meta
+            _save_flat_normalized_cache(
+                flat_ged_path, docs_df, responses_df, approver_names, flat_doc_meta
+            )
+        # ── End Option A ──────────────────────────────────────────────────────
 
         # Skip VersionEngine — flat GED only has ACTIVE instances.
         # All docs are dernier indice by definition (FLAT_GED_CONTRACT §Known Limitation).
@@ -351,8 +427,8 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
 
         # data_date from flat_ged_doc_meta (not from raw GED Détails sheet)
         data_date_val = None
-        if mock_ctx.flat_ged_doc_meta:
-            for meta in mock_ctx.flat_ged_doc_meta.values():
+        if flat_doc_meta:
+            for meta in flat_doc_meta.values():
                 dd_str = meta.get("data_date", "")
                 if dd_str:
                     try:
@@ -725,6 +801,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
                 effective_responses_df = build_effective_responses(responses_df, persisted_df)
                 # Map effective_source → response_source for UI compatibility
                 if "effective_source" in effective_responses_df.columns:
+                    effective_responses_df["response_source"] = effective_responses_df["effective_source"]
                     effective_responses_df["response_source"] = effective_responses_df["effective_source"]
                 if "observation_pdf" not in effective_responses_df.columns:
                     effective_responses_df["observation_pdf"] = ""

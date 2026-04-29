@@ -1,0 +1,7 @@
+scope,where_defined,rule_value,effect,notes
+gf_sheet_year_filter,src/config_loader.py:SHEET_YEAR_FILTERS,"LOT 03-GOE-LGD: 2026",Documents created before 2026 on this sheet are excluded with reason 'PRE_2026:LOT 03-GOE-LGD' in the ExclusionConfig pass.,Excludes pre-2026 LGD GOE rows from the clean GF reconstruction.
+emetteur_filter,src/config_loader.py:SHEET_EMETTEUR_FILTER,"LOT 03-GOE-LGD: frozenset({'LGD'})",Only emetteur=LGD routes to this sheet. Other emetteurs trigger ROUTING_EMETTEUR_MISMATCH.,Single-contractor sheet.
+secondary_lgd_sheet,src/config_loader.py:SHEET_EMETTEUR_FILTER,"LOT B06-AH07-BFUP-CAS BA-LGD: frozenset({'LGD'})",Same emetteur filter for the LGD BFUP sub-lot.,No year filter on this sub-lot.
+shared_lgd_sheet,src/config_loader.py:SHEET_EMETTEUR_FILTER,"LOT I02-FKI: frozenset({'FKI', 'LGD'})",Both FKI and LGD allowed.,Sheet is also in EXCLUDED_SHEETS so the filter is moot — the sheet is excluded entirely.
+contractor_reference,src/reporting/consultant_fiche.py:CONTRACTOR_REFERENCE,"LGD: name='Legendre', lots=[03, 07, 06B]",Display label only.,Used by contractor fiche.
+discrepancy_relabel,(none),"(no LGD-specific Part H pass exists today)",—,The BENTIN exception is the only sheet-specific discrepancy relabel. LGD pre-2026 rows are dropped at the routing stage via the year filter; they should never reach the discrepancy stream.

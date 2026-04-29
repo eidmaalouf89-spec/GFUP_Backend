@@ -1,0 +1,29 @@
+ui_component,ui_event,bridge_call,backend_method,backend_module,populates_or_returns
+shell.jsx (App init),mount,jansaBridge.init,Api.get_overview_for_ui + get_consultants_for_ui + get_contractors_for_ui,reporting.aggregator + ui_adapter,window.OVERVIEW + window.CONSULTANTS + window.CONTRACTORS + window.CONTRACTORS_LIST
+shell.jsx (Focus toggle),click Focus button,jansaBridge.refreshForFocus,(same three for_ui calls),(same),(same)
+shell.jsx (stale slider),onChange (debounced 400ms),jansaBridge.refreshForFocus,(same),(same),(same)
+shell.jsx (consultant fiche nav),click consultant card,jansaBridge.loadFiche,Api.get_fiche_for_ui → get_consultant_fiche,reporting.consultant_fiche.build_consultant_fiche,window.FICHE_DATA
+shell.jsx (Reports page button),click Tableau VISA,jansaBridge.api.export_team_version,Api.export_team_version,reporting.data_loader + shutil,result {success path error}
+shell.jsx (Reports page button),onsuccess,jansaBridge.api.open_file_in_explorer,Api.open_file_in_explorer,subprocess.Popen explorer,result {success}
+overview.jsx,click Tableau VISA,jansaBridge.api.export_team_version,Api.export_team_version,reporting.data_loader + shutil,result {success path error}
+overview.jsx,onsuccess,jansaBridge.api.open_file_in_explorer,Api.open_file_in_explorer,subprocess.Popen,result {success}
+fiche_page.jsx,click drilldown cell,jansaBridge.api.get_doc_details,Api.get_doc_details,reporting.consultant_fiche helpers (filter/_attach_derived) inline,result {docs count filter_key consultant}
+fiche_page.jsx,click drilldown export,jansaBridge.api.export_drilldown_xlsx,Api.export_drilldown_xlsx,inline openpyxl,result {success path count}
+fiche_page.jsx,fiche header export,jansaBridge.api.export_team_version,Api.export_team_version,reporting.data_loader,result {success path}
+runs.jsx,mount,jansaBridge.api.get_all_runs,Api.get_all_runs,run_explorer.get_all_runs,list[run dict]
+runs.jsx,click export bundle,jansaBridge.api.export_run_bundle,Api.export_run_bundle,run_explorer.export_run_bundle,result {success path}
+executer.jsx,mount,jansaBridge.api.get_app_state,Api.get_app_state,direct sqlite read of run_memory.db + INPUT_DIR scan,{has_baseline current_run total_runs ged_file_detected gf_file_detected ...}
+executer.jsx,onChange runMode/ged/gf/reportsDir,jansaBridge.api.validate_inputs,Api.validate_inputs,run_orchestrator.validate_run_inputs,{valid errors warnings}
+executer.jsx,click Lancer,jansaBridge.api.run_pipeline_async,Api.run_pipeline_async,run_orchestrator.run_pipeline_controlled (worker thread),{started warnings} OR {started:false errors warnings}
+executer.jsx,polling 600ms,jansaBridge.api.get_pipeline_status,Api.get_pipeline_status,internal _pipeline_status dict,{running message error completed_run warnings}
+executer.jsx,click Parcourir,jansaBridge.api.select_file,Api.select_file,webview.create_file_dialog,path string or null
+runs.jsx and others,(no direct call),Api.get_run_summary,run_explorer.get_run_summary,run_explorer,{...}
+(future),(no UI today),Api.compare_runs,run_explorer.compare_runs,run_explorer,{...}
+contractors.jsx (ContractorsPage),mount via shell.jsx active === 'Contractors',(window.CONTRACTORS_LIST + window.CONTRACTORS populated at init),(populated by get_contractors_for_ui at shell init),reporting.ui_adapter.adapt_contractors_lookup + adapt_contractors_list,window.CONTRACTORS_LIST (enriched top-N) + window.CONTRACTORS (full lookup)
+document_panel.jsx (DocumentCommandCenterPanel),search query (debounced 250ms),jansaBridge.searchDocuments,Api.search_documents,reporting.document_command_center.search_documents,list[{numero indice titre emetteur lot primary_tag latest_status}]
+document_panel.jsx (DocumentCommandCenterPanel),select result → doc mode,jansaBridge.loadDocumentCommandCenter,Api.get_document_command_center,reporting.document_command_center.build_document_command_center,{header latest_status responses comments revision_history chronologie tags warnings}
+shell.jsx (DCC panel trigger),window.openDocumentCommandCenter(numero,indice),(sets dccState to {mode:"doc" numero indice}),(handled internally by DocumentCommandCenterPanel),(no backend call at trigger time),(renders DocumentCommandCenterPanel with initial doc state)
+(no direct UI today),(none),Api.get_chain_timeline,reporting.chain_timeline_attribution.load_chain_timeline_artifact,reads output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json,{family_key numero indices totals chain_long cycle_depasse attribution_breakdown}
+(no UI today),(none),Api.get_contractor_list,reporting.aggregator.compute_contractor_summary,reporting,list
+(no UI today),(none),Api.get_contractor_fiche,reporting.contractor_fiche.build_contractor_fiche,reporting,dict
+(no UI today),(none),Api.get_dashboard_data,reporting.aggregator.* + focus_filter,reporting,dict (used internally by get_overview_for_ui)

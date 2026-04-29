@@ -176,7 +176,7 @@ function Sidebar({ active, onNav, focusMode, focusCount, runCount, consultantCou
 }
 
 /* ── Topbar — breadcrumb + search + Focus toggle + Theme toggle ── */
-function Topbar({ page, focusMode, setFocusMode, theme, setTheme, focusStats, staleDays, onStaleChange }) {
+function Topbar({ page, focusMode, setFocusMode, theme, setTheme, focusStats, staleDays, onStaleChange, setPanelState }) {
   return (
     <header style={{
       height: 60, flexShrink: 0,
@@ -194,20 +194,24 @@ function Topbar({ page, focusMode, setFocusMode, theme, setTheme, focusStats, st
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', letterSpacing:'-.01em' }}>{page}</span>
       </div>
 
-      {/* Search */}
-      <div style={{
-        flex: 1, maxWidth: 420, margin: '0 auto',
-        display:'flex', alignItems:'center', gap: 8,
-        padding: '6px 12px', borderRadius: 8,
-        background: 'var(--bg-elev-2)', border:'1px solid var(--line)',
-        color: 'var(--text-3)',
-      }}>
+      {/* Search — opens Document Command Center search panel on click */}
+      <div
+        onClick={() => setPanelState && setPanelState({ mode: 'search' })}
+        style={{
+          flex: 1, maxWidth: 420, margin: '0 auto',
+          display:'flex', alignItems:'center', gap: 8,
+          padding: '6px 12px', borderRadius: 8,
+          background: 'var(--bg-elev-2)', border:'1px solid var(--line)',
+          color: 'var(--text-3)', cursor: 'pointer',
+        }}>
         {shellIcons.search}
         <input
-          placeholder="Rechercher consultants, entreprises, documents\u2026"
+          readOnly
+          placeholder="Rechercher consultants, entreprises, documents…"
           style={{
             flex: 1, border:'none', outline:'none', background:'transparent',
             fontFamily:'inherit', fontSize: 12.5, color:'var(--text)',
+            pointerEvents: 'none',
           }}
         />
         <span style={{
@@ -215,11 +219,23 @@ function Topbar({ page, focusMode, setFocusMode, theme, setTheme, focusStats, st
           padding:'1px 6px', borderRadius: 4,
           background:'var(--bg-chip)', color:'var(--text-3)',
           border:'1px solid var(--line)',
-        }}>\u2318K</span>
+        }}>⌘K</span>
       </div>
 
       {/* Controls */}
       <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
+        <button
+          onClick={() => setPanelState && setPanelState({ mode: 'search' })}
+          title="Recherche document"
+          style={{
+            width: 34, height: 34, borderRadius: 99,
+            background: 'var(--bg-elev-2)', border: '1px solid var(--line)',
+            color: 'var(--text-2)', cursor: 'pointer', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {shellIcons.search}
+        </button>
         <FocusToggle
           focusMode={focusMode} setFocusMode={setFocusMode}
           stats={focusStats}
@@ -464,11 +480,15 @@ function LoadingScreen({ error }) {
    Reloads on focus toggle. Loads fiche data on consultant navigate. */
 function App() {
   const [active, setActive] = useState(() => localStorage.getItem('jansa_page') || 'Overview');
-  const [focusMode, setFocusModeRaw] = useState(() => localStorage.getItem('jansa_focus') === '1');
+  const [focusMode, setFocusModeRaw] = useState(() => {
+    const stored = localStorage.getItem('jansa_focus');
+    return stored === null ? true : stored === '1';
+  });
   const [theme, setTheme] = useState(() => localStorage.getItem('jansa_theme') || 'dark');
   const [cinemaKey, setCinemaKey] = useState(0);
   const [cinemaOn, setCinemaOn] = useState(false);
   const [selectedConsultant, setSelectedConsultant] = useState(null);
+  const [panelState, setPanelState] = useState(null);
 
   // ── Stale threshold (Step 11 — stale threshold control parity) ──
   const [staleDays, setStaleDaysRaw] = useState(() => {
@@ -513,6 +533,14 @@ function App() {
         if (gen === focusGenRef.current) setReloading(false);
       });
     }, 400);
+  }, []);
+
+  // Expose global opener for Document Command Center
+  useEffect(() => {
+    window.openDocumentCommandCenter = (numero, indice) => {
+      setPanelState({ mode: 'doc', numero, indice: indice != null ? indice : null });
+    };
+    return () => { delete window.openDocumentCommandCenter; };
   }, []);
 
   // Initial data load
@@ -612,6 +640,7 @@ function App() {
           theme={theme} setTheme={setTheme}
           focusStats={focusMode ? focusStats : null}
           staleDays={staleDays} onStaleChange={onStaleChange}
+          setPanelState={setPanelState}
         />
 
         {/* Focus-mode vignette frame */}
@@ -647,7 +676,7 @@ function App() {
           {active === 'Overview'       && <OverviewPage focusMode={focusMode} onNavigate={navigateTo}/>}
           {active === 'Consultants'    && <ConsultantsPage onOpen={(c) => navigateTo('ConsultantFiche', c)}/>}
           {active === 'ConsultantFiche'&& <ConsultantFichePage consultant={selectedConsultant} onBack={() => navigateTo('Consultants')} focusMode={focusMode}/>}
-          {active === 'Contractors'    && <StubPage title="Entreprises" note="Laiss\u00e9 intact volontairement dans cette it\u00e9ration."/>}
+          {active === 'Contractors'    && <ContractorsPage/>}
           {active === 'Executer'       && <ExecuterPage onRunComplete={async () => {
             if (window.jansaBridge && window.jansaBridge.api) {
               try { await window.jansaBridge.refreshForFocus(focusMode, staleDaysRef.current); } catch (e) {}
@@ -660,6 +689,14 @@ function App() {
           {active === 'Settings'       && <StubPage title="Param\u00e8tres" note="Pr\u00e9f\u00e9rences \u2014 non retravaillé dans cette maquette."/>}
         </div>
       </main>
+
+      {/* Document Command Center Panel */}
+      <DocumentCommandCenterPanel
+        state={panelState}
+        onClose={() => setPanelState(null)}
+        focusMode={focusMode}
+        staleDays={staleDays}
+      />
 
       {/* Cinema animation — plays once per toggle */}
       <FocusCinema key={cinemaKey} show={cinemaKey > 0} on={cinemaOn}/>

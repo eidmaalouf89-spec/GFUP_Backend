@@ -1,0 +1,195 @@
+{
+  "_note": "Reconstructed from `find` of repo root. Generated 2026-04-29.",
+  "_excludes": [".git", "__pycache__", ".pytest_cache", "backup", "backups", ".npm-cache", "pytest-cache-files-*"],
+  "root": {
+    "entrypoints": ["app.py", "main.py", "run_chain_onion.py"],
+    "config_files": [".gitignore", "CLAUDE.md", "README.md"],
+    "doc_files": [
+      "FLAT_GED_INTEGRATION_EXECUTION_PLAN.md",
+      "FLAT_GED_INTEGRATION_EXECUTION_PLAN_v2.md",
+      "GFUP_STEP_TRACKER.md",
+      "JANSA_INTEGRATION_NOTES.md"
+    ],
+    "log_files_root": [
+      "run_a.log","run_b.log","run_c.log","run_d.log","run_e.log","run_f.log",
+      "step15_debug.log","pipeline_run.log","fix_gf_schema_main.log",
+      "test1_main_no_baseline.log","test2_bootstrap.log","test2_bootstrap_utf8.log",
+      "test2_main_after_bootstrap.log"
+    ],
+    "tmp_artifacts_at_root": [
+      "tmpxkmaioec.db","tmpyw_386pd.db","test_write_permission.tmp",
+      "run_explorer_bundle_latest.zip"
+    ],
+    "subfolders": ["src","ui","scripts","input","output","runs","data","docs","tests","context","backup","backups","EID_Prompts_CODEX",".claude"]
+  },
+
+  "src": {
+    "_note": "All Python source. Bare imports work because main.py inserts src/ on sys.path.",
+    "top_modules": [
+      "config_loader.py","consultant_gf_writer.py","consultant_integration.py",
+      "consultant_match_report.py","consultant_matcher.py","debug_writer.py",
+      "effective_responses.py","flat_ged_runner.py","normalize.py","query_library.py",
+      "read_raw.py","reconciliation_engine.py","report_memory.py","routing.py",
+      "run_explorer.py","run_memory.py","run_orchestrator.py","team_version_builder.py",
+      "version_engine.py","workflow_engine.py","writer.py"
+    ],
+    "subpackages": {
+      "api_v2": {"_note": "present but appears empty / unused by active runtime"},
+      "chain_onion": [
+        "__init__.py","chain_builder.py","chain_classifier.py","chain_metrics.py",
+        "chain_models.py","exporter.py","family_grouper.py","narrative_engine.py",
+        "onion_engine.py","onion_scoring.py","query_hooks.py","source_loader.py",
+        "validation_harness.py"
+      ],
+      "consultant_ingest": [
+        "__init__.py","avls_ingest.py","consultant_excel_exporter.py",
+        "consultant_report_builder.py","consultant_transformers.py",
+        "lesommer_ingest.py","socotec_ingest.py","terrell_ingest.py",
+        "validate_consultant_reports.py"
+      ],
+      "domain": [
+        "__init__.py","classification.py","discrepancy.py","family_builder.py",
+        "gf_helpers.py","normalization.py","sas_helpers.py"
+      ],
+      "flat_ged": {
+        "files": ["__init__.py","cli.py","config.py","reader.py","resolver.py",
+                  "transformer.py","utils.py","validator.py","writer.py"],
+        "input": {
+          "source_main": [
+            "consultant_mapping.py","ged_parser_contract.py","status_mapping.py"
+          ]
+        },
+        "_note": "Frozen builder snapshot. DO NOT modify business rules."
+      },
+      "pipeline": {
+        "files": ["__init__.py","compute.py","context.py","paths.py","runner.py","utils.py"],
+        "stages": [
+          "__init__.py",
+          "stage_init_run.py","stage_read.py","stage_read_flat.py",
+          "stage_normalize.py","stage_version.py","stage_route.py",
+          "stage_report_memory.py","stage_write_gf.py","stage_build_team_version.py",
+          "stage_discrepancy.py","stage_diagnosis.py","stage_finalize_run.py"
+        ]
+      },
+      "reporting": [
+        "__init__.py","aggregator.py","bet_report_merger.py","chain_timeline_attribution.py",
+        "consultant_fiche.py","contractor_fiche.py","data_loader.py",
+        "document_command_center.py","focus_filter.py","focus_ownership.py",
+        "ui_adapter.py"
+      ]
+    }
+  },
+
+  "ui": {
+    "_note": "Production UI. Babel/React loaded from CDN. NO build step.",
+    "production_entry": "ui/jansa-connected.html",
+    "components": [
+      "ui/jansa/shell.jsx","ui/jansa/overview.jsx","ui/jansa/consultants.jsx",
+      "ui/jansa/fiche_base.jsx","ui/jansa/fiche_page.jsx","ui/jansa/runs.jsx",
+      "ui/jansa/executer.jsx","ui/jansa/contractors.jsx","ui/jansa/document_panel.jsx"
+    ],
+    "supporting": ["ui/jansa/data_bridge.js","ui/jansa/tokens.js"],
+    "config": ["ui/eslint.config.js","ui/vite.config.js"],
+    "_note_vite": "vite.config.js exists for legacy reasons but is NOT required by app.py runtime."
+  },
+
+  "scripts": [
+    "scripts/bootstrap_report_memory.py","scripts/bootstrap_run_zero.py",
+    "scripts/nuke_and_rebuild_run0.py","scripts/repo_health_check.py",
+    "scripts/reset_to_clean_run0.py"
+  ],
+
+  "input": {
+    "_note": "User-provided source files. Auto-detected by app.Api._detect_file.",
+    "files": ["GED_export.xlsx","FLAT_GED.xlsx","Grandfichier_v3.xlsx","Mapping.xlsx"],
+    "subfolders": {
+      "consultant_reports": ["AMO HQE","BET Acoustique AVLS","BET Structure TERRELL","socotec"]
+    },
+    "_note_flat_ged_in_input": "input/FLAT_GED.xlsx is a developer leftover; runtime uses output/intermediate/FLAT_GED.xlsx (auto-built by orchestrator)."
+  },
+
+  "output": {
+    "_note": "Latest pipeline artifacts (also copied to runs/run_NNNN/).",
+    "primary_artifacts": [
+      "GF_V0_CLEAN.xlsx","GF_TEAM_VERSION.xlsx",
+      "Tableau de suivi de visa 10_04_2026.xlsx",
+      "DISCREPANCY_REPORT.xlsx","DISCREPANCY_REVIEW_REQUIRED.xlsx",
+      "ANOMALY_REPORT.xlsx","AUTO_RESOLUTION_LOG.xlsx","IGNORED_ITEMS_LOG.xlsx",
+      "RECONCILIATION_LOG.xlsx",
+      "MISSING_IN_GED_DIAGNOSIS.xlsx","MISSING_IN_GED_TRUE_ONLY.xlsx",
+      "MISSING_IN_GF_DIAGNOSIS.xlsx","MISSING_IN_GF_TRUE_ONLY.xlsx",
+      "INSERT_LOG.xlsx","NEW_SUBMITTAL_ANALYSIS.xlsx","SUSPICIOUS_ROWS_REPORT.xlsx",
+      "consultant_match_report.xlsx","consultant_reports.xlsx"
+    ],
+    "subfolders": {
+      "intermediate": ["FLAT_GED.xlsx","DEBUG_TRACE.csv","flat_ged_run_report.json"],
+      "debug": [
+        "coarse_groups.xlsx","discrepancy_sample.xlsx","exclusion_summary.xlsx",
+        "family_clusters.xlsx","gf_duplicates.xlsx","gf_sheet_schema.xlsx",
+        "lifecycle_resolution.xlsx","missing_in_ged_summary.xlsx",
+        "missing_in_gf_summary.xlsx","new_submittal_summary.xlsx",
+        "reconciliation_summary.xlsx","routing_summary.xlsx"
+      ],
+      "chain_onion": [
+        "CHAIN_REGISTER.csv","CHAIN_VERSIONS.csv","CHAIN_EVENTS.csv",
+        "CHAIN_METRICS.csv","ONION_LAYERS.csv","ONION_SCORES.csv",
+        "CHAIN_NARRATIVES.csv","CHAIN_ONION_SUMMARY.xlsx",
+        "dashboard_summary.json","top_issues.json"
+      ],
+      "parity": {"_note": "validation leftovers; NOT touched at runtime"},
+      "parity_raw_r1": {"_note": "validation leftovers"},
+      "parity_raw_run1": {"_note": "validation leftovers"},
+      "parity_raw_run2": {"_note": "validation leftovers"},
+      "step9": {"_note": "Step 9 historical output. Inactive."}
+    },
+    "stale_files_at_top": [
+      "parity_report.xlsx","ui_parity_report.xlsx","clean_gf_diff_report.xlsx",
+      "tmp63o7zaid.xlsx"
+    ]
+  },
+
+  "runs": {
+    "_note": "Immutable per-run snapshots. Currently only run 0 exists.",
+    "run_0000": {
+      "_artifacts": "Mirror of output/ at run_0 finalization, sha256 verified.",
+      "subfolders": ["debug"]
+    }
+  },
+
+  "data": {
+    "_note": "Persistent state. SQLite databases.",
+    "files": [
+      "run_memory.db",
+      "report_memory.db",
+      "report_memory.db.malformed_bak"
+    ]
+  },
+
+  "docs": {
+    "_note": "60+ markdowns of historical execution records. Use as secondary reference; trust /context/ over docs.",
+    "subfolders": {
+      "archive": ["dev_tools","old_specs","one_off_docs","prompts","step_logs","ui_legacy","validation_history"]
+    }
+  },
+
+  "tests": {
+    "_note": "pytest suite. Some tests in tests/flat_ged/.",
+    "subfolders": ["flat_ged"]
+  },
+
+  "context": {
+    "_note": "This folder. Authoritative summary of repo state as of 2026-04-27.",
+    "markdown": [
+      "00_PROJECT_MISSION.md","01_RUNTIME_MAP.md","02_DATA_FLOW.md",
+      "03_UI_FEED_MAP.md","04_PIPELINE_STAGES.md","05_OUTPUT_ARTIFACTS.md",
+      "06_EXCEPTIONS_AND_MAPPINGS.md","07_OPEN_ITEMS.md","08_DO_NOT_TOUCH.md",
+      "09_PROMPT_PROTOCOL.md","10_VALIDATION_COMMANDS.md"
+    ],
+    "machine_files": [
+      "software_tree.json","artifact_inventory.csv","module_dependency_map.csv",
+      "ui_endpoint_map.csv","data_columns_map.csv",
+      "exceptions_bentin_old.csv","exceptions_lgd_lot03_pre2026.csv",
+      "exceptions_other.csv","implicit_hardcoded_rules.csv"
+    ]
+  }
+}

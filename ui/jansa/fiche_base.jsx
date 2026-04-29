@@ -1209,7 +1209,9 @@ function DrilldownDrawer({ state, onClose, onExport }) {
                 {docs.map((d, i) => {
                   const isLate = d.remaining_days != null && d.remaining_days < 0;
                   return (
-                    <tr key={i} style={{ background: isLate ? "rgba(255,69,58,0.04)" : "transparent" }}>
+                    <tr key={i}
+                      onClick={state.onRowClick ? () => state.onRowClick(d) : undefined}
+                      style={{ cursor: state.onRowClick ? "pointer" : "default", background: isLate ? "rgba(255,69,58,0.04)" : "transparent" }}>
                       <td style={{...D_CELL, textAlign:"left", paddingLeft:20, color: C.accent, fontWeight:500}}>{d.numero || "—"}</td>
                       <td style={{...D_CELL, textAlign:"center"}}>{d.indice || "—"}</td>
                       <td style={D_CELL}>{d.emetteur || "—"}</td>

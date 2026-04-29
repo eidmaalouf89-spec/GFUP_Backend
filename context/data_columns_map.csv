@@ -1,0 +1,48 @@
+dataset_or_file,key_columns,join_keys,notes
+"input/GED_export.xlsx (sheet 'Doc. sous workflow, x versions')","AFFAIRE,PROJET,BATIMENT,PHASE,EMETTEUR,SPECIALITE,LOT,TYPE DE DOC,ZONE,NIVEAU,NUMERO,INDICE,Libellé du document,Créé le","(numero,indice) within document",2-row header (CORE_COLUMNS in row1; APPROVER_SUB_FIELDS in row2 grouped 4 cols per approver). See src/flat_ged/input/source_main/ged_parser_contract.py.
+GED responses (long format),"approver_raw,response_date_raw,response_status_raw,response_comment,pj_flag","(numero,indice) -> doc_id",One row per (document × approver). approver_raw is the exact GED column header.
+input/Grandfichier_v3.xlsx (multi-sheet),(per-sheet schemas detected by routing.read_all_gf_sheet_structures),GF row -> sheet,Each sheet has its own column layout; routing infers schema per sheet.
+input/Mapping.xlsx,(unknown - not consumed at runtime today),-,Present in input/ but app.Api.run_pipeline_async does not pass it. UI hint: 'informatif - non transmis au backend'.
+output/intermediate/FLAT_GED.xlsx (sheet GED_RAW_FLAT),"numero,indice + flat columns","(numero,indice)",Raw GED rows after exception filter.
+output/intermediate/FLAT_GED.xlsx (sheet GED_OPERATIONS),"numero,indice,step_order,step_type,actor_clean,submittal_date,response_date,...","(numero,indice,step_order)",Active operations only (instance_role=ACTIVE).
+output/intermediate/DEBUG_TRACE.csv,(builder fields),-,Builder debug trace (batch mode).
+docs_df (pipeline ctx),"doc_id,numero,numero_normalized,indice,emetteur,lot_normalized,lot_prefix,type_doc,gf_sheet_name,is_dernier_indice,lifecycle_id,chain_position,is_excluded_lifecycle,...",doc_id (UUID; SESSION-SCOPED),Built by stage_read or stage_read_flat; UUID doc_id must NOT be persisted.
+responses_df (pipeline ctx),"doc_id,approver_raw,approver_canonical,response_date_raw,response_status_raw,response_comment,pj_flag,date_status_type",doc_id,Long-format approver responses.
+effective_responses_df (ctx),"doc_id + approver_canonical + (status, source, confidence, ...)",doc_id,Composed from GED responses + persisted report_memory rows. HIGH/MEDIUM only.
+dernier_df (ctx),"doc_id + selected docs_df columns + _visa_global, _focus_owner, _focus_owner_tier, _days_since_last_activity, _days_to_deadline, _focus_priority",doc_id,Latest indice per lifecycle. Augmented in data_loader for UI.
+versioned_df (ctx),doc_id + lifecycle_id + chain_position + is_dernier_indice + anomaly_flags + confidence,doc_id,Output of VersionEngine.
+output/GF_V0_CLEAN.xlsx (sheets),(varies per sheet),"(numero,indice) implied",One sheet per LOT * sheet defined in GF template.
+output/GF_TEAM_VERSION.xlsx,(same as OGF - surgically patched),(same as OGF),Surgical patch with date format / fill preservation.
+output/DISCREPANCY_REPORT.xlsx,"flag_type,severity,sheet_name,numero,indice,document_code,gf_value,ged_value,reconciliation_note,date_diff,title_similarity",-,"Severity in {REVIEW_REQUIRED, COSMETIC, EXCLUDED, INFO}."
+output/DISCREPANCY_REVIEW_REQUIRED.xlsx,(subset of above),-,severity=REVIEW_REQUIRED only.
+output/RECONCILIATION_LOG.xlsx,"reconciliation decisions, scores",-,SCORE_AUTO_RECONCILE=0.85 / SCORE_PROBABLE_REVIEW=0.70.
+output/IGNORED_ITEMS_LOG.xlsx,"numero,indice,sheet,document_code,exclusion_reason,reconciliation_note,anomaly_flags",-,Includes BENTIN_LEGACY_EXCEPTION (anomaly_flags=['BENTIN_LEGACY']).
+output/MISSING_IN_GED_*.xlsx,(diagnosis fields),-,Missing in GED audit.
+output/MISSING_IN_GF_*.xlsx,(diagnosis fields),-,Missing in GF audit.
+output/INSERT_LOG.xlsx,(insertion records),-,New rows inserted by reconstruction.
+output/NEW_SUBMITTAL_ANALYSIS.xlsx,family fields,-,New submittal per family.
+output/SUSPICIOUS_ROWS_REPORT.xlsx,(suspicious-row fields),-,Rows flagged by heuristics.
+output/consultant_match_report.xlsx,"matched_doc_id, ged_doc_id, consultant_doc, confidence, action",doc_id,Per-consultant match results with HIGH/MEDIUM/LOW confidence.
+output/consultant_reports.xlsx,(standardised consultant reports),-,One row per consultant report record.
+output/chain_onion/CHAIN_REGISTER.csv,"family_key,current_state,portfolio_bucket,first_event,last_event,...",family_key,One row per family.
+output/chain_onion/CHAIN_VERSIONS.csv,"family_key,version_key,indice,...",family_key,All versions per family.
+output/chain_onion/CHAIN_EVENTS.csv,"family_key,version_key,event_type,event_date,actor,...",family_key,Timeline of events.
+output/chain_onion/CHAIN_METRICS.csv,"family_key,stale_days,pressure_index,activity_dates,...",family_key,Metrics per family.
+output/chain_onion/ONION_LAYERS.csv,"family_key,layer,severity_weight,confidence_factor,pressure_factor,recency_factor,evidence_factor,layer_score",family_key,"One row per (family,layer) when evidence exists."
+output/chain_onion/ONION_SCORES.csv,"family_key,total_onion_score,normalized_score_100,action_priority_rank,top_theme,...",family_key,One row per family with chain-level rollup.
+output/chain_onion/CHAIN_NARRATIVES.csv,"family_key,urgency,confidence,narrative",family_key,Plain-language summary.
+output/chain_onion/dashboard_summary.json,(portfolio rollup),-,Used by query_hooks.get_dashboard_summary.
+output/chain_onion/top_issues.json,(top 20 list),-,Used by query_hooks.get_top_issues.
+data/run_memory.db (table runs),"run_number,status,is_current,is_stale,started_at,completed_at,run_mode,core_version",run_number,Status: STARTED / COMPLETED / FAILED.
+data/run_memory.db (table run_inputs),"run_number,input_type,file_name,file_path,file_hash",run_number,GED + GF + reports_dir + mapping (when used).
+data/run_memory.db (table run_artifacts),"run_number,artifact_type,artifact_name,file_path,file_hash,format,created_at","(run_number,artifact_type)",Authoritative registry. ~33 entries per FULL run.
+data/run_memory.db (table run_corrections),(corrections schema),run_number,Manual corrections audit.
+data/run_memory.db (table run_invalidation_log),(invalidation entries),run_number,Stale runs log.
+data/report_memory.db (table ingested_reports),"report_id,file_path,file_hash,ingested_at,confidence",report_id,Per-report ingestion log.
+data/report_memory.db (table persisted_report_responses),"report_id,doc_key (numero+indice),approver_canonical,status,confidence,comment,attachment_flag,is_active",doc_key,Per-row consultant truth that survives runs.
+window.OVERVIEW (UI global),"week_num,data_date_str,run_number,total_runs,total_docs,pending_blocking,refus_rate,best_consultant,best_contractor,visa_flow,weekly,focus,priority_queue,legacy_backlog_count",-,Built by ui_adapter.adapt_overview.
+window.CONSULTANTS (UI global),"id,slug,name,canonical_name,group,role,totals,ratios,delta,...",canonical_name,"group in {MOEX,Primary,Secondary}."
+window.CONTRACTORS (UI global),<contractor_code>: contractor dict,contractor_code,Lookup keyed by emetteur code.
+window.CONTRACTORS_LIST (UI global),(list of contractor dicts),-,List form for grid rendering.
+window.FICHE_DATA (UI global),"consultant,header,week_delta,bloc1,bloc2,bloc3,non_saisi,s1,s2,s3",-,Per-consultant fiche; SAS variant for MOEX SAS.
+get_doc_details (UI on-demand),"docs[],count,filter_key,consultant",-,"docs item: numero,indice,emetteur,titre,date_soumission,date_limite,remaining_days,status,lot."

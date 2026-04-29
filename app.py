@@ -13,6 +13,8 @@ import time
 import webbrowser
 from pathlib import Path
 
+import traceback
+
 import webview
 
 # ── Path resolution ──────────────────────────────────────────
@@ -138,6 +140,112 @@ def _sanitize_for_json(obj):
     # Fallback: convert to string
     return str(obj)
 
+# ── Chain data freshness helpers ──────────────────────────────
+
+CHAIN_ONION_REFRESH_TIMEOUT_S = 300
+
+
+def _chain_onion_outputs_stale(base_dir: Path) -> tuple:
+    """Decide whether chain_onion outputs need to be regenerated.
+
+    Returns (is_stale, reason). True if any required file is missing,
+    OR if FLAT_GED.xlsx is newer than CHAIN_REGISTER.csv (chain_onion's
+    inputs changed since last run).
+    """
+    co = base_dir / "output" / "chain_onion"
+    required = ["CHAIN_REGISTER.csv", "CHAIN_EVENTS.csv", "CHAIN_VERSIONS.csv"]
+    for name in required:
+        p = co / name
+        if not p.exists():
+            return True, f"missing: {name}"
+    flat_ged = base_dir / "output" / "intermediate" / "FLAT_GED.xlsx"
+    register = co / "CHAIN_REGISTER.csv"
+    if flat_ged.exists() and flat_ged.stat().st_mtime > register.stat().st_mtime:
+        return True, "FLAT_GED.xlsx newer than CHAIN_REGISTER.csv"
+    return False, "fresh"
+
+
+def _run_chain_onion_subprocess(base_dir: Path) -> tuple:
+    """Invoke run_chain_onion.py as a subprocess. Returns (success, message).
+
+    Captures stdout/stderr; logs them via print. Times out at
+    CHAIN_ONION_REFRESH_TIMEOUT_S. NEVER raises — failures return (False, msg).
+    """
+    script = base_dir / "run_chain_onion.py"
+    if not script.exists():
+        return False, f"run_chain_onion.py not found at {script}"
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=str(base_dir),
+            capture_output=True,
+            text=True,
+            timeout=CHAIN_ONION_REFRESH_TIMEOUT_S,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            co = base_dir / "output" / "chain_onion"
+            required = ["CHAIN_REGISTER.csv", "CHAIN_EVENTS.csv", "CHAIN_VERSIONS.csv"]
+            if all((co / name).exists() for name in required):
+                print(f"[app][CHAIN_ONION] exit {result.returncode} but artifacts present — partial success")
+                return True, f"partial success (exit {result.returncode})"
+            print(f"[app][CHAIN_ONION] subprocess exited {result.returncode}")
+            stderr_safe = (result.stderr or "")[-500:].encode("utf-8", errors="replace").decode("utf-8")
+            print(f"[app][CHAIN_ONION] stderr tail: {stderr_safe}")
+            return False, f"exit code {result.returncode}"
+        print(f"[app][CHAIN_ONION] subprocess OK")
+        return True, "ok"
+    except subprocess.TimeoutExpired:
+        return False, f"timeout after {CHAIN_ONION_REFRESH_TIMEOUT_S}s"
+    except Exception as exc:
+        return False, f"exception: {exc}"
+
+
+def _refresh_chain_timeline(ctx, base_dir: Path) -> tuple:
+    """Recompute CHAIN_TIMELINE_ATTRIBUTION.{json,csv} from current chain_onion
+    outputs + ctx. Returns (success, message). NEVER raises.
+    """
+    try:
+        from reporting.chain_timeline_attribution import (
+            _load_chain_data,
+            compute_all_chain_timelines,
+            write_chain_timeline_artifact,
+        )
+        co_dir = base_dir / "output" / "chain_onion"
+        intermediate = base_dir / "output" / "intermediate"
+        events_df, register_df, versions_df = _load_chain_data(co_dir)
+        timelines = compute_all_chain_timelines(ctx, events_df, register_df, versions_df)
+        json_path, csv_path = write_chain_timeline_artifact(timelines, intermediate)
+        print(f"[app][CHAIN_TIMELINE] wrote {json_path.name} ({len(timelines)} chains)")
+        return True, f"{len(timelines)} chains"
+    except Exception as exc:
+        print(f"[app][CHAIN_TIMELINE] refresh failed: {exc}")
+        traceback.print_exc()
+        return False, str(exc)
+
+
+def _ensure_chain_data_fresh(ctx, base_dir: Path) -> None:
+    """Top-level orchestrator: refresh chain_onion if stale, then chain_timeline.
+
+    Called from _prewarm_cache AFTER _cache_ready is set, so UI is not blocked.
+    NEVER raises.
+    """
+    try:
+        is_stale, reason = _chain_onion_outputs_stale(base_dir)
+        if is_stale:
+            print(f"[app][CHAIN_DATA] chain_onion stale ({reason}) — regenerating")
+            ok, msg = _run_chain_onion_subprocess(base_dir)
+            if not ok:
+                print(f"[app][CHAIN_DATA] chain_onion regeneration failed: {msg}")
+                return
+        else:
+            print(f"[app][CHAIN_DATA] chain_onion fresh — skipping subprocess")
+        _refresh_chain_timeline(ctx, base_dir)
+    except Exception as exc:
+        print(f"[app][CHAIN_DATA] _ensure_chain_data_fresh outer exception: {exc}")
+        traceback.print_exc()
+
 # ── API class exposed to JavaScript ──────────────────────────
 class Api:
     """
@@ -156,6 +264,31 @@ class Api:
             "completed_run": None,
             "warnings": [],
         }
+        self._cache_ready = threading.Event()
+        self._chain_data_ready = threading.Event()
+        threading.Thread(target=self._prewarm_cache, daemon=True).start()
+
+    def _prewarm_cache(self):
+        ctx = None
+        try:
+            from reporting.data_loader import load_run_context
+            ctx = load_run_context(BASE_DIR)
+            print("[app] Cache pre-warm complete.")
+        except Exception as exc:
+            print(f"[app] Cache pre-warm failed: {exc}")
+        finally:
+            self._cache_ready.set()
+
+        # Phase 3: chain_onion + chain_timeline auto-refresh (background, after cache_ready)
+        if ctx is None or getattr(ctx, "data_date", None) is None or getattr(ctx, "dernier_df", None) is None:
+            # No usable ctx → skip refresh, but unblock chain_data_ready so callers don't deadlock
+            print("[app][CHAIN_DATA] skipping refresh: ctx is missing data_date or dernier_df")
+            self._chain_data_ready.set()
+            return
+        try:
+            _ensure_chain_data_fresh(ctx, BASE_DIR)
+        finally:
+            self._chain_data_ready.set()
 
     def get_app_state(self):
         """Called by React on mount. Returns system state."""
@@ -341,6 +474,55 @@ class Api:
         with self._pipeline_lock:
             self._pipeline_status["message"] = msg
 
+    def _build_live_operational_numeros(self):
+        try:
+            from chain_onion.query_hooks import (
+                QueryContext,
+                get_live_operational,
+                get_legacy_backlog,
+            )
+            co_dir = BASE_DIR / "output" / "chain_onion"
+            if not co_dir.exists():
+                return None, 0
+            ctx = QueryContext(output_dir=co_dir)
+            scores = ctx.scores()
+            if scores.empty:
+                return None, 0
+            live_df = get_live_operational(ctx)
+            legacy_df = get_legacy_backlog(ctx)
+            if live_df.empty:
+                return None, 0
+            live_numeros = set(
+                live_df["family_key"].dropna().astype(str).tolist()
+            )
+            legacy_count = len(legacy_df) if legacy_df is not None else 0
+            return live_numeros, legacy_count
+        except Exception as exc:
+            print(exc)
+            return None, 0
+
+    @staticmethod
+    def _apply_live_narrowing(focus_result, live_numeros, legacy_count):
+        if live_numeros is None:
+            return
+        fdf = focus_result.focused_df
+        if fdf is None:
+            return
+        if "numero_normalized" not in fdf.columns:
+            return
+        mask = fdf["numero_normalized"].astype(str).isin(live_numeros)
+        focus_result.focused_df = fdf[mask].copy()
+        focus_result.focused_doc_ids = set(
+            focus_result.focused_df["doc_id"].tolist()
+        )
+        surviving = focus_result.focused_doc_ids
+        focus_result.priority_queue = [
+            x for x in focus_result.priority_queue
+            if x.get("doc_id") in surviving
+        ]
+        focus_result.stats["focused_count"] = len(surviving)
+        focus_result.stats["legacy_backlog_count"] = legacy_count
+
     # ── Dashboard / reporting data ─────────────────────────────
 
     def get_dashboard_data(self, focus=False, stale_days=90):
@@ -359,6 +541,9 @@ class Api:
             ctx = load_run_context(BASE_DIR)
             focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
             focus_result = apply_focus_filter(ctx, focus_config)
+            _legacy_count = 0
+            _live_numeros, _legacy_count = self._build_live_operational_numeros()
+            self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
 
             kpis = compute_project_kpis(ctx, focus_result=focus_result)
             consultants = compute_consultant_summary(ctx, focus_result=focus_result)
@@ -378,6 +563,7 @@ class Api:
             }
             if focus:
                 payload["priority_queue"] = focus_result.priority_queue[:50]
+                payload["legacy_backlog_count"] = _legacy_count
 
             return _sanitize_for_json(payload)
         except Exception as exc:
@@ -394,6 +580,9 @@ class Api:
             ctx = load_run_context(BASE_DIR)
             focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
             focus_result = apply_focus_filter(ctx, focus_config)
+            _legacy_count = 0
+            _live_numeros, _legacy_count = self._build_live_operational_numeros()
+            self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
             return _sanitize_for_json(compute_consultant_summary(ctx, focus_result=focus_result))
         except Exception as exc:
             return {"error": str(exc)}
@@ -407,6 +596,9 @@ class Api:
             ctx = load_run_context(BASE_DIR)
             focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
             focus_result = apply_focus_filter(ctx, focus_config)
+            _legacy_count = 0
+            _live_numeros, _legacy_count = self._build_live_operational_numeros()
+            self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
             return _sanitize_for_json(compute_contractor_summary(ctx, focus_result=focus_result))
         except Exception as exc:
             return {"error": str(exc)}
@@ -502,6 +694,9 @@ class Api:
                 from reporting.focus_filter import apply_focus_filter, FocusConfig
                 focus_config = FocusConfig(enabled=True, stale_threshold_days=int(stale_days))
                 focus_result = apply_focus_filter(ctx, focus_config)
+                _legacy_count = 0
+                _live_numeros, _legacy_count = self._build_live_operational_numeros()
+                self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
                 id_col = "doc_id_resp" if "doc_id_resp" in docs.columns else "doc_id"
                 focused_df = getattr(focus_result, "focused_df", None)
                 if focused_df is not None and "_focus_owner" in focused_df.columns:
@@ -621,6 +816,39 @@ class Api:
         except Exception as exc:
             traceback.print_exc()
             return _sanitize_for_json({"docs": [], "count": 0, "error": str(exc)})
+
+    def search_documents(self, query, focus=False, stale_days=30, limit=50):
+        """Substring search across dernier_df. Returns ranked list of document summaries."""
+        self._cache_ready.wait()
+        try:
+            from reporting.data_loader import load_run_context
+            from reporting.document_command_center import search_documents
+            ctx = load_run_context(BASE_DIR)
+            results = search_documents(ctx, str(query or ""),
+                                       bool(focus), int(stale_days), int(limit))
+            return _sanitize_for_json(results)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({"error": str(exc), "query": query})
+
+    def get_document_command_center(self, numero, indice=None, focus=False, stale_days=30):
+        """Full Document Command Center payload for one document."""
+        self._cache_ready.wait()
+        try:
+            from reporting.data_loader import load_run_context
+            from reporting.document_command_center import build_document_command_center
+            ctx = load_run_context(BASE_DIR)
+            payload = build_document_command_center(
+                ctx, str(numero),
+                None if indice is None else str(indice),
+                bool(focus), int(stale_days),
+            )
+            return _sanitize_for_json(payload)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({"error": str(exc), "numero": numero})
 
     def export_drilldown_xlsx(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90):
         """Export the currently filtered drilldown documents to an Excel file."""
@@ -791,6 +1019,7 @@ class Api:
 
     def get_overview_for_ui(self, focus=False, stale_days=90):
         """Return OVERVIEW payload shaped for JANSA standalone dashboard."""
+        self._cache_ready.wait()
         try:
             dashboard = self.get_dashboard_data(focus, stale_days)
             if isinstance(dashboard, dict) and "error" in dashboard:
@@ -805,6 +1034,7 @@ class Api:
 
     def get_consultants_for_ui(self, focus=False, stale_days=90):
         """Return CONSULTANTS list shaped for JANSA standalone dashboard."""
+        self._cache_ready.wait()
         try:
             raw = self.get_consultant_list(focus, stale_days)
             if isinstance(raw, dict) and "error" in raw:
@@ -818,6 +1048,7 @@ class Api:
 
     def get_contractors_for_ui(self, focus=False, stale_days=90):
         """Return CONTRACTORS + CONTRACTORS_LIST for JANSA standalone dashboard."""
+        self._cache_ready.wait()
         try:
             raw = self.get_contractor_list(focus, stale_days)
             if isinstance(raw, dict) and "error" in raw:
@@ -835,6 +1066,61 @@ class Api:
     def get_fiche_for_ui(self, consultant_name, focus=False, stale_days=90):
         """Return FICHE_DATA for one consultant — already shaped correctly."""
         return self.get_consultant_fiche(consultant_name, focus, stale_days)
+
+    def get_chain_onion_intel(self, limit=20):
+        """Return top_issues + dashboard_summary from chain_onion output for the UI panel."""
+        try:
+            co_dir = OUTPUT_DIR / "chain_onion"
+            top_path = co_dir / "top_issues.json"
+            dash_path = co_dir / "dashboard_summary.json"
+
+            top_issues = []
+            if top_path.exists():
+                data = json.loads(top_path.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    top_issues = data[:int(limit)]
+
+            summary = {}
+            if dash_path.exists():
+                summary = json.loads(dash_path.read_text(encoding="utf-8"))
+
+            return _sanitize_for_json({"top_issues": top_issues, "summary": summary})
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return {"top_issues": [], "summary": {}, "error": str(exc)}
+
+    def get_chain_timeline(self, numero):
+        """Return the chain timeline payload for one document by numero.
+
+        Phase 4 (Document Command Center) consumes this for the
+        "Chronologie de la chaîne" panel section.
+
+        Returns the per-chain dict (header + indices[] + totals + tag flags +
+        attribution_breakdown), or {"error": ...} if the artifact is unavailable
+        or the numero has no chain.
+        """
+        self._chain_data_ready.wait()
+        try:
+            from reporting.chain_timeline_attribution import load_chain_timeline_artifact
+            intermediate = BASE_DIR / "output" / "intermediate"
+            timelines = load_chain_timeline_artifact(intermediate)
+            # Normalize numero to chain_onion's zero-padded 6-digit family_key form
+            s = str(numero).strip()
+            if s.isdigit():
+                family_key = s.zfill(6)
+            else:
+                family_key = s
+            payload = timelines.get(family_key)
+            if payload is None:
+                return _sanitize_for_json({"error": f"No chain timeline for numero {numero!r}", "numero": numero})
+            return _sanitize_for_json(payload)
+        except FileNotFoundError as exc:
+            return _sanitize_for_json({"error": str(exc), "numero": numero})
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({"error": str(exc), "numero": numero})
 
 # ── Main ─────────────────────────────────────────────────────
 def main():

@@ -1,0 +1,31 @@
+scope,where_defined,rule_value,why_it_matters
+ui_resolution,app.py:_resolve_ui,only ui/jansa-connected.html is accepted,app refuses to start if any other UI variant is provided.
+flat_ged_default_mode,src/pipeline/paths.py:FLAT_GED_MODE,'raw',Default value if orchestrator is bypassed. The orchestrator overrides to 'flat' at runtime. Calling pipeline.runner directly takes the raw path silently.
+gf_inheritance,src/run_orchestrator.py:_resolve_inherited_gf_record,resolve FINAL_GF from latest COMPLETED non-stale run; fallback to run_0,"If user does not provide a GF in the Executer page, the orchestrator inherits from history."
+disabled_root_for_disabled_modes,src/run_orchestrator.py:_patched_main_context,output/_orchestrator_disabled/<run_mode_lower>/...,"In modes where consultant ingestion is disabled (GED_ONLY, GED_REPORT without reports_dir), output paths get redirected to a disabled root so files don't poison the real output/."
+team_version_retry,src/pipeline/stages/stage_build_team_version.py,"3 attempts (immediate, +1s, +2s)",Robust to transient locks on output/GF_TEAM_VERSION.xlsx (Excel hold etc.).
+team_version_fatal_modes,src/pipeline/stages/stage_build_team_version.py,FULL and GED_REPORT raise RuntimeError after 3 attempts; other modes warn-only,Production modes guarantee a team file or fail loudly.
+ogf_template_fallback_chain,src/pipeline/stages/stage_build_team_version.py,1) ctx.GF_FILE on disk; 2) latest GF_TEAM_VERSION artifact; 3) latest FINAL_GF artifact; 4) skip/fail,Allows the team builder to function across runs with or without a fresh OGF.
+data_loader_legacy_fallback,src/reporting/data_loader.py,raw GED rebuild path triggered when FLAT_GED artifact missing; logs '[LEGACY_RAW_FALLBACK]',Legacy path; should not be hit in healthy runs but kept as safety net.
+data_loader_cache,src/reporting/data_loader.py,module-level _cached_context + _cached_run_number; cleared by clear_cache() after pipeline run completion,Avoids re-loading the run context for every UI call.
+api_prewarm,app.py:Api.__init__,daemon thread loads RunContext on Api construction; api.get_*_for_ui calls wait via _cache_ready.Event,Smooths out first-paint latency.
+sqlite_lock_retry,app.py:_query_db AND data_loader._query_db,"retry delays (0.0, 0.2, 0.5)s + immutable URI fallback ('file:...?mode=ro&immutable=1')",Tolerates pipeline writers concurrently using the DB.
+data_bridge_wait_timeout,ui/jansa/data_bridge.js:waitForApi,5000 ms,Bridge degrades to placeholder data after 5s without window.pywebview.api.
+data_bridge_loadgen,ui/jansa/data_bridge.js,_loadGen counter increments per refresh; older responses are discarded,Race-condition guard during Focus toggle / stale-slider changes.
+react_data_version,ui/jansa/shell.jsx,setDataVersion(v=>v+1) after each refreshForFocus,Forces re-render of children that rely on window globals.
+fiche_canonical_fallback,ui/jansa/shell.jsx:navigateTo,fiche call uses consultant.canonical_name OR consultant.name,"Resolves SOCOTEC, AVLS, etc. UI tokens to canonical backend names via reporting.consultant_fiche.resolve_consultant_name."
+status_resolve_three,src/reporting/consultant_fiche.py:_resolve_status_labels,"default {VSO, VAO, REF}; Bureau de Contrôle {FAV, SUS, DEF}; MOEX SAS {VSO, VAO, REF}",Determines which labels appear in fiche header and bloc3.
+focus_priority_levels,src/reporting/focus_filter.py + focus_ownership.py,_focus_priority is 1..5 (P1 overdue -> P5 ok),Drives priority_queue ordering and OVERVIEW.focus.p* counters.
+chain_onion_dependency,app.Api._build_live_operational_numeros,"if output/chain_onion/ missing or scores empty, return (None, 0)",Focus mode silently degrades to ownership-only when chain_onion outputs are absent.
+pj_flag_truthiness,src/flat_ged/input/source_main/ged_parser_contract.py,any non-None/non-zero PJ value -> flag=1,Convention used by the builder.
+mapping_xlsx_runtime_role,(unclear),Mapping.xlsx is in input/ and exposed in Executer UI but app.Api.run_pipeline_async does not pass it,Either remove the picker or wire it through. UI labels it 'informatif - non transmis au backend'.
+chain_onion_runner_independence,run_chain_onion.py,reads output/intermediate/FLAT_GED.xlsx + DEBUG_TRACE.csv + data/report_memory.db; writes output/chain_onion/*,"Not coupled to run_number - its inputs come from the most recent intermediate, not from a registered run artifact."
+chain_onion_step_codes,src/chain_onion/*.py docstrings,"Steps 04..14 (source_loader=04, family_grouper=05, chain_builder=06, chain_classifier=07, chain_metrics=08, onion_engine=09, onion_scoring=10, narrative_engine=11, exporter=12, query_hooks=13, validation_harness=14)",Used in logs and docs.
+new_submittal_doc_id_uuid,src/chain_onion/source_loader.py,doc_id is a fresh UUID per loader call; SESSION-SCOPED,Must NOT be persisted to chain output CSVs or used cross-run.
+identity_keys_in_chain,src/chain_onion/source_loader.py,FAMILY_KEY=str(numero); VERSION_KEY=numero+'_'+indice; INSTANCE_KEY=version_key+'_'+submission_instance_id,Stable cross-run keys for chain analysis.
+artifact_sha256,src/run_memory.py:sha256_file,sha256 of every registered artifact,Integrity contract for run replay / parity checks.
+team_version_export_filename,app.Api.export_team_version,'Tableau de suivi de visa DD_MM_YYYY.xlsx' under OUTPUT_DIR; date from ctx.data_date or today,Dated copy used for distribution.
+drilldown_export_filename,app.Api.export_drilldown_xlsx,'Drilldown_<consultant>_<filter>_DDMMYYYY.xlsx' under OUTPUT_DIR,Sanitised consultant + filter slugs.
+windows_explorer_reveal,app.Api.open_file_in_explorer,"subprocess.Popen('explorer /select,...'); falls back to opening parent folder if file missing",Windows-specific UX.
+bureau_de_controle_socotec_synonym,src/reporting/consultant_fiche.py:COMPANY_TO_CANONICAL,'SOCOTEC' -> 'Bureau de Contrôle',Allows UI tokens to use either form.
+moex_gemo_synonym,src/reporting/consultant_fiche.py,'GEMO' -> 'Maître d'Oeuvre EXE',Allows UI to display either token.

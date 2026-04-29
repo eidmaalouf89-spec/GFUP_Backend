@@ -302,71 +302,77 @@ def compute_moex_countdown(engine: WorkflowEngine, doc_ids: list,
     The countdown activates when:
       1. ALL primary approvers (excluding MOEX) have ANSWERED
       2. At least one non-primary, non-MOEX approver is still PENDING
+
+    Performance: uses engine._doc_approvers dict directly to avoid creating
+    one DataFrame per doc (was the dominant cost at 4 800+ docs).
     """
     from datetime import timedelta
 
+    dd = None
+    if data_date is not None:
+        dd = data_date.date() if hasattr(data_date, 'date') else data_date
+
+    _empty = {
+        "countdown_active": False,
+        "last_primary_date": None,
+        "countdown_deadline": None,
+        "countdown_expired": False,
+        "pending_secondary": [],
+    }
+
     result = {}
     for doc_id in doc_ids:
-        approvers_df = engine.get_all_approver_statuses(doc_id)
-        if approvers_df.empty:
-            result[doc_id] = {
-                "countdown_active": False,
-                "last_primary_date": None,
-                "countdown_deadline": None,
-                "countdown_expired": False,
-                "pending_secondary": [],
-            }
+        entries = engine._doc_approvers.get(doc_id)
+        if not entries:
+            result[doc_id] = dict(_empty)
             continue
 
-        # Classify each approver
         primary_answered_dates = []
-        all_primary_answered = True
-        pending_secondary = []
+        all_primary_answered   = True
+        pending_secondary      = []
 
-        for _, row in approvers_df.iterrows():
-            approver = row["approver_canonical"]
-            status_type = row["date_status_type"]
+        for entry in entries:
+            approver    = entry["approver"]
+            status_type = entry.get("date_status_type", "NOT_CALLED")
 
-            # Skip MOEX — it's the one who closes, not a reviewer here
             if _is_moex(approver):
                 continue
 
             if _is_primary(approver):
-                if status_type == "ANSWERED" and row["date_answered"] is not None:
-                    primary_answered_dates.append(row["date_answered"])
+                if status_type == "ANSWERED" and entry.get("date_answered") is not None:
+                    primary_answered_dates.append(entry["date_answered"])
                 elif status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
                     all_primary_answered = False
-                elif status_type == "NOT_CALLED":
-                    pass  # not called = not relevant
-                else:
+                # NOT_CALLED: not relevant; other: treat as not answered
+                elif status_type != "NOT_CALLED":
                     all_primary_answered = False
             else:
                 # Secondary (non-primary, non-MOEX)
                 if status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
                     pending_secondary.append(approver)
 
-        countdown_active = all_primary_answered and len(primary_answered_dates) > 0 and len(pending_secondary) > 0
+        countdown_active = (
+            all_primary_answered
+            and len(primary_answered_dates) > 0
+            and len(pending_secondary) > 0
+        )
 
-        last_primary_date = None
+        last_primary_date  = None
         countdown_deadline = None
-        countdown_expired = False
+        countdown_expired  = False
 
         if countdown_active:
-            # date_answered values might be datetime or date
-            dates = []
-            for d in primary_answered_dates:
-                if hasattr(d, 'date'):
-                    dates.append(d.date())
-                else:
-                    dates.append(d)
-            last_primary_date = max(dates)
+            dates = [
+                d.date() if hasattr(d, 'date') else d
+                for d in primary_answered_dates
+            ]
+            last_primary_date  = max(dates)
             countdown_deadline = last_primary_date + timedelta(days=10)
-            if data_date is not None:
-                dd = data_date.date() if hasattr(data_date, 'date') else data_date
+            if dd is not None:
                 countdown_expired = dd > countdown_deadline
 
         result[doc_id] = {
-            "countdown_active": countdown_active,
+            "countdown_active":  countdown_active,
             "last_primary_date": last_primary_date,
             "countdown_deadline": countdown_deadline,
             "countdown_expired": countdown_expired,
@@ -390,110 +396,45 @@ def compute_responsible_party(engine: WorkflowEngine, doc_ids: list) -> dict:
         "MULTIPLE_CONSULTANTS" — more than one consultant is pending
         "MOEX"                 — all consultants answered but MOEX hasn't issued visa yet
         None                   — document is closed (visa issued, not a REF)
+
+    Performance: uses engine._doc_approvers dict directly to avoid creating
+    one DataFrame per doc (was the dominant cost at 4 800+ docs).
     """
     result = {}
 
     for doc_id in doc_ids:
 
-        # ── Step 1: Retrieve the computed visa global status ──────────────────
-        # compute_visa_global_with_date is the single source of truth for visa.
-        # We only need the status string, not the date.
+        # ── Step 1: Visa global (O(1) dict lookup) ───────────────────────────
         visa, _ = engine.compute_visa_global_with_date(doc_id)
 
-        # ── Rule 1: Final REF → Contractor is responsible ────────────────────
-        # MOEX issued a full-workflow refusal; the contractor must resubmit.
-        if visa == "REF":
-            # No dedicated contractor field is exposed by WorkflowEngine,
-            # so we fall back to the generic sentinel "CONTRACTOR".
+        # Rule 1 + 2: REF/SAS REF → CONTRACTOR
+        if visa in ("REF", "SAS REF"):
             result[doc_id] = "CONTRACTOR"
             continue
 
-        # ── Rule 2: SAS REF → Contractor is responsible ──────────────────────
-        # The SAS first-pass was refused, meaning the submission itself was bad.
-        # Counted against the contractor, not against any consultant.
-        if visa == "SAS REF":
-            result[doc_id] = "CONTRACTOR"
-            continue
+        # ── Step 2: Scan pre-computed approver entries (no DataFrame creation)
+        entries = engine._doc_approvers.get(doc_id, [])
+        pending = []
 
-        # ── Step 2: Inspect per-approver statuses to find pending consultants ─
-        # get_all_approver_statuses returns a DataFrame with columns:
-        #   approver_canonical, date_answered, status_clean, date_status_type
-        approvers_df = engine.get_all_approver_statuses(doc_id)
+        for entry in entries:
+            approver    = entry["approver"]
+            status_type = entry.get("date_status_type", "NOT_CALLED")
+            if _is_moex(approver) or status_type == "NOT_CALLED":
+                continue
+            if status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
+                pending.append(approver)
 
-        pending = []  # will hold canonical names of consultants who are late/pending
-
-        if not approvers_df.empty:
-            for _, row in approvers_df.iterrows():
-                approver = row["approver_canonical"]
-                status_type = row["date_status_type"]
-
-                # Exclude MOEX/GEMO — they are handled separately in Rule 4.
-                if _is_moex(approver):
-                    continue
-
-                # Exclude approvers that have never been called yet (NOT_CALLED
-                # means the document hasn't reached this approver's stage).
-                if status_type == "NOT_CALLED":
-                    continue
-
-                # A consultant is "pending" if they are overdue or in delay.
-                if status_type in ("PENDING_IN_DELAY", "PENDING_LATE"):
-                    pending.append(approver)
-
-        # ── Rule 3: Pending consultants — check countdown ────────────────────
+        # ── Rule 3: Pending consultants ──────────────────────────────────────
         if pending:
-            # Check if all PRIMARY approvers have answered
-            primary_all_done = True
-            last_primary_date = None
-            for _, arow in approvers_df.iterrows():
-                a = arow["approver_canonical"]
-                if _is_moex(a):
-                    continue
-                if _is_primary(a):
-                    if arow["date_status_type"] != "ANSWERED":
-                        primary_all_done = False
-                        break
-                    else:
-                        d = arow.get("date_answered")
-                        if d is not None:
-                            if last_primary_date is None or d > last_primary_date:
-                                last_primary_date = d
-
-            if not primary_all_done:
-                # Some primary consultants are still pending — they are blocking
-                if len(pending) == 1:
-                    result[doc_id] = pending[0]
-                else:
-                    result[doc_id] = "MULTIPLE_CONSULTANTS"
-                continue
-
-            # All primaries answered, only secondary pending — check 10-day countdown
-            if last_primary_date is not None:
-                from datetime import timedelta
-                # For now, just mark as secondary pending (MOEX countdown tracked separately)
-                if len(pending) == 1:
-                    result[doc_id] = pending[0]
-                else:
-                    result[doc_id] = "MULTIPLE_CONSULTANTS"
-                continue
-
-            # Fallback
-            if len(pending) == 1:
-                result[doc_id] = pending[0]
-            else:
-                result[doc_id] = "MULTIPLE_CONSULTANTS"
+            result[doc_id] = pending[0] if len(pending) == 1 else "MULTIPLE_CONSULTANTS"
             continue
 
-        # ── Rule 4: No pending consultants and no visa → MOEX must act ───────
-        # All called consultants have answered but MOEX hasn't issued its
-        # visa chapeau yet — MOEX is the responsible party.
+        # ── Rule 4: No pending, no visa → MOEX must act ──────────────────────
         if visa is None:
             result[doc_id] = "MOEX"
             continue
 
-        # ── Rule 5: No pending, visa exists and it isn't a REF → Closed ──────
-        # REF was already handled in Rule 1, so any non-None visa here means
-        # the document is fully approved (VSO, VAO, etc.) — no one is responsible.
+        # ── Rule 5: Closed (visa exists, not REF) ────────────────────────────
         result[doc_id] = None
 
     return result

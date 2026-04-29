@@ -49,6 +49,7 @@ pytest-cache-files-*/
 backup/
 backups/
 backup_*/
+.claude/settings.local.json
 .claude/worktrees/
 .trash/
 
