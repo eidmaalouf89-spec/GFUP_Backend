@@ -122,6 +122,34 @@
     },
 
     /**
+     * Load fiche data for a specific contractor.
+     * Populates window.CONTRACTOR_FICHE_DATA.
+     * @param {string}  contractorCode
+     * @param {boolean} focusMode
+     * @param {number}  staleDays  stale-threshold in days (default 90)
+     */
+    loadContractorFiche: async function (contractorCode, focusMode, staleDays) {
+      if (!bridge.api) {
+        window.CONTRACTOR_FICHE_DATA = null;
+        return;
+      }
+      try {
+        var result = await bridge.api.get_contractor_fiche_for_ui(
+          String(contractorCode), !!focusMode, staleDays != null ? staleDays : 90
+        );
+        if (result && !result.error) {
+          window.CONTRACTOR_FICHE_DATA = result;
+        } else {
+          console.error("[data_bridge] Contractor fiche load error:", result && result.error);
+          window.CONTRACTOR_FICHE_DATA = null;
+        }
+      } catch (e) {
+        console.error("[data_bridge] Contractor fiche load exception:", e);
+        window.CONTRACTOR_FICHE_DATA = null;
+      }
+    },
+
+    /**
      * Search documents by query string.
      * @param {string}  query
      * @param {boolean} focusMode

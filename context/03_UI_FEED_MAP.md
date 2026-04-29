@@ -20,6 +20,7 @@ the responses onto `window`:
 | `window.CONSULTANTS` | `api.get_consultants_for_ui(focus, stale)` | `Api.get_consultants_for_ui` | `Api.get_consultant_list` → `reporting.aggregator.compute_consultant_summary` → `reporting.ui_adapter.adapt_consultants` |
 | `window.CONTRACTORS`, `window.CONTRACTORS_LIST` | `api.get_contractors_for_ui(focus, stale)` | `Api.get_contractors_for_ui` | `Api.get_contractor_list` → `reporting.aggregator.compute_contractor_summary` → `reporting.ui_adapter.adapt_contractors_lookup` + `adapt_contractors_list` |
 | `window.FICHE_DATA` | `api.get_fiche_for_ui(name, focus, stale)` (on consultant nav) | `Api.get_fiche_for_ui` | `Api.get_consultant_fiche` → `reporting.consultant_fiche.build_consultant_fiche` (or `build_sas_fiche` if name == "MOEX SAS") |
+| `window.CHAIN_INTEL` | `api.get_chain_onion_intel(20)` | `Api.get_chain_onion_intel` | reads `output/chain_onion/top_issues.json` (list, sliced to limit) + `output/chain_onion/dashboard_summary.json` (summary dict); applies `reporting.narrative_translation.translate_top_issue` per issue (FR overlay); returns `{top_issues, summary}` |
 
 If `window.pywebview.api` is unavailable within 5s, `data_bridge.js`
 populates **placeholder zero values** so the React app still renders. This
@@ -45,7 +46,7 @@ Renders the dashboard. Reads `window.OVERVIEW`. Specifically uses:
 - `best_contractor {code, name, pass_rate, delta}`
 - `visa_flow {submitted, answered, vso, vao, ref, hm, pending, on_time, late}`
 - `weekly: [...]` (sparkline values)
-- `focus {focused, p1_overdue, p2_urgent, p3_soon, p4_ok, total_dernier, excluded, stale, resolved, by_consultant}`
+- `focus {focused, p1_overdue, p2_urgent, p3_soon, p4_ok, total_dernier, excluded, stale, resolved, by_consultant, by_contractor}` (Phase 5: `by_contractor` added 2026-04-29 — list of `{code, name, p1, p2, p3, p4, total}` keyed on uppercase 3-letter emetteur code with canonical company name resolved via `reporting.contractor_fiche.resolve_emetteur_name`)
 - `legacy_backlog_count` (when focus on)
 - `priority_queue` (when focus on)
 
@@ -67,6 +68,17 @@ Reads `window.CONSULTANTS` and groups by `c.group ∈ {"MOEX","Primary","Seconda
 Click on a card triggers `navigateTo("ConsultantFiche", c)` in shell.jsx,
 which calls `jansaBridge.loadFiche(c.canonical_name || c.name, focusMode, staleDays)`,
 populating `window.FICHE_DATA`.
+
+**Phase 5 (2026-04-29) — Focus-aware cards.** `ConsultantsPage` accepts
+`focusMode` from `shell.jsx` and looks up
+`window.OVERVIEW.focus.by_consultant` keyed on `c.canonical_name`. Each
+card type (`MoexCard`, `PrimaryCard`, `SecondaryChip`) swaps its headline
+KPI from `c.total` to `c.focus_owned` ("À traiter") when `focusMode` is
+true, with the all-time `c.total` retained as a smaller secondary slot
+("Total docs"). A 4-segment `P1·P2·P3·P4` mini-bar (`FocusPriBar`,
+defined at the top of the file) renders under each card whose actor has
+a `by_consultant` entry, regardless of focus mode. Existing
+`FOCUS {n}` / `F{n}` chips are preserved.
 
 Data source: `reporting.aggregator.compute_consultant_summary` →
 `reporting.ui_adapter.adapt_consultants`.
@@ -139,10 +151,33 @@ Other reports section is a placeholder ("à venir").
 
 ### Stub pages (rendered by `shell.jsx`)
 
-- `Contractors` → `<StubPage title="Entreprises" note="Laissé intact …">`
-  (despite full backend support).
 - `Discrepancies` → `<StubPage title="Écarts" …>`.
 - `Settings` → `<StubPage title="Paramètres" …>`.
+
+### `ContractorsPage` (`ui/jansa/contractors.jsx`)
+
+Reads `window.CONTRACTORS_LIST` (enriched cards) and `window.CONTRACTORS`
+(full code→name lookup; chips for codes not in the enriched list).
+
+**Phase 5 (2026-04-29) — All eligible emetteurs surface as cards + focus-aware reorientation.**
+- `adapt_contractors_list` returns ALL contractors with ≥5 docs (29
+  today) — previously sliced to top-5 by approval rate, which buried
+  major emetteurs like BEN (374 docs) in the chip section. New sort:
+  `docs DESC` normally, `(focus_owned, docs) DESC` in focus mode. Card
+  ceiling is `[:50]` (defensive). Pass-rate sort is intentionally NOT
+  used.
+- Canonical company names (BEN→Bentin, LGD→Legendre, SNI→SNIE, …)
+  applied via `reporting.contractor_fiche.resolve_emetteur_name` in
+  both `adapt_contractors_list` and `adapt_contractors_lookup`. Cards
+  AND chips both show canonical names.
+- `ContractorsPage` accepts `focusMode` from `shell.jsx` and looks up
+  `window.OVERVIEW.focus.by_contractor` keyed on uppercase code. In
+  focus mode, `ContractorCard` renders three slots: focus_owned
+  headline ("À traiter") / total docs ("Total docs") / pass_rate as a
+  small soft-pill chip ("Conformité"). In non-focus mode the
+  pre-Phase 5 two-slot layout (Conformité large / Documents) is
+  preserved. `FocusPriBar` mini-bar appears when an entry exists.
+  `ContractorChip` (code-only fallback) is unchanged.
 
 ---
 
@@ -294,6 +329,26 @@ indices A, B, C → C). This is documented in
 **Phase 5 Mod 2 (done 2026-04-29):** `ChainOnionPanel` issue rows in `overview.jsx`
 are now clickable. Inventory confirmed no other active doc-reference sites remain
 unwired. `priority_queue` exists in OVERVIEW data but is not rendered (no site to wire).
+
+**Phase 2 (done 2026-04-29) — Direct fiche navigation + FR synthese:**
+
+- `OverviewPage` now accepts an `onOpenConsultant` prop, threaded down to
+  `KpiRow.BestPerformerCard` ("Consultant de la semaine") and
+  `FocusByConsultant` per-row buttons. Both call sites replaced
+  `onNavigate('Consultants')` with `onOpenConsultant(consultant)`. The shell
+  closure `(c) => navigateTo('ConsultantFiche', c)` is the same one used by
+  `<ConsultantsPage onOpen={...}/>` — single fiche-open path, multiple entry
+  points. `data.best_consultant` carries `name` (sufficient for
+  `loadFiche(canonical_name || name)`); each `c` in `focus.by_consultant`
+  carries `name` likewise. "Entreprise de la semaine" KPI card unchanged
+  (still routes to Contractors list — Phase 7 territory).
+- `get_chain_onion_intel` (`app.py` ~line 1070) now applies
+  `reporting.narrative_translation.translate_top_issue` per issue. Each
+  `top_issues[i]` carries three additive keys: `executive_summary_fr`,
+  `primary_driver_fr`, `recommended_focus_fr`. English fields are preserved.
+  `ChainOnionPanel` Synthèse cell renders `executive_summary_fr ||
+  executive_summary || ''` (fallback chain). `narrative_engine.py` was not
+  touched.
 
 ---
 

@@ -4,9 +4,37 @@
    No fiche drill-down yet — get_contractor_fiche is in the backend but
    the bridge method is not wired; this is a future step. */
 
-function ContractorsPage() {
+/* ── Phase 5: P1·P2·P3·P4 mini-bar (read-only viz of by_consultant/by_contractor entry).
+   Always rendered when an entry exists. Width-proportional segments. ── */
+function FocusPriBar({ entry, height = 4 }) {
+  if (!entry) return null;
+  const total = (entry.p1 || 0) + (entry.p2 || 0) + (entry.p3 || 0) + (entry.p4 || 0);
+  if (total <= 0) return null;
+  const segs = [
+    { v: entry.p1 || 0, c: '#FF453A' },
+    { v: entry.p2 || 0, c: '#FF9F0A' },
+    { v: entry.p3 || 0, c: '#FFD60A' },
+    { v: entry.p4 || 0, c: '#30D158' },
+  ];
+  return (
+    <div style={{
+      display: 'flex', width: '100%', height, borderRadius: 99,
+      overflow: 'hidden', background: 'var(--line)', marginTop: 8,
+    }}
+    title={`P1 ${segs[0].v} · P2 ${segs[1].v} · P3 ${segs[2].v} · P4 ${segs[3].v}`}>
+      {segs.map((s, i) => s.v > 0 && (
+        <div key={i} style={{ flexBasis: `${(s.v / total) * 100}%`, background: s.c }}/>
+      ))}
+    </div>
+  );
+}
+
+function ContractorsPage({ focusMode, onOpenContractor }) {
   const list   = window.CONTRACTORS_LIST || [];  // enriched top-N
   const lookup = window.CONTRACTORS     || {};  // full code→name
+
+  const focusByCode = ((window.OVERVIEW && window.OVERVIEW.focus && window.OVERVIEW.focus.by_contractor) || [])
+    .reduce((m, c) => { m[(c.code || '').toUpperCase()] = c; return m; }, {});
 
   // Build a set of codes already in the enriched list
   const inList = new Set(list.map(c => c.code));
@@ -55,7 +83,7 @@ function ContractorsPage() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
             gap: 14,
           }}>
-            {list.map(c => <ContractorCard key={c.code} c={c} />)}
+            {list.map(c => <ContractorCard key={c.code} c={c} focusMode={focusMode} focusEntry={focusByCode[(c.code || '').toUpperCase()]} onOpen={onOpenContractor}/>)}
           </div>
         </CtSection>
       )}
@@ -116,7 +144,7 @@ function CtSection({ num, title, sub, children }) {
 }
 
 /* ── Enriched contractor card (has pass_rate + docs from CONTRACTORS_LIST) ── */
-function ContractorCard({ c }) {
+function ContractorCard({ c, focusMode, focusEntry, onOpen }) {
   const F = window.JANSA_FONTS;
   const rate = c.pass_rate != null ? c.pass_rate : null;
   const tone = rate == null ? 'var(--text-3)'
@@ -133,9 +161,10 @@ function ContractorCard({ c }) {
       border: '1px solid var(--line)', borderRadius: 16,
       padding: 20, display: 'flex', flexDirection: 'column', gap: 12,
       position: 'relative', overflow: 'hidden',
-      cursor: 'default',
+      cursor: onOpen ? 'pointer' : 'default',
       transition: 'border-color 0.2s, transform 0.2s',
     }}
+    onClick={() => onOpen && onOpen(c)}
     onMouseEnter={e => {
       e.currentTarget.style.borderColor = 'var(--line-2)';
       e.currentTarget.style.transform = 'translateY(-2px)';
@@ -167,39 +196,97 @@ function ContractorCard({ c }) {
       </div>
 
       {/* KPIs */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        paddingTop: 10, borderTop: '1px solid var(--line)',
-      }}>
-        <div>
-          <div style={{
-            fontFamily: F.ui, fontSize: 22, fontWeight: 300,
-            letterSpacing: '-.02em', color: tone,
-          }}>
-            {rate != null ? rate : '—'}
-            {rate != null && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>%</span>}
+      {focusMode ? (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          paddingTop: 10, borderTop: '1px solid var(--line)',
+        }}>
+          {/* Left — focus_owned (headline) */}
+          <div>
+            <div style={{
+              fontFamily: F.ui, fontSize: 22, fontWeight: 300,
+              letterSpacing: '-.02em', color: 'var(--accent)',
+            }}>
+              {c.focus_owned != null ? c.focus_owned : 0}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+              À traiter
+            </div>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-            Conformité
+          {/* Middle — total docs (secondary) */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: F.num, fontSize: 16, fontWeight: 500, color: 'var(--text)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {c.docs != null ? c.docs.toLocaleString('fr-FR') : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+              Total docs
+            </div>
+          </div>
+          {/* Right — pass_rate (small chip, demoted) */}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              display: 'inline-block',
+              padding: '3px 8px', borderRadius: 99, fontSize: 13,
+              fontFamily: F.num, fontVariantNumeric: 'tabular-nums',
+              color: tone,
+              background: rate != null && rate >= 90
+                ? 'rgba(48,209,88,0.08)'
+                : rate != null && rate >= 80
+                ? 'rgba(10,132,255,0.08)'
+                : 'rgba(255,159,10,0.08)',
+            }}>
+              {rate != null ? `${rate}%` : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginTop: 2 }}>
+              Conformité
+            </div>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{
-            fontFamily: F.ui, fontSize: 18, fontWeight: 500, color: 'var(--text)',
-            fontVariantNumeric: 'tabular-nums', fontFamily: F.num,
-          }}>
-            {c.docs != null ? c.docs.toLocaleString('fr-FR') : '—'}
+      ) : (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          paddingTop: 10, borderTop: '1px solid var(--line)',
+        }}>
+          <div>
+            <div style={{
+              fontFamily: F.ui, fontSize: 22, fontWeight: 300,
+              letterSpacing: '-.02em', color: tone,
+            }}>
+              {rate != null ? rate : '—'}
+              {rate != null && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>%</span>}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+              Conformité
+            </div>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-            Documents
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              fontFamily: F.num, fontSize: 18, fontWeight: 500, color: 'var(--text)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {c.docs != null ? c.docs.toLocaleString('fr-FR') : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+              Documents
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* P1·P2·P3·P4 mini-bar — always shown when entry exists */}
+      <FocusPriBar entry={focusEntry}/>
     </div>
   );
 }
 
 /* ── Plain chip for contractors without KPI data ── */
+// ContractorChip: low-doc fallback (contractors with <5 docs). Stays
+// non-clickable in V1 — the contractor fiche needs enough chain history
+// to be useful, and these chips represent contractors below that threshold.
+// V2 may revisit if backend builds a "minimal fiche" path.
 function ContractorChip({ c }) {
   const F = window.JANSA_FONTS;
   const codeLabel = (c.code || c.name || '?').slice(0, 4).toUpperCase();

@@ -488,6 +488,7 @@ function App() {
   const [cinemaKey, setCinemaKey] = useState(0);
   const [cinemaOn, setCinemaOn] = useState(false);
   const [selectedConsultant, setSelectedConsultant] = useState(null);
+  const [selectedContractor, setSelectedContractor] = useState(null);
   const [panelState, setPanelState] = useState(null);
 
   // ── Stale threshold (Step 11 — stale threshold control parity) ──
@@ -605,6 +606,14 @@ function App() {
         await window.jansaBridge.loadFiche(apiName, focusMode, staleDaysRef.current);
         setDataVersion(v => v + 1);
       }
+    } else if (id === 'ContractorFiche') {
+      const contractor = payload;
+      setSelectedContractor(contractor);
+      const code = (contractor && contractor.code) || '';
+      if (code && window.jansaBridge.api) {
+        await window.jansaBridge.loadContractorFiche(code, focusMode, staleDaysRef.current);
+        setDataVersion(v => v + 1);
+      }
     }
     setActive(id);
   };
@@ -673,10 +682,11 @@ function App() {
               </div>
             </div>
           )}
-          {active === 'Overview'       && <OverviewPage focusMode={focusMode} onNavigate={navigateTo}/>}
-          {active === 'Consultants'    && <ConsultantsPage onOpen={(c) => navigateTo('ConsultantFiche', c)}/>}
+          {active === 'Overview'       && <OverviewPage focusMode={focusMode} onNavigate={navigateTo} onOpenConsultant={(c) => navigateTo('ConsultantFiche', c)} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
+          {active === 'Consultants'    && <ConsultantsPage onOpen={(c) => navigateTo('ConsultantFiche', c)} focusMode={focusMode}/>}
           {active === 'ConsultantFiche'&& <ConsultantFichePage consultant={selectedConsultant} onBack={() => navigateTo('Consultants')} focusMode={focusMode}/>}
-          {active === 'Contractors'    && <ContractorsPage/>}
+          {active === 'Contractors'    && <ContractorsPage focusMode={focusMode} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
+          {active === 'ContractorFiche'&& <ContractorFichePage contractor={selectedContractor} onBack={() => navigateTo('Contractors')} focusMode={focusMode}/>}
           {active === 'Executer'       && <ExecuterPage onRunComplete={async () => {
             if (window.jansaBridge && window.jansaBridge.api) {
               try { await window.jansaBridge.refreshForFocus(focusMode, staleDaysRef.current); } catch (e) {}

@@ -5,22 +5,97 @@
 
 ---
 
+## ⚠ ACTIVE — Phase 0 Backend Audit (opened 2026-04-29)
+
+Phase 7 (contractor quality fiche) reached visual smoke and surfaced data
+integrity issues across pipeline stages. Phase 7 is paused; Phase 0 is the
+gate. Plan: `docs/implementation/PHASE_0_BACKEND_DEBUGGING.md`. README
+section: "Phase 0 — Backend Data Audit (current, blocking)".
+
+### Phase 0 status (Step 0.6 closed 2026-04-29)
+
+| Step | Status | Deliverable |
+|---|---|---|
+| 0.1 Pipeline-stage inventory | ✅ done | `docs/audit/PIPELINE_INVENTORY.md` |
+| 0.2 Canary contractor BEN | ✅ done | `docs/audit/CANARY_BEN.md` |
+| 0.3 Verification scripts | ✅ done | `scripts/audit/_common.py` + 8 audit scripts |
+| 0.4 Run audits | ✅ done | `docs/audit/DIVERGENCE_REPORT.md` (1,901 lines) |
+| 0.5 Triage | ✅ done | `docs/audit/TRIAGE.md` (10 rows, 3 fix-now) |
+| 0.6 Apply fix-now patches | ✅ done | D-001, D-004, D-005 landed and verified |
+| 0.7 Update context docs | (in progress — this file) | |
+| 0.8 Sign-off | pending | `docs/audit/SIGN_OFF.md` |
+
+### Closed by Phase 0 (fix-now landed)
+
+- **D-001 — `CACHE_SCHEMA_VERSION`** added to `data_loader.py`. Cache freshness now rejects schema-mismatched pickles. Production-confirmed pandas StringDtype unpickle drift (canary §13). See `context/11_TOOLING_HAZARDS.md` H-2.
+- **D-004 — AMP 199% bug fixed.** `contractor_quality.py:486-498` now computes `share_contractor_in_long_chains` over closed-cycle attribution only. AMP 1.9945 → 0.9115. Zero contractors over 1.0 across all 29. `avg_contractor_delay_days` unchanged (dormant extension preserved). See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.2.
+- **D-005 — `CHAIN_TIMELINE_ATTRIBUTION.json` truncation fixed.** `write_chain_timeline_artifact` now uses atomic write (tmp + `os.replace`). Artifact regenerated: 2,819 chains parse cleanly (was 2,687 via tolerant parse). 6 contractors no longer missing chains.
+
+### Open (handed forward — out of Phase 0 scope)
+
+| ID | Issue | Suspected location | Classification |
+|---|---|---|---|
+| **D-003** | SNI SAS REF count: raw GED ~184 vs flat_ged 52. Operator's count from raw was never directly audited (we read `FLAT_GED.xlsx::GED_OPERATIONS`, not the raw GED workbook). | raw → flat_ged extraction in `src/flat_ged/transformer.py` | **upstream rework** — open a separate ticket. Document the raw vs flat scope difference. |
+| **D-006** | AAI shows B1=7 (`GED_OPERATIONS` SAS+REF) vs C3=6 (`ctx.responses_df` SAS-track REF). 1 SAS REF row lost between layers. | `stage_read_flat._apply_sas_filter_flat` (`stage_read_flat.py:202-274`) OR doc_id null filter (`stage_read_flat.py:548`) | **needs investigation** — single-row scope; low priority. |
+| **D-010** | `_precompute_focus_columns` calls `we.compute_visa_global_with_date(doc_id)` directly but `flat_ged_doc_meta` is the documented authoritative source in flat mode (engine returns `(None, None)` for SAS REF docs). | `data_loader.py:550` vs `stage_read_flat.py:80-105` | **needs investigation** — write a spot-check comparing the two sources across all dernier docs. |
+
+### Still documented as known limitation (no code change)
+
+- **D-002 — H-3 dual-attribute hazard** (`ctx.responses_df` vs `ctx.workflow_engine.responses_df`). Already documented; Phase 0 added the empirical sanity-check identity (Δ = dernier count). See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.0.
+- **D-007 — two `total` fields under one fiche payload.** See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.1.
+- **D-008 — two `sas_refusal_rate` formulas under the same name.** See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.1.
+- **D-009 — share_long collateral.** SCH and LGD share values dropped post-fix (0.8843→0.3263, 0.7407→0.3311). Operationally correct: dormant time is captured by `avg_contractor_delay_days`, not the share metric. See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.2.
+
+### Resumption path
+
+Phase 7 closes (Step 11b) only after Phase 0 `SIGN_OFF.md` is signed.
+Phase 7 Steps 1–10 + 4b + 12a + 12a-fix2 + 12b are landed and untouched
+during Phase 0.
+
+**Operational note for the next pipeline run.** The FLAT_GED pickle cache files on disk predate the D-001 patch and lack the `cache_schema_version` key. The next `load_run_context` call will reject them and rebuild from `FLAT_GED.xlsx` (~30 s one-time cost), then write a new cache with `cache_schema_version: "v1"`. This is expected behavior, not a regression.
+
+---
+
 ## High-value, low-risk items (highest ROI for next fixes)
 
-### 1. UI Contractors page is a stub but backend is fully wired
+### 1. UI Contractors page — ✅ RESOLVED (Phase 5, 2026-04-29)
 
-`ui/jansa/shell.jsx:653` renders `<StubPage title="Entreprises">`. The
-backend already provides:
+The Contractors page is live and Focus-aware. Phase 5 fixed the
+"empty entreprise cards" bug (29 enriched cards now visible, was 5),
+applied canonical names everywhere (BEN→Bentin, LGD→Legendre, …), and
+added focus-aware KPI reorientation + a `P1·P2·P3·P4` mini-bar fed by
+the new `OVERVIEW.focus.by_contractor` payload. See
+`docs/implementation/PHASE_5_TAB_FOCUS_AWARENESS_AND_ENTREPRISE_FIX.md`.
 
-- `app.Api.get_contractor_list(focus, stale_days)`
-- `app.Api.get_contractor_fiche(contractor_code, focus, stale_days)`
-- `app.Api.get_contractors_for_ui(focus, stale_days)` shaped through
-  `reporting.ui_adapter.adapt_contractors_list / adapt_contractors_lookup`
-- `data_bridge.js` already populates `window.CONTRACTORS_LIST` and
-  `window.CONTRACTORS`.
+**Still open:** `app.Api.get_contractor_fiche(contractor_code, …)` is
+fully implemented in the backend but the UI does not yet render an
+individual contractor fiche page on click — Phase 7 territory.
 
-A `<ContractorsPage>` component and a `<ContractorFichePage>` would unlock
-this without any backend work.
+**Phase 5 residual — to re-analyse after Phase 6 closes:** the
+"Maître d'Oeuvre EXE — GEMO" card in the Consultants tab still appears
+to display all-time data when Focus mode is on, despite the Phase 5
+headline-swap rule. Two plausible causes (need to confirm during
+re-analysis, do not pre-fix):
+- `c.focus_owned` for the MOEX consultant ≈ `c.total` because MOEX
+  owns most actionable items at any given time, so the swap fires but
+  is visually indistinguishable. If true, this is faithful to the data
+  and not a bug — but the card may need a second visual cue (e.g.
+  emphasize the À traiter label / colorize) to communicate the focus
+  state.
+- The swap is not firing at all on `MoexCard` specifically (e.g.
+  `focusMode` not threading correctly to it, or the conditional
+  rendering is shadowed by another StatBlock that dominates the card's
+  visual weight). Inspect `ui/jansa/consultants.jsx:MoexCard` (KPI row
+  ~lines 233–242) and the props passed by `ConsultantsPage`'s
+  `moex.map` call.
+
+Cross-check the data: in the focus-on payload, compare
+`window.CONSULTANTS[i].focus_owned` and `.total` for canonical_name =
+"Maître d'Oeuvre EXE". If they're equal, root cause is data, not UI.
+
+Reason for deferral: Phase 6 (Intelligence layer) may add new
+MOEX-specific KPI surfaces (`PHASE_6A`–`6D`) that change what the MOEX
+card should display. Re-analysing after 6 avoids fixing twice.
 
 ### 2. Mapping file picker on Executer is dead
 
@@ -38,12 +113,23 @@ The pipeline writes `DISCREPANCY_REPORT.xlsx`,
 "Discrepancies — review queue" page over `DISCREPANCY_REVIEW_REQUIRED.xlsx`
 is purely additive.
 
-### 4. Chain + Onion narratives + top issues not in UI
+### 4. Chain + Onion narratives + top issues — partially wired (2026-04-29)
 
-`output/chain_onion/top_issues.json`, `CHAIN_NARRATIVES.csv`, and
-`dashboard_summary.json` are produced by `run_chain_onion.py` but no UI
-screen renders them. Backend has `chain_onion.query_hooks.get_top_issues`,
-`get_dashboard_summary`, etc. ready.
+`output/chain_onion/top_issues.json` and `dashboard_summary.json` are now
+rendered in the dashboard's `ChainOnionPanel` (`ui/jansa/overview.jsx`)
+via `app.Api.get_chain_onion_intel(20)` → `window.CHAIN_INTEL`. Synthèse
+column is rendered in French (Phase 2, see
+`docs/implementation/PHASE_2_DIRECT_NAV_AND_FRENCH.md` and
+`context/06_EXCEPTIONS_AND_MAPPINGS.md` § K). Issue rows are clickable —
+they open the Document Command Center (Phase 5 Mod 2).
+
+**Still not surfaced:**
+- `CHAIN_NARRATIVES.csv` per-chain detail (only the top 20 from
+  `top_issues.json` are exposed).
+- `primary_driver_fr` and `recommended_focus_fr` are present in the
+  payload but not rendered — Phase 4 enrichment territory.
+- `dashboard_summary` fields beyond what `ChainOnionPanel` already shows
+  (live/escalated/avg_pressure pills + top theme).
 
 ---
 
@@ -218,8 +304,8 @@ the Flat GED transformer source if onion scoring needs correction.
 
 | Asset | Purpose if connected |
 |---|---|
-| `output/chain_onion/CHAIN_NARRATIVES.csv` | Per-chain plain-language summary; could populate a "Top issues" UI panel. |
-| `output/chain_onion/top_issues.json` | Already a 20-row priority list; could replace or augment current `priority_queue` in OVERVIEW. |
+| `output/chain_onion/CHAIN_NARRATIVES.csv` | Per-chain plain-language summary; could populate a "Top issues" UI panel. (Top 20 already surfaced via `top_issues.json` — this would expose the rest.) |
+| `output/chain_onion/top_issues.json` | ✅ Wired 2026-04-29 — top 20 rendered in dashboard `ChainOnionPanel` via `Api.get_chain_onion_intel`, FR overlay applied (Phase 2). |
 | `output/chain_onion/CHAIN_ONION_SUMMARY.xlsx` | Management workbook; useful for steering meetings. |
 | `output/chain_onion/dashboard_summary.json` | Portfolio KPIs; complements `aggregator.compute_project_kpis`. |
 | `MISSING_IN_GED_TRUE_ONLY.xlsx` / `MISSING_IN_GF_TRUE_ONLY.xlsx` | Curated review queues. |
@@ -238,9 +324,10 @@ opens them via `open_file_in_explorer(path)` (the API already exists).
 
 1. **Wire the Contractors page** (#1). Pure frontend; backend has all the
    data. Big visible win.
-2. **Wire chain+onion priority into the UI** (#4). The data exists. A
-   "Priority Queue" panel that exposes `top_issues.json` would convert
-   the analytical layer into operational signal.
+2. ~~**Wire chain+onion priority into the UI** (#4).~~ ✅ Done 2026-04-29
+   (Phase 2). `ChainOnionPanel` in `overview.jsx` renders the top 20 from
+   `top_issues.json` with FR synthese. Remaining: per-chain narrative detail
+   from `CHAIN_NARRATIVES.csv` is still un-surfaced.
 3. **Decide the FLAT_GED_MODE default** (#6). This is a one-line change
    that reduces a foot-gun every time a developer calls the pipeline
    directly.

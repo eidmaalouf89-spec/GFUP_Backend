@@ -12,9 +12,9 @@ const ovFmt = (n) => (n ?? 0).toLocaleString('fr-FR').replace(/,/g, '\u202f');
 const ovSigned = (n) => n > 0 ? `+${n}` : `${n}`;
 
 /* ── Shared card ── */
-function OvCard({ children, style, padding = 22, dense }) {
+function OvCard({ children, style, padding = 22, dense, onClick }) {
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background: 'var(--bg-elev)',
       border: '1px solid var(--line)',
       borderRadius: 18,
@@ -107,7 +107,7 @@ function OvSpark({ values, color = 'var(--accent)', height = 34 }) {
 }
 
 /* ── KPI Row (4 cards) — Total Docs · Pending · Best Consultant · Best Contractor ── */
-function KpiRow({ data, onNavigate }) {
+function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor }) {
   const trend = (data.weekly || []).map(w => w.closed);
   const pendTrend = (data.weekly || []).map(w => w.opened - w.closed).map((_, i, a) => {
     // running pending estimate
@@ -148,7 +148,7 @@ function KpiRow({ data, onNavigate }) {
         delta={data.best_consultant.delta}
         medal="A"
         accent="#30D158"
-        onClick={() => onNavigate('Consultants')}
+        onClick={() => onOpenConsultant && onOpenConsultant(data.best_consultant)}
       />
       <BestPerformerCard
         eyebrow="Entreprise de la semaine"
@@ -157,7 +157,7 @@ function KpiRow({ data, onNavigate }) {
         delta={data.best_contractor.delta}
         medal="B"
         accent="#FFD60A"
-        onClick={() => onNavigate('Contractors')}
+        onClick={() => onOpenContractor && onOpenContractor(data.best_contractor)}
       />
     </div>
   );
@@ -443,7 +443,7 @@ function WeeklyActivity({ data, focusMode }) {
 }
 
 /* ── FOCUS MODE visuals — replaces the old priority cue list ── */
-function FocusPanel({ data, onNavigate }) {
+function FocusPanel({ data, onNavigate, onOpenConsultant }) {
   const f = data.focus || { focused: 0, p1_overdue: 0, p2_urgent: 0, p3_soon: 0, p4_ok: 0, by_consultant: [] };
 
   return (
@@ -466,7 +466,7 @@ function FocusPanel({ data, onNavigate }) {
         <div style={{ fontSize: 16, fontWeight: 600, color:'var(--text)', marginTop: 4, marginBottom: 14 }}>
           Qui doit faire quoi
         </div>
-        <FocusByConsultant items={f.by_consultant} onNavigate={onNavigate}/>
+        <FocusByConsultant items={f.by_consultant} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant}/>
       </OvCard>
     </div>
   );
@@ -534,7 +534,7 @@ function FocusRadial({ f }) {
 }
 
 /* Stacked horizontal bar per consultant */
-function FocusByConsultant({ items, onNavigate }) {
+function FocusByConsultant({ items, onNavigate, onOpenConsultant }) {
   if (!items || !items.length) return <div style={{ fontSize: 12, color:'var(--text-3)', padding: 12 }}>Aucune donn\u00e9e par consultant.</div>;
   const max = Math.max(...items.map(c => c.p1 + c.p2 + c.p3 + c.p4));
   return (
@@ -544,7 +544,7 @@ function FocusByConsultant({ items, onNavigate }) {
         const pct = (total / max) * 100;
         return (
           <button key={c.slug}
-            onClick={() => onNavigate('Consultants')}
+            onClick={() => onOpenConsultant && onOpenConsultant(c)}
             style={{
               display:'grid', gridTemplateColumns:'150px 1fr 36px', alignItems:'center', gap: 10,
               padding: '6px 8px', borderRadius: 8, border:'1px solid transparent',
@@ -718,7 +718,7 @@ function QuickActions({ onNavigate }) {
 }
 
 /* ── Page ── */
-function OverviewPage({ focusMode, onNavigate }) {
+function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContractor }) {
   const data = window.OVERVIEW;
   return (
     <div style={{ padding: 32, animation: 'fadeInUp 0.4s cubic-bezier(.4,0,.2,1)' }}>
@@ -739,10 +739,10 @@ function OverviewPage({ focusMode, onNavigate }) {
       </div>
 
       {/* KPI row */}
-      <KpiRow data={data} onNavigate={onNavigate}/>
+      <KpiRow data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onOpenContractor={onOpenContractor}/>
 
       {/* Focus panel (replaces cue list) */}
-      {focusMode && <FocusPanel data={data} onNavigate={onNavigate}/>}
+      {focusMode && <FocusPanel data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant}/>}
 
       {focusMode && window.OVERVIEW && window.OVERVIEW.legacy_backlog_count > 0 && (
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
@@ -756,12 +756,6 @@ function OverviewPage({ focusMode, onNavigate }) {
         <WeeklyActivity data={data} focusMode={focusMode}/>
       </div>
 
-      {/* Project Stats + System Status (side by side) */}
-      <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:20 }}>
-        <ProjectStatsCard stats={data.project_stats}/>
-        <SystemStatusCard status={data.system_status}/>
-      </div>
-
       {/* Chain+Onion intelligence panel */}
       <ChainOnionPanel/>
 
@@ -770,6 +764,12 @@ function OverviewPage({ focusMode, onNavigate }) {
 
       {/* Quick Actions */}
       <QuickActions onNavigate={onNavigate}/>
+
+      {/* Project Stats + System Status (side by side) */}
+      <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:20 }}>
+        <ProjectStatsCard stats={data.project_stats}/>
+        <SystemStatusCard status={data.system_status}/>
+      </div>
     </div>
   );
 }
@@ -817,6 +817,7 @@ function CoSummaryPill({ label, value, color }) {
 }
 
 function ChainOnionPanel() {
+  const [expanded, setExpanded] = useStateOv(false);
   const intel = window.CHAIN_INTEL;
   if (!intel) return null;
 
@@ -824,8 +825,9 @@ function ChainOnionPanel() {
   const allIssues = intel.top_issues || [];
   if (!allIssues.length && !summary.total_chains) return null;
 
-  const visible = allIssues.slice(0, 15);
-  const overflow = allIssues.length - visible.length;
+  const COLLAPSED_LIMIT = 25;
+  const visible = expanded ? allIssues : allIssues.slice(0, COLLAPSED_LIMIT);
+  const overflow = allIssues.length - COLLAPSED_LIMIT;
 
   return (
     <OvCard style={{ marginBottom: 20 }}>
@@ -935,7 +937,7 @@ function ChainOnionPanel() {
               </div>
               {/* Summary */}
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {issue.executive_summary}
+                {issue.executive_summary_fr || issue.executive_summary || ''}
               </div>
             </div>
           );
@@ -943,8 +945,23 @@ function ChainOnionPanel() {
       </div>
 
       {overflow > 0 && (
-        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-3)', textAlign: 'center', padding: '6px 0' }}>
-          +{overflow} autre{overflow > 1 ? 's' : ''} chaîne{overflow > 1 ? 's' : ''} prioritaire{overflow > 1 ? 's' : ''}
+        <div style={{ textAlign: 'center', marginTop: 10 }}>
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{
+              background: 'transparent', border: '1px solid var(--line)',
+              borderRadius: 8, padding: '8px 14px',
+              fontSize: 11, color: 'var(--text-3)',
+              fontFamily: 'inherit', cursor: 'pointer',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elev-2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {expanded
+              ? 'Réduire ↑'
+              : `Voir les ${overflow} autre${overflow > 1 ? 's' : ''} chaîne${overflow > 1 ? 's' : ''} prioritaire${overflow > 1 ? 's' : ''} →`
+            }
+          </button>
         </div>
       )}
     </OvCard>

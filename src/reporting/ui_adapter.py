@@ -181,6 +181,7 @@ def adapt_overview(dashboard_data: dict, app_state: dict) -> dict:
         "focused": 0, "p1_overdue": 0, "p2_urgent": 0, "p3_soon": 0, "p4_ok": 0,
         "total_dernier": total_docs, "excluded": 0, "stale": 0, "resolved": 0,
         "by_consultant": [],
+        "by_contractor": [],
     }
     if focus and isinstance(focus, dict) and focus.get("focus_enabled"):
         focus_stats = {
@@ -194,6 +195,7 @@ def adapt_overview(dashboard_data: dict, app_state: dict) -> dict:
             "stale":        focus.get("stale_excluded", 0),
             "resolved":     focus.get("resolved_excluded", 0),
             "by_consultant": focus.get("by_consultant", []),
+            "by_contractor": focus.get("by_contractor", []),
         }
     else:
         focus_stats = _empty_focus
@@ -282,31 +284,40 @@ def adapt_consultants(consultant_list: list) -> list:
     return result
 
 
-def adapt_contractors_list(contractor_list: list) -> list:
+def adapt_contractors_list(contractor_list: list, focus: bool = False) -> list:
     """
     Transform compute_contractor_summary() output → window.CONTRACTORS_LIST shape.
-    Top 5 contractors by approval rate.
+    Returns ALL eligible contractors (≥5 docs) with canonical names.
+    Sort: by docs DESC normally; by (focus_owned, docs) DESC in focus mode.
+    Pass-rate sort intentionally NOT used — it buries large emetteurs.
     """
+    from .contractor_fiche import resolve_emetteur_name
     scored = []
     for ct in contractor_list:
         total = ct.get("total_submitted", 0)
         if total < 5:
             continue
         rate = _safe_pct(ct.get("visa_vso", 0) + ct.get("visa_vao", 0), total)
+        code = ct.get("code", ct["name"])
         scored.append({
-            "code": ct.get("code", ct["name"]),
-            "name": ct["name"],
-            "docs": total,
-            "pass_rate": rate,
-            "delta": None,  # Not yet connected
+            "code":         code,
+            "name":         resolve_emetteur_name(code) or ct["name"],
+            "docs":         total,
+            "pass_rate":    rate,
+            "delta":        None,
+            "focus_owned":  ct.get("focus_owned", 0),
         })
-
-    scored.sort(key=lambda x: x["pass_rate"], reverse=True)
-    return scored[:5]
+    if focus:
+        scored.sort(key=lambda x: (x["focus_owned"], x["docs"]), reverse=True)
+    else:
+        scored.sort(key=lambda x: x["docs"], reverse=True)
+    return scored[:50]
 
 
 def adapt_contractors_lookup(contractor_list: list) -> dict:
-    """
-    Build window.CONTRACTORS code→name lookup from contractor summary.
-    """
-    return {ct.get("code", ct["name"]): ct["name"] for ct in contractor_list}
+    """Build window.CONTRACTORS code→canonical name lookup."""
+    from .contractor_fiche import resolve_emetteur_name
+    return {
+        ct.get("code", ct["name"]): (resolve_emetteur_name(ct.get("code", ct["name"])) or ct["name"])
+        for ct in contractor_list
+    }

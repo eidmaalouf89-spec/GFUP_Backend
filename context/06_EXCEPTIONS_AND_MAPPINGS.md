@@ -113,6 +113,40 @@ short forms sometimes):
 
 ## B. Status mappings
 
+### B.0 — Responses DataFrame: dual-attribute hazard (`ctx.responses_df` vs `ctx.workflow_engine.responses_df`)
+
+`WorkflowEngine.__init__` (`src/workflow_engine.py:54-57`) filters its local copy by `~is_exception_approver`. This drops ALL SAS rows (`approver_raw == "0-SAS"`) and any other exception-approver row from the workflow-engine view. `ctx.responses_df` is NOT filtered — it carries the full set.
+
+Operational consequence: code that needs SAS-track signal (SAS REF detection, full-track-vs-SAS-track tracing) MUST use `ctx.responses_df`. Code that needs the workflow-engine `_lookup` (visa_global computation, deadline tracking) uses `ctx.workflow_engine.responses_df` and the filter is semantically correct there. The dual-attribute pattern is fragile; the choice is always deliberate. See `context/11_TOOLING_HAZARDS.md` H-3 for the full discovery story (Phase 7 12a-fix2, 2026-04-29).
+
+**Phase 0 audit empirical confirmation (2026-04-29).** On the current Run 0 dataset, `len(ctx.responses_df) - len(ctx.workflow_engine.responses_df) = 4,834 = len(ctx.dernier_df)`. Each active doc carries exactly one SAS row in `ctx.responses_df`; the WorkflowEngine constructor strips them all into a separate view. Any future regression in this invariant (delta ≠ dernier count) signals that either the SAS-row injection in `stage_read_flat._build_responses_df` or the WorkflowEngine filter has changed. Reference: `docs/audit/CANARY_BEN.md` §13 / D-105.
+
+### B.1 — Contractor fiche payload: two `total` and two `sas_refusal_rate` fields
+
+`get_contractor_fiche_for_ui` (`app.py:1070-1106`) ships a single payload with TWO independently-computed views of the same contractor. Consumers must know which view they are reading.
+
+**Two `total` figures:**
+- `payload["total_submitted"]` and `payload["total_current"]` come from `contractor_fiche.build_contractor_fiche` (`src/reporting/contractor_fiche.py:100-101`). They count ALL `ctx.docs_df` / `ctx.dernier_df` rows for the emetteur with NO legacy filter. For BEN this is 583 (includes pre-2026 BENTIN_OLD).
+- `payload["quality"]["open_finished"]["total"]` comes from `contractor_quality.build_contractor_quality` (`src/reporting/contractor_quality.py:438-446`). It applies `_apply_legacy_filter` first. For BEN this is 98 (post-2026 only).
+
+The two are intentionally different scopes. UI consumers must not assume `total_submitted == quality.open_finished.total`. Audit reference: `docs/audit/TRIAGE.md` D-007.
+
+**Two `sas_refusal_rate` formulas under the same name:**
+- `payload["block4_quality"]["sas_refusal_rate"]` (`contractor_fiche.py:335`) = `(REF + SAS REF on dernier) / total_current`. Terminal-visa rate over ALL 583 dernier rows (engine returns visa for pre-2026 docs). For BEN: 0.072.
+- `payload["quality"]["kpis"]["sas_refusal_rate"]["value"]` (`contractor_quality.py:167-196`) = SAS-track REF / SAS-track answered, over `ctx.responses_df` filtered to legacy-filtered doc_ids. For BEN: 0.0816.
+
+Both are legitimate metrics. Renaming one (e.g. `dernier_refusal_rate` for the block4 form) is Phase 7 territory. Audit reference: `docs/audit/TRIAGE.md` D-008.
+
+### B.2 — `share_contractor_in_long_chains`: closed-cycle scope
+
+After the Phase 0 D-004 fix (2026-04-29), `contractor_quality.py:486-498` computes `share_contractor_in_long_chains` from CLOSED-CYCLE attribution only — `dormant_days_by_numero` is NOT passed into `_contractor_delay_for_chain` for this metric. The `avg_contractor_delay_days` KPI (`contractor_quality.py:472-476`) DOES pass dormant time and is unchanged.
+
+Pre-fix, AMP showed `share = 1.9945` (199%, mathematically impossible) because the numerator included dormant time but the denominator (`chain.totals.delay_days`) did not. Two contractors had non-trivial collateral inflation that disappeared post-fix:
+- SCH: `share` 0.8843 → 0.3263.
+- LGD: `share` 0.7407 → 0.3311.
+
+These reductions are correct behavior. The dormant-time view of contractor delay is captured by `avg_contractor_delay_days`, NOT by the share metric. Audit reference: `docs/audit/TRIAGE.md` D-004 / D-009.
+
 ### B.1 — Status vocabulary (`src/flat_ged/input/source_main/status_mapping.py`)
 
 ```
@@ -160,6 +194,14 @@ mode.
 ---
 
 ## C. Contractor (emetteur) mappings
+
+> **Single source of truth for code → name resolution at runtime:**
+> `src/reporting/contractor_fiche.resolve_emetteur_name(code)` (added Phase 5,
+> 2026-04-29). It reads `CONTRACTOR_REFERENCE` below and returns the canonical
+> company name, falling back to the code itself if unmapped. Used by
+> `ui_adapter.adapt_contractors_list`, `adapt_contractors_lookup`, and
+> `focus_filter.apply_focus_filter` (`by_contractor` aggregation). Do NOT
+> duplicate the lookup elsewhere — import the helper.
 
 ### C.1 — Code → display name (`src/reporting/consultant_fiche.py:CONTRACTOR_REFERENCE`)
 
@@ -422,6 +464,38 @@ The JSX label span (`document_panel.jsx`) renders:
 **Do not convert to plain strings in the backend.** The dict shape allows
 future JSX styling of status vs. indice independently. Formatting logic
 stays in `_build_comments_section` (rule: no business logic in JSX).
+
+---
+
+## K. Chain+Onion narrative EN→FR translation (`src/reporting/narrative_translation.py`)
+
+Read-side overlay applied by `app.Api.get_chain_onion_intel` after loading
+`top_issues.json`. Adds three FR fields per issue without modifying the EN
+fields. Deterministic dict lookup only — no LLM, no dynamic translation.
+
+The dict keys mirror the bounded template space emitted by
+`src/chain_onion/narrative_engine.py` (frozen). Every distinct return value
+of `_executive_summary`, `_primary_driver_text` (incl. `_PRIMARY_DRIVER_NONE`),
+and `_recommended_focus` has one entry. Counts:
+
+| Field | EN templates | FR field added |
+|---|---:|---|
+| `executive_summary` | 6 | `executive_summary_fr` |
+| `primary_driver_text` | 7 | `primary_driver_fr` |
+| `recommended_focus` | 6 | `recommended_focus_fr` |
+
+**Fallback contract:** if a template is not in the dict, the FR field equals
+the English original. Never `None`, never `""` (unless the EN input was
+already empty/None).
+
+**Currently rendered:** only `executive_summary_fr` (Synthèse column of
+`ChainOnionPanel` in `overview.jsx`). `primary_driver_fr` and
+`recommended_focus_fr` are produced but not surfaced — Phase 4 territory.
+
+**Maintenance rule:** if `narrative_engine.py` ever introduces a new
+template, add a corresponding entry to the matching dict in
+`narrative_translation.py`. Until then the UI renders the English original
+(by design; never crashes, never blank).
 
 ---
 

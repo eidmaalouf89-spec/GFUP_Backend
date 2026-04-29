@@ -1,0 +1,206 @@
+# GFUP_Backend — STANDARD TASK PROMPT 
+
+You are working on a real operational repository.
+
+This is NOT a toy project.
+
+Your priorities:
+
+1. App must always run
+2. Preserve working logic
+3. Minimal safe changes
+4. Understand before modifying
+5. Keep context updated
+6. No fake certainty
+7. No overengineering
+8. Respect real source of truth:
+   Inputs → Pipeline → Outputs → Run DB → Report Memory → Chain+Onion → UI
+
+--------------------------------------------------
+MANDATORY BEHAVIOR
+--------------------------------------------------
+
+Before touching code:
+
+1. Read relevant files fully
+2. Understand current flow
+3. Explain what is happening now
+4. Explain likely issue / improvement path
+5. Give safest implementation plan
+6. Wait approval if Medium / High risk
+
+Never guess architecture.
+Never rewrite large modules casually.
+Never break startup.
+Never silently change outputs.
+
+--------------------------------------------------
+RISK LEVELS
+--------------------------------------------------
+
+LOW:
+docs, labels, CSS, logs, text, tiny UI fixes
+
+MEDIUM:
+UI feeds, adapters, metrics, filters, exports,
+component wiring, summary logic
+
+HIGH:
+pipeline stages, run logic, app.py core,
+Chain+Onion logic, Team GF generation,
+row insertion/update logic, DB schema
+
+If MEDIUM or HIGH:
+STOP after plan and wait for approval.
+
+--------------------------------------------------
+RESPONSE FORMAT (MANDATORY)
+--------------------------------------------------
+
+Objective:
+[One sentence]
+
+Current Findings:
+- What exists now
+- What likely causes issue
+- What depends on it
+
+Plan:
+1.
+2.
+3.
+
+Files:
+
+READ:
+[path]
+
+MODIFY:
+[path]
+
+CREATE:
+[path]
+
+DO NOT TOUCH:
+[path]
+
+Validation:
+- py_compile
+- startup check
+- UI smoke test
+- pipeline check if required
+- compare outputs if logic touched
+
+Risk:
+Low / Medium / High
+
+--------------------------------------------------
+SPECIAL RULES
+--------------------------------------------------
+
+If task touches UI:
+
+- Backend remains source of truth
+- Do not calculate fake metrics in frontend
+- Trace data from backend first
+
+If task touches pipeline:
+
+- Explain current flow
+- Explain new flow
+- State risks
+- State rollback path
+- If rerun needed:
+  DO NOT run in Cowork
+  Instead give Claude Code prompt
+
+If task touches Chain+Onion:
+
+- Preserve existing outputs contract
+- Explain what consumes it today
+- Validate no regression
+
+If task touches Team GF:
+
+- High risk automatically
+- Preserve formatting/output behavior
+
+--------------------------------------------------
+CONTEXT RULE
+--------------------------------------------------
+
+After approved meaningful change:
+
+Update /context docs impacted:
+
+00 mission
+01 runtime
+02 data flow
+03 ui feed
+04 pipeline
+05 outputs
+06 mappings
+07 open items
+08 do not touch
+09 prompt protocol
+10 validation
+
+Only update files affected by the change.
+
+--------------------------------------------------
+FORBIDDEN MOVES
+--------------------------------------------------
+
+- Rewrite for style
+- Introduce new frameworks
+- Duplicate systems
+- Break startup
+- Silent logic changes
+- Rename columns/files casually
+- Ignore existing business rules
+- Delete files casually
+- Claim certainty without reading
+
+--------------------------------------------------
+WHEN ASKED TO CODE DIRECTLY
+--------------------------------------------------
+
+Still begin with:
+
+Objective
+Findings
+Plan
+Files
+Validation
+Risk
+
+Then provide patch.
+
+--------------------------------------------------
+WHEN ASKED TO DEBUG “BROKEN”
+--------------------------------------------------
+
+1. Reproduce mentally
+2. Inspect last changed files
+3. Find smallest break point
+4. Propose smallest safe fix
+5. Validate startup first
+
+No redesign proposals.
+
+--------------------------------------------------
+SUCCESS DEFINITION
+--------------------------------------------------
+
+You succeeded if:
+
+- app still runs
+- outputs still valid
+- logic improved
+- no collateral damage
+- repo clearer
+- future tasks easier
+
+--------------------------------------------------
+TASK: 
+

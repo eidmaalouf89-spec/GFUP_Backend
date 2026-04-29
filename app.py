@@ -1056,7 +1056,7 @@ class Api:
             from reporting.ui_adapter import adapt_contractors_lookup, adapt_contractors_list
             return _sanitize_for_json({
                 "lookup": adapt_contractors_lookup(raw),
-                "list": adapt_contractors_list(raw),
+                "list":   adapt_contractors_list(raw, focus=focus),
             })
         except Exception as exc:
             import traceback
@@ -1066,6 +1066,44 @@ class Api:
     def get_fiche_for_ui(self, consultant_name, focus=False, stale_days=90):
         """Return FICHE_DATA for one consultant — already shaped correctly."""
         return self.get_consultant_fiche(consultant_name, focus, stale_days)
+
+    def get_contractor_fiche_for_ui(self, contractor_code, focus=False, stale_days=90):
+        """Return contractor fiche payload for the UI.
+
+        Thin wrapper around get_contractor_fiche. Adds canonical-name
+        enrichment so the UI header shows 'Bentin' rather than 'BEN'.
+        Also merges the V1 quality payload (5 KPIs, polar histogram,
+        dormant lists, open/finished, long-chains) under payload['quality'].
+        A quality-build failure degrades to payload['quality'] = {'error': str}
+        rather than failing the whole fiche.
+        """
+        payload = self.get_contractor_fiche(contractor_code, focus=focus, stale_days=stale_days)
+        if isinstance(payload, dict) and "error" not in payload:
+            try:
+                from reporting.contractor_fiche import resolve_emetteur_name
+                raw_code = payload.get("contractor_code") or contractor_code
+                payload["contractor_name"] = resolve_emetteur_name(raw_code)
+            except Exception:
+                pass
+
+            # Merge quality payload (best-effort — degrade gracefully)
+            try:
+                from reporting.data_loader import load_run_context
+                from reporting.contractor_quality import (
+                    build_contractor_quality,
+                    build_contractor_quality_peer_stats,
+                )
+                ctx = load_run_context(BASE_DIR)
+                peer = build_contractor_quality_peer_stats(ctx)
+                payload["quality"] = build_contractor_quality(
+                    ctx, contractor_code, peer_stats=peer
+                )
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                payload["quality"] = {"error": str(exc)}
+
+        return payload
 
     def get_chain_onion_intel(self, limit=20):
         """Return top_issues + dashboard_summary from chain_onion output for the UI panel."""
@@ -1084,6 +1122,8 @@ class Api:
             if dash_path.exists():
                 summary = json.loads(dash_path.read_text(encoding="utf-8"))
 
+            from reporting.narrative_translation import translate_top_issue
+            top_issues = [translate_top_issue(i) for i in top_issues]
             return _sanitize_for_json({"top_issues": top_issues, "summary": summary})
         except Exception as exc:
             import traceback

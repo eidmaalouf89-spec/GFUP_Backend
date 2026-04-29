@@ -593,9 +593,16 @@ def write_chain_timeline_artifact(
             pass
 
     # JSON: pretty-printed, sorted by family_key
+    # Phase 0 D-005 (2026-04-29): atomic write. Pre-fix, a process kill mid-write
+    # left CHAIN_TIMELINE_ATTRIBUTION.json truncated at the canonical path,
+    # silently feeding partial data to consumers (audit found 132 chains missing
+    # for AXI/UTB/FRS/SCH/LIN/DBH). Write to *.tmp then os.replace → final.
+    import os
     ordered = dict(sorted(timelines.items()))
-    with open(json_path, "w", encoding="utf-8") as f:
+    json_tmp = json_path.with_suffix(".json.tmp")
+    with open(json_tmp, "w", encoding="utf-8") as f:
         json.dump(ordered, f, indent=2, ensure_ascii=False, default=str)
+    os.replace(str(json_tmp), str(json_path))
 
     # CSV: one row per (indice, phase, attributed_to entry)
     rows: list[dict] = []
@@ -648,7 +655,10 @@ def write_chain_timeline_artifact(
         "attributed_to_actor", "attributed_to_tier", "attributed_days",
     ])
     csv_df.sort_values(["family_key", "indice", "phase"], inplace=True)
-    csv_df.to_csv(csv_path, index=False)
+    # Phase 0 D-005 atomic write (see comment near JSON above)
+    csv_tmp = csv_path.with_suffix(".csv.tmp")
+    csv_df.to_csv(csv_tmp, index=False)
+    os.replace(str(csv_tmp), str(csv_path))
 
     logger.info(
         "[CHAIN_TIMELINE] Wrote %s (%d bytes) and %s (%d rows)",

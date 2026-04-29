@@ -9,8 +9,20 @@ from collections import defaultdict
 import pandas as pd
 
 from .data_loader import RunContext
+from .consultant_fiche import CONTRACTOR_REFERENCE
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_emetteur_name(code: str) -> str:
+    """Return canonical company name for an emetteur code (e.g. 'BEN' → 'Bentin').
+    Falls back to the input code if unmapped or empty."""
+    if not code:
+        return ""
+    entry = CONTRACTOR_REFERENCE.get(str(code).strip().upper())
+    if entry and entry.get("name"):
+        return entry["name"]
+    return str(code)
 
 
 def _safe_str(val):

@@ -74,6 +74,18 @@ def clear_cache():
 # Caches normalized docs_df + responses_df from stage_read_flat so the 30-second
 # xlsx re-parse is skipped on every hot load. Cache is invalidated automatically
 # when FLAT_GED.xlsx is newer than the cache files (i.e. after a pipeline run).
+#
+# Phase 0 D-001 fix (2026-04-29): cache freshness ALSO checks
+# CACHE_SCHEMA_VERSION written into cache_meta.json. Pre-fix, mtime alone was
+# fooled by upstream code changes (e.g. stage_read_flat schema drift) AND by
+# pandas pickle serialization drift across pandas versions. Bump
+# CACHE_SCHEMA_VERSION whenever:
+#   - stage_read_flat.py emitted columns change
+#   - normalize_responses / normalize_docs add or rename columns
+#   - flat_doc_meta structure changes
+#   - pandas-side pickle compatibility breaks (rare)
+CACHE_SCHEMA_VERSION = "v1"
+
 
 def _flat_cache_paths(flat_ged_path: str):
     """Return (docs_pkl, resp_pkl, meta_json) paths alongside FLAT_GED.xlsx."""
@@ -86,12 +98,24 @@ def _flat_cache_paths(flat_ged_path: str):
 
 
 def _flat_cache_is_fresh(flat_ged_path: str) -> bool:
-    """Return True if all cache files exist and are newer than the xlsx."""
+    """Return True if all cache files exist, are newer than the xlsx, AND
+    declare the current CACHE_SCHEMA_VERSION (Phase 0 D-001)."""
     try:
         xlsx_mtime = Path(flat_ged_path).stat().st_mtime
         for p in _flat_cache_paths(flat_ged_path):
             if not p.exists() or p.stat().st_mtime <= xlsx_mtime:
                 return False
+        # Phase 0 D-001 schema-version check
+        _, _, meta_p = _flat_cache_paths(flat_ged_path)
+        meta = json.loads(meta_p.read_text(encoding="utf-8"))
+        cached_ver = meta.get("cache_schema_version")
+        if cached_ver != CACHE_SCHEMA_VERSION:
+            logger.info(
+                "[FLAT_CACHE] Cache schema version mismatch (cache=%r want=%r) — "
+                "rejecting cache, will rebuild from FLAT_GED.xlsx",
+                cached_ver, CACHE_SCHEMA_VERSION,
+            )
+            return False
         return True
     except Exception:
         return False
@@ -99,7 +123,11 @@ def _flat_cache_is_fresh(flat_ged_path: str) -> bool:
 
 def _save_flat_normalized_cache(flat_ged_path: str, docs_df, responses_df,
                                  approver_names: list, flat_doc_meta: dict) -> None:
-    """Write pickle + json cache alongside FLAT_GED.xlsx (non-fatal on error)."""
+    """Write pickle + json cache alongside FLAT_GED.xlsx (non-fatal on error).
+
+    Phase 0 D-001: meta now includes cache_schema_version. _flat_cache_is_fresh
+    rejects caches missing or mismatched on this key.
+    """
     import pickle
     docs_p, resp_p, meta_p = _flat_cache_paths(flat_ged_path)
     try:
@@ -108,11 +136,15 @@ def _save_flat_normalized_cache(flat_ged_path: str, docs_df, responses_df,
         with open(str(resp_p), "wb") as f:
             pickle.dump(responses_df, f, protocol=5)
         meta_p.write_text(
-            json.dumps({"approver_names": approver_names, "flat_doc_meta": flat_doc_meta},
-                       ensure_ascii=False, default=str),
+            json.dumps({
+                "cache_schema_version": CACHE_SCHEMA_VERSION,
+                "approver_names": approver_names,
+                "flat_doc_meta": flat_doc_meta,
+            }, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
-        logger.info("[FLAT_CACHE] Cache written: %s", docs_p.parent)
+        logger.info("[FLAT_CACHE] Cache written (schema=%s): %s",
+                    CACHE_SCHEMA_VERSION, docs_p.parent)
     except Exception as exc:
         logger.warning("[FLAT_CACHE] Cache write failed (non-fatal): %s", exc)
 

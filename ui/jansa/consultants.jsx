@@ -4,11 +4,39 @@
    Secondary = compact chip grid.
    Click any card -> opens the Consultant Fiche. */
 
-function ConsultantsPage({ onOpen }) {
+/* ── Phase 5: P1·P2·P3·P4 mini-bar (read-only viz of by_consultant/by_contractor entry).
+   Always rendered when an entry exists. Width-proportional segments. ── */
+function FocusPriBar({ entry, height = 4 }) {
+  if (!entry) return null;
+  const total = (entry.p1 || 0) + (entry.p2 || 0) + (entry.p3 || 0) + (entry.p4 || 0);
+  if (total <= 0) return null;
+  const segs = [
+    { v: entry.p1 || 0, c: '#FF453A' },
+    { v: entry.p2 || 0, c: '#FF9F0A' },
+    { v: entry.p3 || 0, c: '#FFD60A' },
+    { v: entry.p4 || 0, c: '#30D158' },
+  ];
+  return (
+    <div style={{
+      display: 'flex', width: '100%', height, borderRadius: 99,
+      overflow: 'hidden', background: 'var(--line)', marginTop: 8,
+    }}
+    title={`P1 ${segs[0].v} · P2 ${segs[1].v} · P3 ${segs[2].v} · P4 ${segs[3].v}`}>
+      {segs.map((s, i) => s.v > 0 && (
+        <div key={i} style={{ flexBasis: `${(s.v / total) * 100}%`, background: s.c }}/>
+      ))}
+    </div>
+  );
+}
+
+function ConsultantsPage({ onOpen, focusMode }) {
   const all = window.CONSULTANTS;
   const moex = all.filter(c => c.group === 'MOEX');
   const primary = all.filter(c => c.group === 'Primary');
   const secondary = all.filter(c => c.group === 'Secondary');
+
+  const focusByName = ((window.OVERVIEW && window.OVERVIEW.focus && window.OVERVIEW.focus.by_consultant) || [])
+    .reduce((m, c) => { m[c.name] = c; return m; }, {});
 
   const F = window.JANSA_FONTS;
 
@@ -33,20 +61,20 @@ function ConsultantsPage({ onOpen }) {
 
       {/* Cercle 1 — MOEX */}
       <Section num="01" title="Maîtrise d'œuvre d'exécution" sub="Pilotage central · coordonne tous les consultants">
-        {moex.map(c => <MoexCard key={c.slug} c={c} onOpen={onOpen}/>)}
+        {moex.map(c => <MoexCard key={c.slug} c={c} onOpen={onOpen} focusMode={focusMode} focusEntry={focusByName[c.canonical_name]}/>)}
       </Section>
 
       {/* Cercle 2 — Primary */}
       <Section num="02" title="Consultants principaux" sub={`${primary.length} équipes · structure, fluides, électricité, architecture`}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-          {primary.map(c => <PrimaryCard key={c.slug} c={c} onOpen={onOpen}/>)}
+          {primary.map(c => <PrimaryCard key={c.slug} c={c} onOpen={onOpen} focusMode={focusMode} focusEntry={focusByName[c.canonical_name]}/>)}
         </div>
       </Section>
 
       {/* Cercle 3 — Secondary */}
       <Section num="03" title="Spécialistes" sub={`${secondary.length} expertises ponctuelles · appels ponctuels sur documents`}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-          {secondary.map(c => <SecondaryChip key={c.slug} c={c} onOpen={onOpen}/>)}
+          {secondary.map(c => <SecondaryChip key={c.slug} c={c} onOpen={onOpen} focusMode={focusMode} focusEntry={focusByName[c.canonical_name]}/>)}
         </div>
       </Section>
     </div>
@@ -122,7 +150,7 @@ function CnBreakdown({ vso, vao, ref_, avg_days, s1_label, s2_label, s3_label })
       ))}
       {avg_days != null && (
         <span style={{ fontSize: 10, color:'var(--text-3)' }}>
-          {'\u00b7'}{' '}
+          {'·'}{' '}
           <span style={{ fontFamily: F.num, fontVariantNumeric:'tabular-nums' }}>{avg_days}j</span>
           {' moy.'}
         </span>
@@ -132,7 +160,7 @@ function CnBreakdown({ vso, vao, ref_, avg_days, s1_label, s2_label, s3_label })
 }
 
 /* ── MOEX — hero orchestrator card ── */
-function MoexCard({ c, onOpen }) {
+function MoexCard({ c, onOpen, focusMode, focusEntry }) {
   const F = window.JANSA_FONTS;
   return (
     <div onClick={() => onOpen(c)} style={{
@@ -203,8 +231,12 @@ function MoexCard({ c, onOpen }) {
 
       {/* KPIs */}
       <div style={{ display:'flex', gap: 24, flexShrink: 0, alignItems:'flex-end' }}>
-        <StatBlock label="Documents" value={c.total.toLocaleString('fr-FR').replace(/,/g,'\u202f')}/>
-        <StatBlock label="Répondus" value={c.answered.toLocaleString('fr-FR').replace(/,/g,'\u202f')}/>
+        {focusMode
+          ? <StatBlock label="À traiter" value={(c.focus_owned || 0).toLocaleString('fr-FR')} color="var(--accent)"/>
+          : <StatBlock label="Documents" value={c.total.toLocaleString('fr-FR').replace(/,/g,' ')}/>
+        }
+        {focusMode && <StatBlock label="Total docs" value={c.total.toLocaleString('fr-FR').replace(/,/g,' ')}/>}
+        <StatBlock label="Répondus" value={c.answered.toLocaleString('fr-FR').replace(/,/g,' ')}/>
         <StatBlock label="En attente" value={c.pending} color="var(--bad)"/>
         <StatBlock label="Conformité" value={`${c.pass_rate}%`} color="var(--good)" spark={c.trend}/>
       </div>
@@ -216,6 +248,11 @@ function MoexCard({ c, onOpen }) {
       }}>
         <CnBreakdown vso={c.vso} vao={c.vao} ref_={c.ref} avg_days={c.avg_response_days}
           s1_label={c.s1_label} s2_label={c.s2_label} s3_label={c.s3_label}/>
+      </div>
+
+      {/* P1·P2·P3·P4 mini-bar — full width, always shown when entry exists */}
+      <div style={{ gridColumn: '1 / -1' }}>
+        <FocusPriBar entry={focusEntry}/>
       </div>
     </div>
   );
@@ -238,7 +275,7 @@ function StatBlock({ label, value, color, spark }) {
 }
 
 /* ── Primary — portrait card ── */
-function PrimaryCard({ c, onOpen }) {
+function PrimaryCard({ c, onOpen, focusMode, focusEntry }) {
   const F = window.JANSA_FONTS;
   const initials = c.name.split(/[·—\s]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const tone = c.pass_rate >= 90 ? 'var(--good)' : c.pass_rate >= 85 ? 'var(--accent)' : 'var(--warn)';
@@ -291,8 +328,18 @@ function PrimaryCard({ c, onOpen }) {
           <div style={{ fontSize: 10, color:'var(--text-3)', letterSpacing:'.1em', textTransform:'uppercase' }}>Conformité</div>
         </div>
         <div style={{ textAlign:'center' }}>
-          <div style={{ fontFamily: F.ui, fontSize: 18, fontWeight: 500, color:'var(--text)' }}>{c.total.toLocaleString('fr-FR').replace(/,/g,'\u202f')}</div>
-          <div style={{ fontSize: 10, color:'var(--text-3)', letterSpacing:'.1em', textTransform:'uppercase' }}>Docs</div>
+          {focusMode ? (
+            <div>
+              <div style={{ fontFamily: F.ui, fontSize: 18, fontWeight: 500, color:'var(--accent)' }}>{c.focus_owned || 0}</div>
+              <div style={{ fontSize: 10, color:'var(--text-3)', letterSpacing:'.1em', textTransform:'uppercase' }}>À traiter</div>
+              <div style={{ fontSize: 10, color:'var(--text-3)', marginTop: 2 }}>{c.total} total</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontFamily: F.ui, fontSize: 18, fontWeight: 500, color:'var(--text)' }}>{c.total.toLocaleString('fr-FR').replace(/,/g,' ')}</div>
+              <div style={{ fontSize: 10, color:'var(--text-3)', letterSpacing:'.1em', textTransform:'uppercase' }}>Docs</div>
+            </div>
+          )}
         </div>
         <div style={{ textAlign:'right' }}>
           <div style={{ fontFamily: F.ui, fontSize: 18, fontWeight: 500, color: c.pending > 100 ? 'var(--bad)' : 'var(--text)' }}>{c.pending}</div>
@@ -305,12 +352,15 @@ function PrimaryCard({ c, onOpen }) {
         <CnBreakdown vso={c.vso} vao={c.vao} ref_={c.ref} avg_days={c.avg_response_days}
           s1_label={c.s1_label} s2_label={c.s2_label} s3_label={c.s3_label}/>
       </div>
+
+      {/* P1·P2·P3·P4 mini-bar — always shown when entry exists */}
+      <FocusPriBar entry={focusEntry}/>
     </div>
   );
 }
 
 /* ── Secondary — compact chip ── */
-function SecondaryChip({ c, onOpen }) {
+function SecondaryChip({ c, onOpen, focusMode, focusEntry }) {
   const F = window.JANSA_FONTS;
   const initials = c.name.split(/[·—\s]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const tone = c.pass_rate >= 92 ? 'var(--good)' : 'var(--accent)';
@@ -339,8 +389,20 @@ function SecondaryChip({ c, onOpen }) {
         <div style={{ fontSize: 10.5, color:'var(--text-3)', marginTop: 2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.role}</div>
       </div>
       <div style={{ textAlign:'right', flexShrink: 0 }}>
-        <div style={{ fontFamily: F.ui, fontSize: 15, fontWeight: 600, color: tone, letterSpacing:'-.01em' }}>{c.pass_rate}%</div>
-        <div style={{ fontFamily: F.num, fontSize: 10, color:'var(--text-3)', fontVariantNumeric:'tabular-nums' }}>{c.total}</div>
+        {focusMode ? (
+          <div>
+            <div style={{ fontFamily: F.ui, fontSize: 15, fontWeight: 600, color:'var(--accent)', letterSpacing:'-.01em' }}>{c.focus_owned || 0}</div>
+            <div style={{ fontSize: 9, color:'var(--text-3)' }}>à traiter</div>
+            <div style={{ fontFamily: F.num, fontSize: 10, color:'var(--text-3)', fontVariantNumeric:'tabular-nums' }}>{c.total} total</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontFamily: F.ui, fontSize: 15, fontWeight: 600, color: tone, letterSpacing:'-.01em' }}>{c.pass_rate}%</div>
+            <div style={{ fontFamily: F.num, fontSize: 10, color:'var(--text-3)', fontVariantNumeric:'tabular-nums' }}>{c.total}</div>
+          </div>
+        )}
+        {/* Mini-bar — before VSO/VAO/REF line */}
+        <div style={{ marginTop: 4 }}><FocusPriBar entry={focusEntry} height={3}/></div>
         {/* Visa micro breakdown — uses per-consultant labels */}
         {c.vso != null && (
           <div style={{ fontSize: 9, color:'var(--text-3)', fontVariantNumeric:'tabular-nums', marginTop: 2 }}

@@ -21,6 +21,7 @@ from typing import Optional
 
 import pandas as pd
 
+from .contractor_fiche import resolve_emetteur_name
 from .data_loader import RunContext
 
 logger = logging.getLogger(__name__)
@@ -220,5 +221,27 @@ def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:
             })
     by_consultant.sort(key=lambda x: x["total"], reverse=True)
     result.stats["by_consultant"] = by_consultant
+
+    # ── Per-contractor breakdown for UI by_contractor mini-bar ──────
+    by_contractor = {}
+    for item in pq_records:
+        if item.get("owner_tier") != "CONTRACTOR":
+            continue
+        code = (item.get("emetteur") or "").strip()
+        if not code or code == "?":
+            continue
+        code_up = code.upper()
+        bucket = by_contractor.setdefault(code_up, {
+            "code": code_up,
+            "name": resolve_emetteur_name(code_up) or code_up,
+            "p1": 0, "p2": 0, "p3": 0, "p4": 0,
+            "total": 0,
+        })
+        p = item.get("priority")
+        if p in (1, 2, 3, 4):
+            bucket[f"p{p}"] += 1
+            bucket["total"] += 1
+    by_contractor_list = sorted(by_contractor.values(), key=lambda x: x["total"], reverse=True)
+    result.stats["by_contractor"] = by_contractor_list
 
     return result

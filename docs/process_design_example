@@ -1,0 +1,154 @@
+Objective
+Design Document Command Center: a right-side popup/window for any document, opened from search or drilldown click, using only Flat GED enriched with reports as source.
+No Chain+Onion join. No UI-side calculations.
+User Value
+MOEX opens one document and immediately sees:
+
+latest indice status
+all enriched reviewer responses
+comments
+document history available from Flat GED
+operational tags
+next decision state
+The user keeps current navigation context.
+Touchpoints
+UI
+
+global search
+drilldown rows
+right-side document panel
+data_bridge
+
+call backend only
+no calculation
+app.Api
+Add read-only endpoints:
+
+search_documents(query, focus, stale_days)
+get_document_command_center(numero, indice=None, focus=False, stale_days=30)
+backend/reporting
+Create backend builder for document detail.
+Recommended:
+
+src/reporting/document_command_[center.py](http://center.py)
+pipeline
+No new pipeline stage for MVP unless needed.
+chain_onion
+Do not use.
+DB
+Do not modify.
+Source Rule
+Use only:
+Flat GED enriched with reports / RunContext effective responses
+The project data flow already says the UI read-side resolves latest run artifacts, parses Flat GED, normalizes responses, builds effective responses with report memory, then feeds reporting/UI.
+Do not join:
+
+CHAIN_REGISTER.csv
+ONION_SCORES.csv
+CHAIN_NARRATIVES.csv
+top_issues.json Required Rule for Cowork No calculations in the UI layer. The UI must only render backend-prepared fields. All document status, tags, latest status, response grouping, pending logic, comment grouping, and tag classification must be calculated in the backend/reporting layer. This respects the current architecture where UI consumes shaped backend globals/results, while reporting adapters prepare data for rendering. Recommended Scope MVP
+Search Bar
+Search by:
+
+numero
+titre
+indice
+emetteur
+lot Returns a short result list: numero indice titre emetteur lot primary_tag latest_status
+Open Panel
+Right-side drawer, 40–45% width.
+Must preserve:
+
+current page
+filters
+scroll
+drilldown state No navigation route change.
+Panel Content
+Header
+
+numero
+titre
+indice latest
+emetteur
+lot
+current operational tag
+Latest Status
+Backend returns latest enriched response state.
+Responses
+Grouped reviewer responses:
+
+consultant / role
+status
+response date
+deadline if available
+comment
+Comments
+Backend grouped comments, not UI-parsed.
+Revision History
+From available Flat GED / RunContext data only.
+Tags
+Backend-generated deterministic tags.
+Tag System
+Primary tag: exactly one
+
+Chaîne Morte
+Bloqué Entreprise
+Bloqué Consultant
+Arbitrage MOEX
+Réponses Incomplètes
+Signature MOEX
+Gain Facile
+Ancien Pending
+Secondary tags: optional
+
+Missing comment
+Multiple REF
+Waiting MOEX
+Waiting consultant
+Waiting contractor
+No vague tags. No planning-risk tag. No “revue rapide”.
+Backend Tag Logic
+Gain Facile
+All available responses aligned positive:
+
+VSO / VAO
+FAV
+HM accepted as non-blocking
+Arbitrage MOEX
+Contradictory statuses:
+
+at least one positive
+at least one blocking / negative
+Bloqué Consultant
+At least one consultant response is:
+
+REF
+SUS
+DEF
+Bloqué Entreprise
+MOEX REF or document needs corrected resubmission.
+Réponses Incomplètes
+Mandatory reviewers missing / not answered.
+Signature MOEX
+All necessary reviewers are non-blocking, but MOEX final visa missing.
+Chaîne Morte
+Invalid/abandoned chain according to available Flat GED status.
+Ancien Pending
+Pending beyond backend-defined threshold.
+Risks
+Low
+
+UI drawer
+search field
+rendering backend payload
+Medium
+
+backend document detail composition
+tag rules
+matching latest indice correctly
+Avoid
+
+touching pipeline stages
+touching run_memory
+touching report_memory schema
+using Chain+Onion identity joins The project explicitly flags that identity systems differ between Flat GED and Chain+Onion, so avoiding Chain+Onion is the safer choice. Cowork Handoff Prompt Objective: Implement a Document Command Center right-side panel using ONLY Flat GED enriched with reports / RunContext effective responses. Important rules: - Do NOT use Chain+Onion outputs. - Do NOT join ONION_SCORES, CHAIN_REGISTER, CHAIN_NARRATIVES, or top_issues. - Do NOT calculate document tags/statuses in the UI. - All calculations must be done in backend/reporting. - UI only renders backend-prepared fields. - Preserve current navigation context when panel opens/closes. - At every meaningful change, update the project context files. Files to read: - [app.py](http://app.py) - ui/jansa/shell.jsx - ui/jansa/data_bridge.js - ui/jansa/fiche_page.jsx - ui/jansa/fiche_base.jsx - src/reporting/data_[loader.py](http://loader.py) - src/reporting/consultant_[fiche.py](http://fiche.py) - src/reporting/ui_[adapter.py](http://adapter.py) - context/03_UI_FEED_[MAP.md](http://MAP.md) - context/02_DATA_[FLOW.md](http://FLOW.md) - context/08_DO_NOT_[TOUCH.md](http://TOUCH.md) - context/09_PROMPT_[PROTOCOL.md](http://PROTOCOL.md) Files to create: - ui/jansa/document_panel.jsx - src/reporting/document_command_[center.py](http://center.py) Files to modify: - [app.py](http://app.py) - ui/jansa/shell.jsx - ui/jansa/data_bridge.js - context/03_UI_FEED_[MAP.md](http://MAP.md) - context/02_DATA_[FLOW.md](http://FLOW.md) - context/07_OPEN_[ITEMS.md](http://ITEMS.md) if the feature closes or changes an open item Do not touch: - src/flat_ged/* - src/run_[memory.py](http://memory.py) - src/report_[memory.py](http://memory.py) - src/effective_[responses.py](http://responses.py) unless strictly necessary and approved - src/pipeline/stages/* - src/team_version_[builder.py](http://builder.py) - data/run_memory.db - data/report_memory.db - runs/run_0000/ Backend requirements: 1. Add [app.Api.search](http://app.Api.search)_documents(query, focus=False, stale_days=30). 2. Add app.Api.get_document_command_center(numero, indice=None, focus=False, stale_days=30). 3. Build payload in src/reporting/document_command_[center.py](http://center.py). 4. Use RunContext / effective responses only. 5. Return fully prepared JSON: - header - latest_status - responses - comments - revision_history - primary_tag - secondary_tags - warnings UI requirements: 1. Add global search trigger. 2. Show search results. 3. Clicking result opens right-side DocumentCommandCenter panel. 4. Clicking a drilldown document opens same panel. 5. Panel close returns user to exact current page/state. 6. UI performs no business logic except rendering and open/close state. Validation: - python -m py_compile [app.py](http://app.py) - python -m py_compile src/reporting/document_command_[center.py](http://center.py) - python [app.py](http://app.py) --browser - Verify old pages still render. - Verify search returns documents. - Verify panel opens/closes without route loss. - Verify drilldown click opens panel. - Verify no JS console errors. - Verify no pipeline run is required. - Verify context files updated.

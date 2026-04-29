@@ -96,16 +96,51 @@ data/report_memory.db                   ← persistent consultant truth
 load_run_context(BASE_DIR)
   → resolves latest COMPLETED run from data/run_memory.db
   → reads registered artifact paths
-  → resolves the registered FLAT_GED artifact and parses it through
-    stage_read_flat; raw GED rebuild via read_raw.read_ged is only the
-    legacy fallback (logs [LEGACY_RAW_FALLBACK])
-  → calls normalize_docs + normalize_responses
-  → builds VersionEngine, WorkflowEngine
+  → resolves the registered FLAT_GED artifact, then:
+
+  ┌─ FLAT_GED pickle cache layer ────────────────────────────────────┐
+  │  _flat_cache_is_fresh(flat_ged_path):                            │
+  │    1. xlsx mtime ≥ cache file mtime → REJECT (run wrote new xlsx)│
+  │    2. cache_schema_version != CACHE_SCHEMA_VERSION → REJECT      │
+  │       (D-001 fix, 2026-04-29: catches pandas pickle drift +      │
+  │        upstream stage_read_flat.py schema changes)               │
+  │  HIT  → unpickle docs_df + responses_df + flat_doc_meta (~3s)    │
+  │  MISS → run stage_read_flat → normalize_docs → normalize_responses│
+  │         (~30s one-time cost) → _save_flat_normalized_cache(...)  │
+  │         writes new pkl + meta with current schema version.       │
+  └──────────────────────────────────────────────────────────────────┘
+
+  → docs_df["is_dernier_indice"] = True; dernier_df = docs_df.copy()
+    (in flat mode, all rows are ACTIVE → docs_df ≡ dernier_df)
+
+  ┌─ WorkflowEngine construction ────────────────────────────────────┐
+  │  workflow_engine = WorkflowEngine(responses_df)                  │
+  │  Inside __init__ (workflow_engine.py:54-57):                     │
+  │    self.responses_df = responses_df[~is_exception_approver]      │
+  │    → STRIPS every SAS row + Exception List approver row.         │
+  │    → ctx.workflow_engine.responses_df is therefore SMALLER       │
+  │      than ctx.responses_df by ~len(dernier_df) rows (one SAS     │
+  │      per active doc).                                            │
+  │    → SAS-track signal lives ONLY on ctx.responses_df.            │
+  │    → workflow_engine._lookup is built from the FILTERED frame —  │
+  │      correct for visa_global / deadline / non-SAS use cases.     │
+  │  See context/06_EXCEPTIONS_AND_MAPPINGS.md §B.0 (H-3 hazard).    │
+  └──────────────────────────────────────────────────────────────────┘
+
   → builds effective_responses_df via effective_responses.build_effective_responses
+    (composes report_memory enrichment over the GED responses)
+  → REBUILDS workflow_engine over the effective_responses_df
+  → ctx.responses_df is replaced with the effective frame for downstream
   → calls reporting.focus_ownership.compute_focus_ownership IN PLACE on dernier_df
   → returns RunContext (cached at module level; cleared by clear_cache()
     after a new pipeline run)
 ```
+
+Two named transformations are explicit above so audit consumers can reason
+about which `responses_df` view they are reading. The B-stage cache layer
+and the C-stage WorkflowEngine filter both materially change downstream
+counts; both have caused production bugs (Phase 7 12a-fix2 SNI SAS REF and
+Phase 0 canary StringDtype unpickle drift).
 
 Aggregators take a `RunContext` (+ optional `FocusResult`):
 
@@ -122,6 +157,16 @@ Aggregators take a `RunContext` (+ optional `FocusResult`):
 
 Then UI-shaping (`reporting.ui_adapter.adapt_*`) flattens to the
 `window.OVERVIEW / CONSULTANTS / CONTRACTORS / FICHE_DATA` shape.
+
+**Phase 5 (2026-04-29):** focus stats produced by
+`focus_filter.apply_focus_filter` now carry `by_contractor` (list of
+`{code, name, p1, p2, p3, p4, total}`) alongside the existing
+`by_consultant`, derived from `pq_records` items where
+`owner_tier == "CONTRACTOR"`. `adapt_overview` passes both through into
+`window.OVERVIEW.focus.{by_consultant, by_contractor}`. Canonical
+emetteur names (Bentin, Legendre, …) are applied via
+`reporting.contractor_fiche.resolve_emetteur_name` — the single source
+of truth for code → company name.
 
 ---
 
