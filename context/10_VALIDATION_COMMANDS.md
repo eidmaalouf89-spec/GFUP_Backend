@@ -251,6 +251,115 @@ These are read-only checks — they cannot mutate state.
 
 ---
 
+## L. Count Lineage Audit (Phase 8, last touched 2026-04-30 step 2)
+
+```bash
+# Compile + run the harness (read-only, writes only to output/debug/).
+python -m py_compile scripts/audit_counts_lineage.py
+python scripts/audit_counts_lineage.py
+# Optional: pick a different run.
+python scripts/audit_counts_lineage.py --run 0
+
+# Probe mode (Phase 8 step 2): emits provenance for every (category, layer).
+python scripts/audit_counts_lineage.py --probe
+
+# Companion tests.
+python -m pytest tests/test_audit_counts_lineage.py -q
+```
+
+Expected stdout one-liner shape (default audit run):
+```
+AUDIT: PASS=<n> WARN=<n> FAIL=<n>; first_unexpected_divergence=<category>@<layer>
+```
+
+Outputs:
+- `output/debug/counts_lineage_audit.xlsx` (sheets: `lineage`,
+  `expected_baselines`, `divergences_unexpected`). The
+  `expected_baselines.raw_submission_rows.provenance` field carries the source
+  file + mtime + sheet + row range used for the baseline (refreshed step 2).
+- `output/debug/counts_lineage_audit.json` (machine-readable; shape in
+  `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md` §5.3 step 11).
+- `output/debug/counts_lineage_probe.xlsx` and `.json` (only when `--probe`
+  is passed). One row per (category, layer) with `value_origin_type`,
+  `source_file`, `source_sheet`, `source_column`, `source_filter`,
+  `function_or_code_path`, `is_hardcoded_baseline`, `confidence`.
+
+Known surviving FAILs after step 2 (per `07_OPEN_ITEMS.md`):
+- `workflow_step_count` and `sas_row_count` flagged at L2_STAGE_READ_FLAT —
+  resolved by extending the SAS-filter divergence rule (step 2.5, D-1).
+- `status_SAS_REF` at L1 (RAW=836 → FLAT=284) is a real upstream projection
+  gap (D-011) and not in scope for Phase 8.
+
+This script DOES NOT modify any pipeline output, registry, or production
+source. Safe to run anytime.
+
+---
+
+## M. Phase 8A downstream audits (last touched 2026-05-01)
+
+```bash
+# 8A.1 — D-010 focus/visa source audit (read-only AST walk).
+python -m py_compile scripts/audit_focus_visa_source.py
+python scripts/audit_focus_visa_source.py
+# Expected stdout:
+#   FOCUS_VISA_AUDIT: call_sites=<n> direct_engine=<n> via_resolver=<n> disagreements_total=<n>
+# Last result (2026-05-01): call_sites=10 direct_engine=8 via_resolver=2 disagreements_total=0
+# Outputs:
+#   output/debug/focus_visa_source_audit.json
+#   output/debug/focus_visa_source_audit.xlsx
+
+# 8A.3 — Chain+Onion BLOCK-mode readiness audit (read-only DB + JSON inspection).
+python -m py_compile scripts/check_chain_onion_alignment_block_ready.py
+python scripts/check_chain_onion_alignment_block_ready.py
+# Expected stdout:
+#   BLOCK_READINESS: ready=<true|false> reason=<...>
+# Last result (2026-05-01): ready=false (latest pipeline run predates WARN
+# helper). Re-run after a fresh `python main.py` to clear the gate.
+# Output:
+#   output/debug/chain_onion_block_readiness.json
+
+# 8A.6 — Widened UI payload audit (read-only; compares aggregator/builder vs
+# adapter outputs across 6 UI surfaces).
+python -m py_compile scripts/audit_ui_payload_full_surface.py
+python scripts/audit_ui_payload_full_surface.py
+# Expected stdout one-liner:
+#   UI_PAYLOAD_FULL: surfaces=<n> compared=<n> matches=<n> mismatches=<n>; OK - all compared fields match
+# Last result (2026-05-01): surfaces=6 compared=45 matches=45 mismatches=0
+# Outputs:
+#   output/debug/ui_payload_full_surface_audit.json
+#   output/debug/ui_payload_full_surface_audit.xlsx
+```
+
+All three scripts are read-only. They do NOT modify pipeline output, registry,
+or production source. Safe to run anytime.
+
+---
+
+## N. Phase 8B RAW → FLAT GED reconciliation (closed 2026-05-01)
+
+```bash
+# Phase 8B reconciliation harness (read-only). Produces the 11-sheet
+# raw_flat_reconcile.xlsx workbook plus per-row trace files.
+python -m py_compile scripts/raw_flat_reconcile.py
+python scripts/raw_flat_reconcile.py
+# Outputs (all under output/debug/, NOT registered in run_memory.db):
+#   raw_flat_reconcile.xlsx           (11 sheets, ~695 KB)
+#   flat_ged_trace.{csv,xlsx}         (per-row FLAT projection classification)
+#   raw_ged_trace.csv                 (per-row RAW GED trace)
+#   report_to_flat_trace.{json,xlsx}  (report-integration trace)
+#   SHADOW_FLAT_GED_OPERATIONS.csv    (shadow-corrected operational layer)
+#   SHADOW_FLAT_GED_TRACE.xlsx        (shadow-FLAT per-row trace)
+#   PHASE_8B_FINAL_REPORT.md          (final report + §17 decision gate)
+```
+
+Phase 8B closure outcome (Outcome C): identity contract PASS, SAS REF gap
+99.3% explained, 6 SAS REF rows remain UNEXPLAINED (28xxx /A C1 cluster).
+The script never modifies production FLAT_GED.xlsx. See
+`docs/RAW_TO_FLAT_GED_KNOWLEDGE.md` and `output/debug/PHASE_8B_FINAL_REPORT.md`
+for the canonical reference.
+
+---
+
 ## K. Diff/audit a candidate change
 
 ```bash

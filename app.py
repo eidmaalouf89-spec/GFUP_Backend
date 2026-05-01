@@ -1164,16 +1164,16 @@ class Api:
 
 # ── Main ─────────────────────────────────────────────────────
 def main():
-    api = Api()
     ui_url = _resolve_ui()
     browser_mode = "--browser" in sys.argv
-
     if browser_mode:
         target = _ui_target_for_browser(ui_url)
         print(f"[app] Opening browser mode: {target}")
         webbrowser.open(target)
         return
-
+    print("[app] Creating API...")
+    api = Api()
+    print("[app] Creating WebView window...")
     webview.create_window(
         title="JANSA VISASIST \u2014 P17&CO T2",
         url=ui_url,
@@ -1183,7 +1183,7 @@ def main():
         min_size=(1024, 700),
         text_select=False,
     )
-
+    print("[app] Starting WebView...")
     try:
         webview.start(
             debug="--debug" in sys.argv,

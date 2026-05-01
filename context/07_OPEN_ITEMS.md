@@ -5,54 +5,359 @@
 
 ---
 
-## ⚠ ACTIVE — Phase 0 Backend Audit (opened 2026-04-29)
+## Phase 8 family — closed for current release (status as of 2026-05-01)
 
-Phase 7 (contractor quality fiche) reached visual smoke and surfaced data
-integrity issues across pipeline stages. Phase 7 is paused; Phase 0 is the
-gate. Plan: `docs/implementation/PHASE_0_BACKEND_DEBUGGING.md`. README
-section: "Phase 0 — Backend Data Audit (current, blocking)".
+The Phase 8 family is closed for the current software finalisation cycle.
+**The remaining Phase 8-family items are backlog/hardening/forensic items and are not blockers for software finalisation.**
 
-### Phase 0 status (Step 0.6 closed 2026-04-29)
+| Phase | Status | Summary |
+|---|---|---|
+| **Phase 8 — Count Lineage Fix** | ✅ CLOSED | 57 tests pass on Windows-shell. `AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`. `UI_PAYLOAD: compared=10 matches=10 mismatches=0`. All 10 baseline checks PASS. Cache-hit path works; cache metadata schema v2 stable. Chain+Onion source alignment OK. Remaining FAIL is D-011 RAW→FLAT SAS REF projection (not a Phase 8 blocker; routed to Phase 8B). |
+| **Phase 8A — Downstream Hardening** | ✅ CLOSED FOR CURRENT RELEASE | LOW-risk audits 8A.1, 8A.3, 8A.5, 8A.6, 8A.7 all closed. `UI_PAYLOAD_FULL: surfaces=6 compared=45 matches=45 mismatches=0`. Classification: NM=0, SF=0, ESD=0, TB=0. Decision: KEEP ARCHITECTURE; no UI snapshot layer needed; Phase 8C UI snapshot phase NOT opened. MEDIUM-risk hardening deferred (see backlog). |
+| **Phase 8B — RAW → FLAT Reconciliation** | ✅ CLOSED | Outcome C: existing reason logic incomplete + partially incorrect. Identity contract PASS (RAW unique numero == FLAT == 2,819; RAW unique numero+indice == FLAT == 4,848). SAS REF decomposition 99.3% covered (830/836). Sheet 07 SAS REF: 283 matched canonical, 345 DUPLICATE_FAVORABLE_KEPT, 143 DUPLICATE_MERGED, 32 ACTIVE_VERSION_PROJECTION, 27 MALFORMED_RESPONSE, 6 UNEXPLAINED. Reasons audit: 389 sites total — 40 VALID, 1 INVALID, 30 AMBIGUOUS, 318 MISSING. Report integration: 1,245 reports, 0 NO_MATCH, 942 enrich FLAT, 58 supply primary, 226 blocked on confidence. Shadow model: 27,134 shadow operational rows; UNEXPLAINED residual = 6. Audit one-liner unchanged throughout. |
+| **Phase 8C** | ⏸ FUTURE BACKLOG ONLY / NOT ACTIVE | Not active for current release. See "Deferred backlog" below. |
+
+### Deferred backlog — not release blockers
+
+These are explicitly **not required for software finalisation**:
+
+1. **D-010 broad cleanup** — direct WorkflowEngine visa call cleanup. 8 direct sites identified by 8A.1; `disagreements_total=0`, widened UI payload audit found 0 mismatches. Hardening only.
+2. **Chain+Onion BLOCK-mode flip (8A.4)** — WARN-only is operational. BLOCK mode requires a fresh full pipeline cycle and is enforcement hardening, not a current correctness fix.
+3. **Phase 8C unexplained RAW→FLAT triage** — investigate (a) the 6 remaining SAS REF UNEXPLAINED rows in the 28xxx /A C1 cluster, (b) the 67 non-SAS UNEXPLAINED response rows, (c) the 132 actor-call UNEXPLAINED rows that did not surface as response unexplained.
+4. **GEDDocumentSkip cleanup** — Phase 8B recommended deleting or clarifying the dead-code/misleading docstring in `src/flat_ged/resolver.py:17`. Not required now.
+5. **Optional UI snapshot layer** — Phase 8A.7 decision was KEEP ARCHITECTURE. Snapshot layer remains a future option if a refactor introduces new divergences.
+6. **Optional rule-precedence reconciliation** — sheet 07 vs shadow classifier has a 31-row DUPLICATE_FAVORABLE_KEPT delta due to classifier precedence noise (not row loss).
+7. **Optional `audit_counts_lineage.py` glob fix** — avoid picking up `~$GED_export.xlsx` Excel lock files.
+
+These items can be reopened later as discrete, scoped tasks. None gate current release.
+
+---
+
+## ✅ CLOSED — Phase 8 Count Lineage Fix (fully closed 2026-04-30; reference only)
+
+Phase 8 is read-only reference material. New work routes to **Phase 8A** (downstream hardening) and **Phase 8B** (upstream RAW → FLAT reconciliation + report integration) — see sections below.
+
+**Final closure event 2026-04-30:** Windows-shell pytest pass over the four new test files and the audit script. **57 tests passed in 138.62s.** Audit one-liner verbatim:
+```
+AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX
+UI_PAYLOAD: compared=10 matches=10 mismatches=0; OK - all compared fields match
+```
+All 10 baseline checks PASS. Cache-hit path fired (v2 cache from step-4 verification is current — no rebuild needed). D-012 verdict still PARTIAL_CONFIRMED. The remaining audit FAIL is the upstream D-011 SAS REF projection gap, intentionally not silenced — routed to Phase 8B.
+
+Plan: `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md` (closed; self-contained;
+§18 = step 1 report, §19 = step 2 report, §20 = step 2.5 report,
+§21 = step 3 report, §21.8 = step 3 vdate addendum, §22 = step 4 report,
+§23 = step 5 report, §24 = step 6 report). Read-only after 2026-04-30.
+
+### Phase 8 status
 
 | Step | Status | Deliverable |
 |---|---|---|
-| 0.1 Pipeline-stage inventory | ✅ done | `docs/audit/PIPELINE_INVENTORY.md` |
-| 0.2 Canary contractor BEN | ✅ done | `docs/audit/CANARY_BEN.md` |
-| 0.3 Verification scripts | ✅ done | `scripts/audit/_common.py` + 8 audit scripts |
-| 0.4 Run audits | ✅ done | `docs/audit/DIVERGENCE_REPORT.md` (1,901 lines) |
-| 0.5 Triage | ✅ done | `docs/audit/TRIAGE.md` (10 rows, 3 fix-now) |
-| 0.6 Apply fix-now patches | ✅ done | D-001, D-004, D-005 landed and verified |
-| 0.7 Update context docs | (in progress — this file) | |
-| 0.8 Sign-off | pending | `docs/audit/SIGN_OFF.md` |
+| 1. Audit harness | ✅ closed 2026-04-30 | `scripts/audit_counts_lineage.py`, `tests/test_audit_counts_lineage.py`, `output/debug/counts_lineage_audit.{xlsx,json}` |
+| 2. Audit-the-audit (probe + reader fixes + baseline refresh) | ✅ closed 2026-04-30 | `--probe` mode, `output/debug/counts_lineage_probe.{xlsx,json}`, SAS REF reader fix, baseline 6155→6901 with provenance |
+| 2.5. Apply D-1 + D-012 confirmation | ✅ closed 2026-04-30 | D-1 rule extended (workflow_step_count + sas_row_count); D-012 PARTIAL_CONFIRMED; FAIL 3→1 (only status_SAS_REF remains); 25 tests pass |
+| 3. visa_global source fix | ✅ closed 2026-04-30 | `RunContext.flat_ged_doc_meta` field; `_load_from_flat_artifacts` passes through; `aggregator.resolve_visa_global` helper; 5 call sites replaced; vdate addendum preserves `avg_days_to_visa` |
+| 4. Cache audit fields | ✅ closed 2026-04-30 | `CACHE_SCHEMA_VERSION` bumped `"v1"` → `"v2"`; `_save_flat_normalized_cache` writes 8 audit fields (sha256, mtime, docs_df_rows=4834, responses_df_rows=27237, active_version_count=4834, family_count=2819, status_counts populated, generated_at). Windows rebuild trace confirmed: `[FLAT_CACHE] Cache schema version mismatch (cache='v1' want='v2')` → 30s rebuild → `[FLAT_CACHE] Cache written (schema=v2)`. Audit one-liner `PASS=16 WARN=0 FAIL=1` unchanged. Cache_meta.json values cross-check against RunContext (4 invariants ✓). See §22 for full receipts. Note: Claude Code's step-4 report had two inaccuracies (claimed v2 bump that hadn't landed; claimed §22 appended that didn't exist) — both corrected from this chat via direct Edit. |
+| 5. Chain+Onion source alignment (WARN-only) | ✅ closed 2026-04-30 | `_check_flat_ged_alignment` helper added to `src/chain_onion/source_loader.py` (line 199), invoked at line 332 immediately before `pd.read_excel`. Resolves latest registered FLAT_GED via `data_loader._resolve_latest_run` + `_get_artifact_path`. Writes `output/debug/chain_onion_source_check.json` per run. Logs `[CHAIN_ONION_SOURCE_CHECK] result=...`. WARN-only — wrapped in try/except, never raises. Verification run: `result=OK` (registered and using paths identical), `run_chain_onion.py` exit 0 in 105.7s sandbox, audit one-liner unchanged, 7/7 pytest passed. See §23. BLOCK-mode flip remains a separate later decision. |
+| 6. UI payload verification | ✅ closed 2026-04-30 | `UI_PAYLOAD_FIELD_MAP` (20 entries, data-only) added to `scripts/audit_counts_lineage.py`. `_compare_ui_payload(...)` driver compares `compute_project_kpis` vs `adapt_overview` per audit run. Outputs: new `ui_payload_mismatches` sheet in `counts_lineage_audit.xlsx` + new `ui_payload_comparison` key in `counts_lineage_audit.json`. New stdout line `UI_PAYLOAD: compared=10 matches=10 mismatches=0; OK - all compared fields match`. Production source untouched. Existing audit one-liner byte-identical. 8 new tests. See §24. |
+| 7. Run completion gate | deferred per plan | not in this phase |
 
-### Closed by Phase 0 (fix-now landed)
+### Step 2 probe summary (2026-04-30)
+- 119 records covering L0..L6 × 17 categories; every non-null value has a classified `value_origin_type`.
+- Zero hardcoded baseline literals masquerading as layer values (Phase 1 was already measuring; probe just made provenance explicit).
+- SAS REF reader fixed: L0 = 836, L1 = 284, L2/L3/L4 = 282.
+- `raw_submission_rows` baseline refreshed 6155 → 6901 with inline provenance (`input/GED_export.xlsx`, mtime `2026-04-22`, sheet `"Doc. sous workflow, x versions"`, rows 3..6903).
 
-- **D-001 — `CACHE_SCHEMA_VERSION`** added to `data_loader.py`. Cache freshness now rejects schema-mismatched pickles. Production-confirmed pandas StringDtype unpickle drift (canary §13). See `context/11_TOOLING_HAZARDS.md` H-2.
-- **D-004 — AMP 199% bug fixed.** `contractor_quality.py:486-498` now computes `share_contractor_in_long_chains` over closed-cycle attribution only. AMP 1.9945 → 0.9115. Zero contractors over 1.0 across all 29. `avg_contractor_delay_days` unchanged (dormant extension preserved). See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.2.
-- **D-005 — `CHAIN_TIMELINE_ATTRIBUTION.json` truncation fixed.** `write_chain_timeline_artifact` now uses atomic write (tmp + `os.replace`). Artifact regenerated: 2,819 chains parse cleanly (was 2,687 via tolerant parse). 6 contractors no longer missing chains.
+### Step 2.5 summary (2026-04-30)
+- D-1 rule extension landed: `EXPECTED_DIVERGENCES.open_doc_vs_docs_df_sas_filter` now covers `workflow_step_count` (Δ −24) and `sas_row_count` (Δ −14) for L1→L2.
+- Audit one-liner: `PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`. The remaining FAIL is the real D-011 upstream gap, intentionally not silenced.
+- D-012 verdict: **PARTIAL_CONFIRMED**. The 2-row L1→L2 SAS REF gap decomposes into two non-bug mechanisms:
+  - `sas_filter_component=CONFIRMED`: pair `051020|A` (submittal_date 2025-04-07) excluded by `_apply_sas_filter_flat`, contributes 1 row.
+  - `structural_component=PRESENT`: pair `152012|A` has 2 GED_RAW_FLAT SAS REF rows (multi-cycle SAS, one-row-per-step schema), normalised to 1 in RunContext, contributes 1 row.
+- `pair_gap=1`, `sas_filter_explained_rows=1`, `structural_normalization_rows=1`, `structural_duplicate_pairs=["152012|A"]`. Receipts: `output/debug/sas_pre2026_confirmation.json`. 25 tests pass.
 
-### Open (handed forward — out of Phase 0 scope)
+### Step 3 summary (2026-04-30)
+- **Patch shape (production source):**
+  - `RunContext` gains `flat_ged_doc_meta: dict = field(default_factory=dict)` in `src/reporting/data_loader.py`.
+  - `_load_from_flat_artifacts` now passes `flat_doc_meta or {}` into the `RunContext(...)` constructor (one site).
+  - `src/reporting/aggregator.py` gains `resolve_visa_global(ctx, doc_id)`. The helper prefers `ctx.flat_ged_doc_meta[doc_id]["visa_global"]` (authoritative per `FLAT_GED_CONTRACT`) and pulls `vdate` from `WorkflowEngine.compute_visa_global_with_date(doc_id)` because `flat_doc_meta` does not carry `visa_global_date` today.
+  - All 5 direct call sites in aggregator.py now route through the helper: `compute_project_kpis`, `compute_monthly_timeseries`, `compute_weekly_timeseries`, `compute_consultant_summary`, `compute_contractor_summary`.
+- **Audit one-liner:** `PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX` — unchanged. The remaining FAIL is the upstream D-011 SAS REF projection gap, intentionally not silenced.
+- **KPI behaviour preserved.** WorkflowEngine and `flat_doc_meta` are in full agreement on `visa_global` for every doc in run 0, so no count-category shifted at L4. `avg_days_to_visa` was briefly broken by the original step-3 patch (helper returned `(visa, None)` and the date tile collapsed to null) — fixed in §21.8 addendum. Post-addendum: `avg_days_to_visa = 79.1`.
+- **Snapshot retained for audit forensics:** `output/debug/counts_lineage_audit.PRE_STEP3.json` (transient — safe to delete after sign-off).
+- **Pytest validation inconclusive in sandbox.** Three pytest invocations of `tests/test_resolve_visa_global.py` hung indefinitely in the Cowork Linux sandbox (probable cause: the import chain `reporting.aggregator → data_loader → workflow_engine → read_raw → normalize` blocks on cross-mount Windows reads when invoked through pytest). The 13 helper tests are structurally correct (pure unit tests, mocked engine, no real-data dependency); they need to be confirmed via a Windows shell run. See `context/11_TOOLING_HAZARDS.md` H-4. App smoke and the audit harness both PASS in the sandbox; the regression that the addendum fixed (`avg_days_to_visa = None` → `79.1`) was confirmed via direct `compute_project_kpis` invocation, not via pytest.
 
-| ID | Issue | Suspected location | Classification |
-|---|---|---|---|
-| **D-003** | SNI SAS REF count: raw GED ~184 vs flat_ged 52. Operator's count from raw was never directly audited (we read `FLAT_GED.xlsx::GED_OPERATIONS`, not the raw GED workbook). | raw → flat_ged extraction in `src/flat_ged/transformer.py` | **upstream rework** — open a separate ticket. Document the raw vs flat scope difference. |
-| **D-006** | AAI shows B1=7 (`GED_OPERATIONS` SAS+REF) vs C3=6 (`ctx.responses_df` SAS-track REF). 1 SAS REF row lost between layers. | `stage_read_flat._apply_sas_filter_flat` (`stage_read_flat.py:202-274`) OR doc_id null filter (`stage_read_flat.py:548`) | **needs investigation** — single-row scope; low priority. |
-| **D-010** | `_precompute_focus_columns` calls `we.compute_visa_global_with_date(doc_id)` directly but `flat_ged_doc_meta` is the documented authoritative source in flat mode (engine returns `(None, None)` for SAS REF docs). | `data_loader.py:550` vs `stage_read_flat.py:80-105` | **needs investigation** — write a spot-check comparing the two sources across all dernier docs. |
+### Step 4 summary (2026-04-30)
+- 8 audit fields ship in `output/intermediate/FLAT_GED_cache_meta.json` under `cache_schema_version: "v2"`. Cross-check vs. RunContext: docs_df_rows / responses_df_rows / active_version_count / family_count all match.
+- Schema-version bump auto-rejected the v1 cache on the verification run, forcing a fresh ~30s Windows-shell rebuild that wrote the v2 cache. Trace captured verbatim in §22.2.
+- Audit one-liner unchanged across the rebuild: `PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`.
+- **Trust-but-verify finding:** Claude Code's step-4 execution report claimed both `CACHE_SCHEMA_VERSION = "v2"` and `§22 appended`; chat-side verification showed the constant was still `"v1"` and §22 did not exist. Both were corrected from this chat via direct Edit tool. The 8-field payload extension that Claude Code did apply landed correctly. Recorded in §22 itself as a data point for future agent-driven phases. (Second time this has happened — the step-3 `(visa, None)` regression was the first.)
 
-### Still documented as known limitation (no code change)
+### Step 5 summary (2026-04-30)
+- WARN-only Chain+Onion source alignment check landed in `src/chain_onion/source_loader.py` only (`+106` lines). Helper imports `_resolve_latest_run` and `_get_artifact_path` from `data_loader.py` (slight scope addition vs. the prompt; chosen to avoid hardcoding `run_number=0`).
+- First production run: `result=OK`. The path source_loader is reading is the same canonical path registered in `run_memory.db` for the current run. `sha_match` skipped because paths are identical.
+- Helper is fully defensive: try/except wrap, multiple `db_path` candidates, `UNDETERMINED` outcomes never raise, never block Chain+Onion. Validated: `run_chain_onion.py` exit 0 in 105.7s in sandbox, 7/7 pytest passed in 1.45s in sandbox (small mock-based tests don't trigger H-4), audit one-liner unchanged.
+- Receipts schema deviation worth noting: prompt asked for `generated_at`, helper writes `checked_at`; missing `registered_mtime`/`using_mtime` advisory fields. Functionally fine — load-bearing fields (`result`, `registered_flat_ged_path`, `using_flat_ged_path`, `sha_match`, `reason`) are all present. Recorded for future schema cross-references.
+- BLOCK-mode flip is a deliberate non-decision for now per §9.3 of the plan. Re-approve when there's confidence WARN runs produce no false positives across multiple pipeline cycles.
 
-- **D-002 — H-3 dual-attribute hazard** (`ctx.responses_df` vs `ctx.workflow_engine.responses_df`). Already documented; Phase 0 added the empirical sanity-check identity (Δ = dernier count). See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.0.
-- **D-007 — two `total` fields under one fiche payload.** See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.1.
-- **D-008 — two `sas_refusal_rate` formulas under the same name.** See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.1.
-- **D-009 — share_long collateral.** SCH and LGD share values dropped post-fix (0.8843→0.3263, 0.7407→0.3311). Operationally correct: dormant time is captured by `avg_contractor_delay_days`, not the share metric. See `context/06_EXCEPTIONS_AND_MAPPINGS.md` §B.2.
+### Step 6 summary (2026-04-30)
+- 20 UI_PAYLOAD_FIELD_MAP entries; 10 compared, 10 skipped (out-of-scope-by-design, not coverage gaps).
+- Compared fields: 10/10 match. No `aggregator` ↔ `adapt_overview` divergence in current run.
+- Skipped breakdown:
+  - **Aggregator-only fields not on `adapt_overview` (7)**: `total_docs_all_indices`, `total_lots`, `discrepancies_count`, `docs_sas_ref_active`, `by_visa_global_pct`, `by_building`, `by_responsible`. May be exposed via other adapters (`adapt_consultants`, `adapt_contractors_list`) — out of scope for step 6's overview-only check.
+  - **Intentional UI reshape (2)**: `by_visa_global.REF` and `by_visa_global.SAS REF` are merged by the adapter into `visa_flow.ref` (single bucket). 1:1 not possible; would require sum check as a follow-up.
+  - **Conditional (1)**: `focus_stats` only populates when `focus_result` is active; the audit runs unfocused.
+- Step 6 contract ("flag any field where `compute_project_kpis` and `adapt_overview` disagree on a value they BOTH expose") is satisfied. No follow-up Medium-risk decision triggered.
+- Possible future enhancement (NOT a defect): widen the comparison to other adapter functions (`adapt_consultants`, `adapt_contractors_list`, `adapt_contractors_lookup`) to chase the 7 aggregator-only fields. Track separately if needed.
+
+### Closed by Phase 8 steps 2 + 2.5 + 3 + 4 + 5 + 6
+
+- **G-1, G-2** (workflow_step_count + sas_row_count not covered by SAS-filter rule) → CLOSED by D-1 rule extension in step 2.5.
+- **G-3** (stale 6155 baseline) → updated to 6901 with provenance in `scripts/audit_counts_lineage.py` and `output/debug/counts_lineage_audit.json`.
+- **G-4** (status_SAS_REF = 0) → reader bug, fixed. Real values are L0 = 836, L1 = 284, L2/L3/L4 = 282.
+- **D-1** → APPLIED in step 2.5.
+- **D-2** → APPLIED in step 2. Provenance captured.
+- **D-3** → ANSWERED by step 2 reader fix and the new RAW→FLAT open item below. Not "no SAS REF this run"; the harness was simply not extracting them.
+- **D-4, D-5, D-6** → resolved by step 1 (already noted).
+- **D-012** → CLOSED FOR PHASE 8 (PARTIAL_CONFIRMED). Decomposition above. No production code change required; both mechanisms are documented behaviour.
+- **G-5** → CLOSED by step 3. `flat_ged_doc_meta` now reaches `RunContext` and is consumed by `resolve_visa_global` at 5 aggregator sites.
+
+### Routed onward (after Phase 8 closure)
+
+| ID | Routed to | Why |
+|---|---|---|
+| **D-010** | Phase 8A | `_precompute_focus_columns` parallel `compute_visa_global_with_date` call site. MEDIUM risk; same pattern as Phase 8 step 3 in a different file. |
+| **D-011** | Phase 8B | RAW 836 SAS REF → FLAT 284 SAS REF. Audit's only remaining FAIL. Lives upstream in `src/flat_ged/transformer.py` (do-not-touch list during Phase 8; becomes focus area in 8B). |
+| **D-012** | ✅ closed by Phase 8 step 2.5 | PARTIAL_CONFIRMED. Decomposition: SAS pre-2026 filter excludes `051020\|A` (1 row) + RunContext normalises multi-cycle pair `152012\|A` from 2 rows to 1 (1 row). No production code change required. Evidence: `output/debug/sas_pre2026_confirmation.json`. |
+| **G-5** | ✅ closed by Phase 8 step 3 | `flat_ged_doc_meta` now reaches `RunContext` and is consumed by `resolve_visa_global` at 5 aggregator sites. |
+| **Step 5 BLOCK-mode flip** | Phase 8A | WARN-only landed clean in Phase 8 §23. Flip to BLOCK requires WARN-clean across at least one full pipeline cycle. |
+| **Step 6 widened UI coverage** | Phase 8A | Extend `_compare_ui_payload` to walk `adapt_consultants` / `adapt_contractors_list` / `adapt_contractors_lookup`. Coverage deepening, not a defect. |
 
 ### Resumption path
 
-Phase 7 closes (Step 11b) only after Phase 0 `SIGN_OFF.md` is signed.
-Phase 7 Steps 1–10 + 4b + 12a + 12a-fix2 + 12b are landed and untouched
-during Phase 0.
+**Phase 8 audit-side work is complete.** All in-scope steps (1, 2, 2.5,
+3, 4, 5, 6) are closed. Only the deferred Step 7 remains, and it is
+explicitly out of scope for this phase.
 
-**Operational note for the next pipeline run.** The FLAT_GED pickle cache files on disk predate the D-001 patch and lack the `cache_schema_version` key. The next `load_run_context` call will reject them and rebuild from `FLAT_GED.xlsx` (~30 s one-time cost), then write a new cache with `cache_schema_version: "v1"`. This is expected behavior, not a regression.
+Phase 8 outcomes summary:
+- Audit harness in production with provenance probe and 16-category
+  cross-layer comparison.
+- `raw_submission_rows` baseline refreshed (6155 → 6901 with provenance).
+- SAS REF reader fixed at every layer.
+- Aggregator now resolves `visa_global` from `flat_doc_meta`
+  (authoritative source) with engine-vdate fallback.
+- Cache schema bumped to v2 with 8 audit fields.
+- Chain+Onion source alignment check (WARN-only) running per Chain+Onion run.
+- UI payload comparison running per audit run, 10/10 matches.
+
+Items carried forward — NOT Phase 8 work:
+- **D-010** — parallel `_precompute_focus_columns` issue (separate ticket).
+- **D-011** — RAW 836 → FLAT 284 SAS REF projection in `src/flat_ged/*`
+  (separate ticket).
+- **Step 5 BLOCK-mode flip** — separate later decision; flip after WARN
+  has been clean across at least one full pipeline cycle that exercised
+  registry writes.
+- **Step 6 widened coverage** — possible future enhancement to compare
+  against `adapt_consultants` / `adapt_contractors_list` /
+  `adapt_contractors_lookup` to chase the 7 aggregator-only fields
+  currently marked skipped. Not a defect.
+
+Outstanding sandbox-only validation gaps — **all CLEARED 2026-04-30 by
+single Windows-shell pytest pass: 57 tests passed in 138.62s.**
+- Step 3: `tests/test_resolve_visa_global.py` — ✅ Windows-shell pass.
+- Step 4: `tests/test_cache_meta_v2.py` — ✅ Windows-shell pass.
+- Step 5: `tests/test_chain_onion_source_check.py` — ✅ already passed
+  sandbox; Windows-shell pass confirmed.
+- Step 6: new tests in `tests/test_audit_counts_lineage.py` — ✅
+  Windows-shell pass.
+
+Total Phase 8 test suite: 57 passing on Windows native.
+
+---
+
+## 🔜 NEXT — Phase 8A: Downstream Hardening (LOW audit steps closed 2026-05-01; MEDIUM steps gated)
+
+Plan: `docs/implementation/PHASE_8A_DOWNSTREAM_HARDENING.md` (self-contained; charter received from project owner 2026-04-30; 7 steps).
+
+Mission: harden every downstream consumer after FLAT_GED.xlsx is accepted as the operational source. Close D-010, promote Chain+Onion alignment from WARN to BLOCK on real content mismatches, widen the UI payload audit beyond Overview, and produce a UI metric inventory.
+
+Scope:
+
+| Step | Risk | Notes |
+|---|---|---|
+| **8A.1** D-010 focus-visa source audit | LOW | Read-only AST walk over `src/reporting/*` to enumerate every `compute_visa_global_with_date` call site. |
+| **8A.2** D-010 patch | **MEDIUM** | New `src/reporting/visa_resolver.py` shared module (avoids the circular import that would arise if `data_loader.py` reached into `aggregator.py`). Routes both `aggregator.py` and `_precompute_focus_columns` through the same helper. Per-step approval required. |
+| **8A.3** Chain+Onion BLOCK-readiness audit | LOW | Read-only check that the WARN-only check has been clean across a real pipeline cycle. |
+| **8A.4** Chain+Onion BLOCK flip | **MEDIUM** | Promotes the alignment check from WARN to enforcement. Owner-approved policy: BLOCK only on `WARN_PATH_AND_CONTENT_MISMATCH` or `UNDETERMINED`. Per-step approval required. |
+| **8A.5** UI metric inventory | LOW | Documentation only; produces `context/12_UI_METRIC_INVENTORY.md`. |
+| **8A.6** Widened UI payload audit | LOW (audit-only) → MEDIUM if a true_bug surfaces | Extends Phase 8 §24's UI payload comparison from Overview-only to all UI surfaces in the inventory. |
+| **8A.7** UI snapshot layer decision | LOW | Decision only; opens Phase 8C if 8A.6 proves the current architecture is brittle. |
+
+**Pre-flight finding (locked):** `aggregator.py` imports `from .data_loader import RunContext`. A reverse import would deadlock startup. The `visa_resolver.py` module path is the only viable design — confirmed and locked in §8.1 of the plan.
+
+Phase 8A entry point: hand the plan doc to a fresh agent. Suggested ship order: LOW first (8A.1, 8A.3, 8A.5 in any order), then MEDIUM after per-step approvals (8A.2, 8A.4, 8A.6), then 8A.7 as a closing decision. Same trust-but-verify discipline as Phase 8 (Read-tool spot-check after each Claude Code report).
+
+---
+
+## Phase 8A — Downstream Hardening Status
+
+> Live status of the Phase 8A sub-steps. Updated 2026-05-01 after the LOW-risk batch (8A.1, 8A.3, 8A.5) closed. The "🔜 NEXT — Phase 8A" section above remains as the plan reference; this section carries the run-by-run state.
+
+### 8A.1 — D-010 focus/visa source audit [CLOSED]
+
+- Artifacts:
+  - `scripts/audit_focus_visa_source.py`
+  - `output/debug/focus_visa_source_audit.json`
+  - `output/debug/focus_visa_source_audit.xlsx`
+- Result:
+  - `FOCUS_VISA_AUDIT: call_sites=10 direct_engine=8 via_resolver=2 disagreements_total=0`
+  - Phase 8 audit unchanged:
+    - `AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`
+    - `UI_PAYLOAD: compared=10 matches=10 mismatches=0`
+- Material finding:
+  D-010 scope is 8 direct WorkflowEngine visa call sites, not 1:
+  - `data_loader.py`: `_precompute_focus_columns` (line 604)
+  - `consultant_fiche.py`: `_has_visa_global` (line 1375)
+  - `contractor_fiche.py`: 6 sites inside `build_contractor_fiche` using local variable `we` (lines 138, 175, 198, 226, 252, 317)
+- Decision:
+  Do not patch all 8 sites yet.
+  Recommended sequence:
+    1. Run 8A.6 widened UI payload audit first.
+    2. Patch `_precompute_focus_columns` only in 8A.2.
+    3. Open separate 8A.2b for `consultant_fiche.py` and `contractor_fiche.py` if 8A.6 proves visible impact.
+
+### 8A.3 — Chain+Onion BLOCK-mode readiness audit [CLOSED, ready=false]
+
+- Artifacts:
+  - `scripts/check_chain_onion_alignment_block_ready.py`
+  - `output/debug/chain_onion_block_readiness.json`
+- Result:
+  - `BLOCK_READINESS: ready=false`
+  - Reason: latest pipeline run (2026-04-27) predates Chain+Onion WARN helper installation (2026-04-30).
+- Action required before 8A.4:
+  Run a fresh Windows-side full pipeline cycle:
+    `python main.py`
+  Then run:
+    `python scripts/check_chain_onion_alignment_block_ready.py`
+- Decision:
+  Do not flip BLOCK mode yet.
+
+### 8A.5 — UI metric inventory [CLOSED]
+
+- Artifact:
+  - `context/12_UI_METRIC_INVENTORY.md`
+- Result:
+  - 11 sections found:
+    - 9 required UI pages
+    - Shell / Sidebar & Focus pill (additional page discovered during walk)
+    - Coverage Summary
+  - Export panel documented as having 0 numeric rows.
+- Next:
+  Use this inventory as input to 8A.6 widened UI payload audit.
+
+### 8A.6 — Widened UI payload audit [CLOSED 2026-05-01]
+
+Audit script: `scripts/audit_ui_payload_full_surface.py`
+Test file: `tests/test_ui_payload_full_surface.py` (13 tests, all pass)
+Outputs: `output/debug/ui_payload_full_surface_audit.{json,xlsx}`
+
+**Result verbatim:**
+```
+UI_PAYLOAD_FULL: surfaces=6 compared=45 matches=45 mismatches=0; OK - all compared fields match
+```
+
+Per-surface breakdown:
+| Surface | Compared | Matches | Mismatches | Notes |
+|---|---|---|---|---|
+| consultants_list | 10 | 10 | 0 | 3 naming_only renames documented (docs_called→total, docs_answered→answered, open→pending) |
+| contractors_list | 33 | 33 | 0 | 30 per-contractor pass_rate checks; 1 naming_only (total_submitted→docs), 1 scope_filter (≥5 filter) |
+| consultant_fiche | 0 | 0 | 0 | build_consultant_fiche has no separate aggregator/adapter split — documented per spec §12.7 |
+| contractor_fiche | 0 | 0 | 0 | build_contractor_fiche has no separate aggregator/adapter split — documented per spec §12.7 |
+| dcc | 0 | 0 | 0 | DCC reads CHAIN_TIMELINE_ATTRIBUTION.json directly (2819 chain entries) — no split |
+| chain_onion_panel | 2 | 2 | 0 | 4/4 inventory keys present in dashboard_summary.json; top_issues.json has 20 entries |
+
+Classification breakdown: NM=0, SF=0, ESD=0, **TB=0**.
+S1 baseline intact post-run: `AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`
+S7 app smoke: `app import OK`.
+
+### 8A.7 — UI snapshot-layer decision [CLOSED 2026-05-01]
+
+Decision rule (per spec §13): NM≤2 AND SF≤2 → **keep architecture**.
+
+Inputs: NM=0, SF=0 → condition satisfied with wide margin.
+
+**Decision: KEEP ARCHITECTURE. Phase 8C is NOT opened.**
+
+Rationale: 45 field comparisons across 6 surfaces with 0 mismatches. The current
+aggregator → adapter pipeline is internally consistent. No brittleness detected.
+The naming_only renames (docs_called→total, docs_answered→answered, open→pending,
+total_submitted→docs) and the scope_filter (≥5 contractor threshold) are stable and
+documented. No snapshot layer is needed at this time.
+
+Phase 8C remains available if a future refactor of the adapter layer creates new
+divergences. Trigger: re-run 8A.6 and apply the decision rule again.
+
+### Recommended next action
+
+> **As of 2026-05-01: all items below are deferred backlog — see "Phase 8 family — closed for current release" at the top of this file. None are blockers for software finalisation.**
+
+Do not proceed yet with (blocked/MEDIUM, deferred backlog):
+- 8A.2 broad 8-site patch
+- 8A.4 Chain+Onion BLOCK flip
+- 8C RAW→FLAT cleanup
+
+### Open items (Phase 8A) — deferred backlog
+
+- **8A.2** — MEDIUM, gated: patch `_precompute_focus_columns` only. **(Deferred backlog — not a release blocker. `disagreements_total=0` per 8A.1.)**
+- **8A.2b** — MEDIUM, separate future patch: `consultant_fiche.py` and `contractor_fiche.py` direct visa calls. **(Deferred backlog — not a release blocker.)**
+- **8A.4** — MEDIUM, blocked until fresh pipeline run proves readiness. **(Deferred backlog — WARN-only is operational.)**
+- ~~**8A.6**~~ ✅ CLOSED 2026-05-01. 45 fields, 0 mismatches.
+- ~~**8A.7**~~ ✅ CLOSED 2026-05-01. Decision: keep architecture. Phase 8C not opened.
+- **8C** — later, upstream unexplained RAW→FLAT cleanup. **(Future backlog only / NOT ACTIVE for current release.)**
+
+---
+
+## ✅ CLOSED — Phase 8B: Upstream RAW → FLAT Reconciliation + Report Integration (closed 2026-05-01)
+
+Plan: `docs/implementation/PHASE_8B_RAW_TO_FLAT_RECONCILIATION.md` (closed; reference only). Final report: `output/debug/PHASE_8B_FINAL_REPORT.md`.
+
+**Outcome (§17 decision gate): C — existing reason logic incomplete + partially incorrect.** Identity contract holds; SAS REF gap 99.3% explained; 6 SAS REF rows remain UNEXPLAINED (28xxx /A C1 cluster). Phase 8B closed for current release. Residual unexplained rows + GEDDocumentSkip cleanup are routed to future backlog (Phase 8C / not active).
+
+Mission: prove every RAW GED event and every report event has a named destination — or a named reason for absence — in FLAT. Read-only investigation through 8B.9; production source under `src/flat_ged/*` becomes the focus area only after the §17 gate, with written approval.
+
+Scope:
+
+| Item | Step | Risk | Notes |
+|---|---|---|---|
+| **D-011** — RAW 836 SAS REF → FLAT 284 SAS REF (552-row drop) | 8B.5 (D-011 trace) | LOW (audit-only) → MEDIUM-HIGH at gate if patch needed | The audit's only remaining FAIL. Decomposition into the §5 explanation taxonomy is the headline target. |
+| **Report integration trace** | 8B.8 | LOW (audit-only) → MEDIUM at gate if FLAT schema extension proposed | Records how `data/report_memory.db` reports would attach at the FLAT level with explicit confidence + provenance. The §17 gate decides whether reports stay downstream (current `effective_responses`) or move to FLAT. |
+| **Existing reason logic audit** | 8B.7 | LOW (read-only) | Classify every existing exclusion / reason code in `src/flat_ged/*` as VALID / INVALID / MISSING / AMBIGUOUS. Do NOT modify reason code in this step. |
+| **Shadow corrected FLAT model** | 8B.9 | LOW | Builds `output/debug/SHADOW_FLAT_GED_*` showing what FLAT would look like if all trace gaps were corrected. Never overwrites production FLAT. |
+| **§17 Decision gate** | 8B.10 | n/a — checkpoint | Outcomes: A keep-current-builder / B controlled patch / C replace-reason-logic / D FLAT-schema-extension. Each outcome opens a separate sub-phase if pursued. |
+
+10 steps total. Steps 8B.1 (RAW event extraction) and 8B.2 (FLAT event extraction) come first — they materialize both sides into a common event model so steps 8B.3 through 8B.9 can compare row-by-row.
+
+Phase 8B entry point: hand the plan doc to a fresh agent, then ship one self-contained Claude Code prompt per step. Same trust-but-verify discipline as Phase 8 (Read-tool spot-check after each report).
+
+---
+
+## ✅ Phase 0 + Phase 7 — closed 2026-05-01
+
+Phase 0 (backend audit) signed off 2026-04-29. Phase 7 (contractor quality fiche) shipped 2026-05-01 with 0 backend failures and 25/25 UI checklist items passing. See `docs/implementation/PHASE_7_REPORT.md`.
+
+## V2 backlog — Phase 7 follow-ups
+
+Carried forward, NOT blocking, owned outside Phase 7:
+
+| Item | Source | Notes |
+|---|---|---|
+| Polar histogram visual polish | Step 12b smoke | "Still not pretty" per project owner; clearer scale + sector labels + palette ramp |
+| Drilldowns from polar / long-chains / KPI tiles | Phase 7 §V2 | V1 only dormant queues drill; V2 should expand to chain-level drilldowns |
+| Focus mode behavior on contractor fiche | Phase 7 Q4 | V1 shows "sans effet" notice; V2 should highlight/sort recent issues without filtering historical data |
+| D-003 raw↔flat SAS REF gap | Phase 0 TRIAGE | Upstream rework; SNI raw ~184 vs flat 52 |
+| D-006 AAI 1-row mystery | Phase 0 TRIAGE | Needs investigation |
+| D-010 engine vs meta visa source spot-check | Phase 0 TRIAGE | Needs investigation |
+| "Entreprise de la semaine" selection criteria | Phase 7 12b smoke | `ui_adapter.adapt_overview:125` — `(VSO+VAO)/total_submitted` is not the right taux de conformité per project owner |
 
 ---
 

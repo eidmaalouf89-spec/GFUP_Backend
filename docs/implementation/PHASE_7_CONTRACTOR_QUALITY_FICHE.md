@@ -1,3 +1,7 @@
+> ✅ **CLOSED 2026-05-01.** Phase 7 shipped. See `PHASE_7_REPORT.md` for the final scope, validation evidence, and V2 backlog. This plan file is kept for historical audit; do not re-execute.
+>
+> Original plan content follows below for reference.
+
 # Phase 7 — Contractor Quality Fiche (RESCOPED)
 
 This MD is **self-contained**. An agent assigned only this phase can execute it cold without reading any other file in `docs/implementation/`.

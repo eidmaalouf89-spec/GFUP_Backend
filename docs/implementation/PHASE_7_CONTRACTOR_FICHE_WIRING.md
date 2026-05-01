@@ -1,6 +1,8 @@
-# Phase 7 — Contractor Fiche Wiring  *[SUPERSEDED 2026-04-29]*
+# Phase 7 — Contractor Fiche Wiring  *[SUPERSEDED 2026-04-29 · CLOSED 2026-05-01]*
 
 > ⚠ **This plan has been superseded by `PHASE_7_CONTRACTOR_QUALITY_FICHE.md`.** Do not execute the steps below.
+>
+> **Final state:** Phase 7 closed 2026-05-01. See `PHASE_7_REPORT.md` for the shipped scope, design decisions, and validation evidence. This file is kept for historical audit; do not execute its steps.
 >
 > **Reason:** Inspection during execution revealed that `ui/jansa/fiche_base.jsx` is a monolithic consultant fiche (only `ConsultantFiche` and `DrilldownDrawer` are exposed; ~20 internal components are not). The contractor builder's payload shape (`block1_submission_timeline`, `block2_visa_chart`, `block3_document_table`, `block4_quality`) does not map onto consultant components. The "brutal reuse" approach assumed a primitive layer that does not exist.
 >

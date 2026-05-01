@@ -20,6 +20,7 @@ the responses onto `window`:
 | `window.CONSULTANTS` | `api.get_consultants_for_ui(focus, stale)` | `Api.get_consultants_for_ui` | `Api.get_consultant_list` → `reporting.aggregator.compute_consultant_summary` → `reporting.ui_adapter.adapt_consultants` |
 | `window.CONTRACTORS`, `window.CONTRACTORS_LIST` | `api.get_contractors_for_ui(focus, stale)` | `Api.get_contractors_for_ui` | `Api.get_contractor_list` → `reporting.aggregator.compute_contractor_summary` → `reporting.ui_adapter.adapt_contractors_lookup` + `adapt_contractors_list` |
 | `window.FICHE_DATA` | `api.get_fiche_for_ui(name, focus, stale)` (on consultant nav) | `Api.get_fiche_for_ui` | `Api.get_consultant_fiche` → `reporting.consultant_fiche.build_consultant_fiche` (or `build_sas_fiche` if name == "MOEX SAS") |
+| `window.CONTRACTOR_FICHE_DATA` | `loadContractorFiche` (ui/jansa/data_bridge.js:124-150) → `api.get_contractor_fiche_for_ui(code, focus, stale)` (on contractor nav) | `Api.get_contractor_fiche_for_ui` | `reporting.contractor_quality.build_contractor_quality` (+ `reporting.contractor_fiche.build_contractor_fiche` for header) |
 | `window.CHAIN_INTEL` | `api.get_chain_onion_intel(20)` | `Api.get_chain_onion_intel` | reads `output/chain_onion/top_issues.json` (list, sliced to limit) + `output/chain_onion/dashboard_summary.json` (summary dict); applies `reporting.narrative_translation.translate_top_issue` per issue (FR overlay); returns `{top_issues, summary}` |
 
 If `window.pywebview.api` is unavailable within 5s, `data_bridge.js`
@@ -244,7 +245,7 @@ key (lates first, then earliest deadline).
 | Drilldown | `get_doc_details` | inline in `app.py` over `consultant_fiche` helpers |
 | Drilldown export | `export_drilldown_xlsx` | inline in `app.py` |
 | Contractors (stub) | wired but UI shows StubPage | `aggregator.compute_contractor_summary` |
-| Contractor fiche (no UI yet) | `get_contractor_fiche` | `contractor_fiche.build_contractor_fiche` |
+| Contractor fiche | `get_contractor_fiche_for_ui` | `contractor_fiche.build_contractor_fiche` + `contractor_quality.build_contractor_quality` |
 | Runs | `get_all_runs`, `export_run_bundle` | `run_explorer` |
 | Executer | `validate_inputs`, `run_pipeline_async`, `get_pipeline_status` | `run_orchestrator` |
 | Reports / Tableau VISA | `export_team_version` | `data_loader` + shutil copy |

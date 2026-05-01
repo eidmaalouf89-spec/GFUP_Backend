@@ -211,6 +211,7 @@ returns a JSON-serialisable dict (sanitised through `_sanitize_for_json`).
 | `get_consultants_for_ui(focus, stale_days)` | `reporting.ui_adapter.adapt_consultants` |
 | `get_contractors_for_ui(focus, stale_days)` | `reporting.ui_adapter.adapt_contractors_lookup` + `adapt_contractors_list` (populates `window.CONTRACTORS` + `window.CONTRACTORS_LIST`) |
 | `get_fiche_for_ui(name, focus, stale_days)` | thin alias for `get_consultant_fiche` |
+| `get_contractor_fiche_for_ui(code, focus, stale_days)` | one contractor fiche payload; opens the `ContractorFiche` route in `ui/jansa/contractor_fiche_page.jsx` | `reporting.contractor_fiche.build_contractor_fiche` + `reporting.contractor_quality.build_contractor_quality` |
 
 ### Document Command Center
 

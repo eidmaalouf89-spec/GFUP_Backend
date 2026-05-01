@@ -286,6 +286,47 @@ the project rules explicitly call out:
 
 ---
 
+## D.1 — DUPLICATE_FAVORABLE_KEPT (RAW → FLAT GED projection rule, Phase 8B)
+
+> **Source:** Phase 8B final report (`output/debug/PHASE_8B_FINAL_REPORT.md`),
+> closed 2026-05-01. Documented here as the canonical reference for the
+> single largest RAW → FLAT SAS REF projection rule.
+
+When a contractor submits the same `(numero, indice)` pair more than once
+on the same day and the SAS layer issues both a favorable response
+(VAO / VSO) and a refusal (REF) on the same key, the FLAT projection
+emergent from `src/flat_ged/transformer.py` keeps the favorable SAS row
+and drops the duplicate SAS REF row. In Phase 8B's run-0 reconciliation,
+this rule absorbs **345 of the 836 RAW SAS REF rows** — by far the largest
+single component of the RAW → FLAT SAS REF gap.
+
+Mechanics (as observed, **not** as a single explicit named function):
+
+- Same-day duplicate contractor submission on `(numero, indice)`.
+- Favorable SAS response (VAO/VSO) is kept in the FLAT operational layer.
+- Duplicate SAS REF response on the same `(numero, indice)` is dropped.
+- 345 RAW SAS REF rows in run 0 fall under this rule.
+
+This rule is **emergent** from the duplicate-collapse + status-resolution
+combination in `src/flat_ged/*` rather than a single function with a
+matching name. Do not refactor on the assumption that there is a single
+explicit gate to flip — the behaviour is a composite of upstream
+transformer logic. Phase 8B sheet 07 of `raw_flat_reconcile.xlsx`
+classifies every such row.
+
+Companion projection classifications surfaced by Phase 8B sheet 07:
+
+| Classification | Run-0 row count | Meaning |
+|---|---:|---|
+| matched canonical | 283 | RAW SAS REF row matches FLAT SAS REF row 1:1 |
+| **DUPLICATE_FAVORABLE_KEPT** | **345** | same-day duplicate; favorable kept, REF dropped |
+| DUPLICATE_MERGED | 143 | duplicate row collapsed during projection |
+| ACTIVE_VERSION_PROJECTION | 32 | RAW SAS REF dropped because non-active version |
+| MALFORMED_RESPONSE | 27 | RAW row malformed; not projectable |
+| UNEXPLAINED | 6 | residual; tracked as future backlog (Phase 8C) |
+
+---
+
 ## E. BENTIN_LEGACY_EXCEPTION pass (`src/pipeline/stages/stage_discrepancy.py`, Part H-1)
 
 Even after exclusion, a few BENTIN rows survive in the discrepancy stream

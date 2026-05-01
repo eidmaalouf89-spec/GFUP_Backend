@@ -128,6 +128,78 @@ Both H-2 and H-3 were discovered during Phase 7 (contractor quality fiche) when 
 
 ---
 
+## H-4 — `pytest` invocations of tests that import the reporting chain hang in the sandbox
+
+**What it looks like.** `python -m pytest tests/test_resolve_visa_global.py -q` (or any pytest target whose test module imports `src/reporting/aggregator.py`, `src/reporting/data_loader.py`, or anything that transitively pulls `read_raw` / `normalize` / `workflow_engine`) produces zero stdout for 10+ minutes and never returns. Discovered Phase 8 step 3 vdate addendum (2026-04-30): three consecutive pytest runs of a 13-test pure-mock unit file each hung; `python -m py_compile` on the same file returned in <1 s, and direct invocation (`python -c "from reporting.aggregator import resolve_visa_global; ..."`) completed cleanly.
+
+**Probable cause.** The reporting import chain reads several Windows-mounted `.py` files at import time. pytest's collection phase performs additional discovery work (rootdir resolution, `conftest.py` walking, plugin loading) that multiplies the number of cross-mount stat/read operations. The cross-mount layer that already misbehaves under H-1 appears to deadlock or backpressure indefinitely under that load. py_compile and direct `python -c` invocations touch only the targeted file and do not trigger the deadlock.
+
+**Operational rules.**
+
+1. **For Phase 8 (and any phase that adds tests under `tests/test_*.py` covering the `reporting` package):** do NOT rely on sandbox `pytest` runs as gating validation. Pytest may report `0 passed, 0 failed` or simply hang. Treat any hang as inconclusive, not as failure.
+
+2. **Sandbox-side validation of new helper functions:** invoke directly. Examples:
+   ```bash
+   # Compile (always safe)
+   python -m py_compile src/reporting/aggregator.py
+
+   # Direct functional smoke (avoids pytest collection)
+   python - <<'PY'
+   import sys; sys.path.insert(0, "src")
+   from reporting.data_loader import load_run_context
+   from reporting.aggregator import compute_project_kpis
+   ctx = load_run_context(0)
+   k = compute_project_kpis(ctx)
+   print("avg_days_to_visa:", k.get("avg_days_to_visa"))
+   PY
+   ```
+   This pattern confirmed the Phase 8 §21.8 fix (avg_days_to_visa = 79.1) without pytest.
+
+3. **Authoritative test verification still requires a Windows shell run.** Tests that were structurally written and reviewed in this session (e.g. the 13 pytest cases for `resolve_visa_global`) need to be confirmed via `pytest` from a real Windows terminal before any release-quality sign-off. Mark sandbox pytest results as "inconclusive — see H-4" in execution reports rather than as PASS or FAIL.
+
+4. **App smoke remains a reliable sandbox check.** `timeout 15 python -c "import app"` and `timeout 15 python app.py --browser` both run cleanly because they hit a single import root and exit fast. These should stay in sandbox validation.
+
+5. **Do NOT delete `.pytest_cache/` or `__pycache__/` under repo root from sandbox bash to "fix" the hang** — that may force pytest to re-collect from cold and is not the actual remedy. The remedy is to skip pytest in sandbox for tests in this import family.
+
+**What this looks like in practice.**
+
+- ❌ Wrong: launch `python -m pytest tests/test_resolve_visa_global.py -q`, observe no output after 10 min, conclude the tests fail or the helper is broken, propose a recovery patch.
+- ✅ Right: same observation → record as "pytest inconclusive in sandbox (H-4)" → confirm fix via direct `python -c "..."` invocation against the impacted KPI → flag for Windows-side pytest verification before sign-off.
+
+---
+
+## H-5 — Bulk Windows-mounted xlsx I/O times out in the sandbox cross-mount
+
+**What it looks like.** A `python -c` invocation that calls `load_run_context(0)` (or any code path that triggers `stage_read_flat()` re-parsing `output/intermediate/FLAT_GED.xlsx` — ~32K rows × 2 sheets via openpyxl) emits no output for 5+ minutes and is killed. On a native Windows shell the same call returns in ~30 s. Discovered Phase 8 step 4 (2026-04-30) when the `CACHE_SCHEMA_VERSION` "v1" → "v2" bump correctly forced a rebuild that the sandbox could not finish.
+
+**Probable cause.** The Cowork sandbox exposes the Windows folder via the host-side bind/share that already misbehaves under H-1 and H-4. Bulk file I/O against that mount runs at a fraction of native Windows speed because every `read()` round-trips through the cross-OS bridge layer with caching that is helpful for small reads (Read tool) and harmful for large sequential reads (openpyxl streaming an xlsx). The same penalty applies to any pipeline stage that reads or writes large files under the mount during runtime.
+
+**Operational rules.**
+
+1. **For any step that triggers a cache rebuild, a pipeline rerun, or full xlsx re-parse against `FLAT_GED.xlsx` / `Grandfichier_v3.xlsx` / `GED_export.xlsx`:** do not gate on sandbox completion. Implement the patch, py_compile, run direct `python -c` invocations that touch only modified surfaces, and defer the heavy I/O verification to a Windows-shell run. Mark the verification status in the execution report as "code-landed, runtime verification pending Windows shell — see H-5".
+
+2. **Cache rebuild specifically:** changing `CACHE_SCHEMA_VERSION` in `data_loader.py` is the correct trigger; the existing freshness check rejects mismatched caches and forces the rebuild. Do NOT also `rm -f output/intermediate/FLAT_GED_cache_*.{pkl,json}` from sandbox bash — the rebuild path is already engaged, deletion adds nothing and risks tripping H-1.1.
+
+3. **The one-line Windows-shell verification** for any step that landed code expecting a cache rebuild:
+   ```
+   cd "C:\Users\GEMO 050224\Desktop\cursor\GF updater v3"
+   python scripts/audit_counts_lineage.py
+   ```
+   This single call exercises `load_run_context`, triggers the rebuild as a side effect, runs the audit, and prints the one-liner the harness contract guarantees. Paste the output back into the chat and the project owner closes the step in `07_OPEN_ITEMS.md`.
+
+4. **What is still safe in sandbox bash:** `python -m py_compile <file>`, `python -c "import app"` smoke (single-import, fast), `python scripts/audit_counts_lineage.py --probe` *only when an existing fresh cache is on disk* (probe reads cached state, doesn't trigger a rebuild), reading already-produced files under `output/debug/`.
+
+5. **What is NOT safe in sandbox bash:** any code path that calls `stage_read_flat`, `flat_ged_runner.build_flat_ged_artifacts`, `team_version_builder.build_team_version`, or that writes large xlsx files. Treat the sandbox as a code-review and small-script environment, not a runtime environment for bulk I/O.
+
+**What this looks like in practice.**
+
+- ❌ Wrong: bump CACHE_SCHEMA_VERSION → invoke `load_run_context(0)` in sandbox → wait 5 min → kill the command → conclude the patch is broken → revert.
+- ✅ Right: bump CACHE_SCHEMA_VERSION → py_compile clean → directly inspect the new payload shape via Read tool → mark step as "code-landed, runtime verification pending Windows shell" → hand the project owner the single Windows-shell command → close on their next paste.
+
+H-1, H-4, and H-5 are facets of the same root cause — the cross-mount is a poor substrate for runtime work. The hazards differ by symptom (stale views / pytest-collection deadlock / bulk-read timeout) and remedy (Read tool / direct `python -c` / Windows shell), but they share an operating principle: **prefer Windows-shell runs for anything load-bearing.**
+
+---
+
 ## Change log
 
 | Date | Note |
@@ -135,3 +207,5 @@ Both H-2 and H-3 were discovered during Phase 7 (contractor quality fiche) when 
 | 2026-04-29 | File created after a Phase 2 false alarm caused by bash-cached view of `app.py` reporting 864 lines instead of ~1200, and the sandbox-side `data_bridge.js` view missing 60 lines. Read tool was authoritative both times. |
 | 2026-04-29 | H-2 (cache mtime-only freshness check) and H-3 (WorkflowEngine.responses_df dual-attribute hazard) added after Phase 7 12a-fix2 surfaced both compounded as the SNI SAS REF = 0 % bug. |
 | 2026-04-29 | H-1.1 added after Phase 0 Step 0.6: `sed -i.bak` round-trip overwrote `contractor_quality.py` on Windows with the stale Linux-mount truncated view. Recovery via Edit tool. H-2 production-confirmation note added (StringDtype unpickle drift) and D-001 fix landed. |
+| 2026-04-30 | H-4 added during Phase 8 step 3 vdate addendum: three pytest invocations of a 13-test pure-mock helper file hung indefinitely in the sandbox. Direct `python -c` invocation confirmed the fix (`avg_days_to_visa` restored from `None` to `79.1`). Pytest-side pass needs Windows-shell verification. |
+| 2026-04-30 | H-5 added during Phase 8 step 4: `CACHE_SCHEMA_VERSION` "v1" → "v2" bump correctly triggers a rebuild via the existing freshness check, but the rebuild's xlsx re-parse against the cross-mounted `FLAT_GED.xlsx` was killed at 5 min in sandbox (~30 s on Windows). Step 4 marked code-landed, runtime verification deferred to Windows shell. |

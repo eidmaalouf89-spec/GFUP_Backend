@@ -196,6 +196,112 @@ def _build_ged_responses_for_composition(
     return pd.DataFrame(records)
 
 
+def _check_flat_ged_alignment(flat_ged_path: Path) -> None:
+    """
+    Compare flat_ged_path against the FLAT_GED artifact registered in
+    run_memory.db for the latest completed run.
+    WARN-only — never raises, never blocks. Writes receipts to
+    <flat_ged_parent>/../debug/chain_onion_source_check.json on every call.
+    """
+    import hashlib
+    import json as _json
+    from datetime import datetime, timezone
+
+    _arg = Path(flat_ged_path)
+    receipts: dict = {
+        "result": "UNDETERMINED",
+        "registered_flat_ged_path": None,
+        "using_flat_ged_path": str(_arg),
+        "sha_match": None,
+        "reason": "",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    def _write() -> None:
+        try:
+            debug_dir = _arg.parent.parent / "debug"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            (debug_dir / "chain_onion_source_check.json").write_text(
+                _json.dumps(receipts, ensure_ascii=False, default=str),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    try:
+        resolved_using = _arg.resolve()
+
+        # Locate run_memory.db: try flat_ged-derived root first, then module root
+        db_path: Optional[Path] = None
+        for candidate in (
+            resolved_using.parent.parent.parent / "data" / "run_memory.db",
+            _SRC_DIR.parent / "data" / "run_memory.db",
+        ):
+            if candidate.exists():
+                db_path = candidate
+                break
+
+        if db_path is None:
+            receipts["reason"] = "run_memory.db not found"
+            _LOG.info("_check_flat_ged_alignment: result=UNDETERMINED — %s", receipts["reason"])
+            return
+
+        from reporting.data_loader import _get_artifact_path, _resolve_latest_run  # type: ignore
+
+        run_number = _resolve_latest_run(str(db_path))
+        if run_number is None:
+            receipts["reason"] = "no completed run in run_memory.db"
+            _LOG.info("_check_flat_ged_alignment: result=UNDETERMINED — %s", receipts["reason"])
+            return
+
+        registered_str = _get_artifact_path(str(db_path), run_number, "FLAT_GED")
+        if registered_str is None:
+            receipts["reason"] = f"FLAT_GED not registered for run {run_number}"
+            _LOG.info("_check_flat_ged_alignment: result=UNDETERMINED — %s", receipts["reason"])
+            return
+
+        resolved_registered = Path(registered_str).resolve()
+        receipts["registered_flat_ged_path"] = str(resolved_registered)
+
+        if resolved_using == resolved_registered:
+            receipts["result"] = "OK"
+        else:
+            def _sha256(p: Path) -> str:
+                h = hashlib.sha256()
+                with open(p, "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        h.update(chunk)
+                return h.hexdigest()
+
+            sha_match = _sha256(resolved_using) == _sha256(resolved_registered)
+            receipts["sha_match"] = sha_match
+            if sha_match:
+                receipts["result"] = "WARN_PATH_MISMATCH_SAME_CONTENT"
+                receipts["reason"] = (
+                    f"path mismatch, content identical — "
+                    f"using={resolved_using} registered={resolved_registered}"
+                )
+            else:
+                receipts["result"] = "WARN_PATH_AND_CONTENT_MISMATCH"
+                receipts["reason"] = (
+                    f"path and content differ — "
+                    f"using={resolved_using} registered={resolved_registered}"
+                )
+
+        _LOG.info(
+            "_check_flat_ged_alignment: result=%s using=%s registered=%s",
+            receipts["result"], resolved_using, receipts.get("registered_flat_ged_path"),
+        )
+
+    except Exception as exc:
+        receipts["result"] = "UNDETERMINED"
+        receipts["reason"] = str(exc)
+        _LOG.info("_check_flat_ged_alignment: result=UNDETERMINED reason=%s", exc)
+
+    finally:
+        _write()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public functions
 # ─────────────────────────────────────────────────────────────────────────────
@@ -223,6 +329,7 @@ def load_flat_ged(flat_ged_path: Path) -> pd.DataFrame:
         )
 
     _LOG.info("load_flat_ged: reading GED_OPERATIONS from %s", flat_ged_path)
+    _check_flat_ged_alignment(flat_ged_path)
     ops_df = pd.read_excel(flat_ged_path, sheet_name="GED_OPERATIONS", dtype=str)
 
     # Normalize bool columns (stored as "True"/"False" strings in xlsx)

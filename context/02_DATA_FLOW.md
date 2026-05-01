@@ -158,6 +158,18 @@ Aggregators take a `RunContext` (+ optional `FocusResult`):
 Then UI-shaping (`reporting.ui_adapter.adapt_*`) flattens to the
 `window.OVERVIEW / CONSULTANTS / CONTRACTORS / FICHE_DATA` shape.
 
+### Contractor quality fiche lane (Phase 7, shipped 2026-05-01)
+
+```
+RunContext.docs_df, dernier_df, responses_df, workflow_engine
++ output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json (loaded once per request)
+  → contractor_quality.build_contractor_quality_peer_stats (project-wide median/p25/p75 across 29)
+  → contractor_quality.build_contractor_quality (per-contractor payload)
+  → app.py::get_contractor_fiche_for_ui (merges with build_contractor_fiche header + lots + buildings)
+  → bridge: loadContractorFiche → window.CONTRACTOR_FICHE_DATA
+  → ContractorFichePage.jsx (renders 7 widgets)
+```
+
 **Phase 5 (2026-04-29):** focus stats produced by
 `focus_filter.apply_focus_filter` now carry `by_contractor` (list of
 `{code, name, p1, p2, p3, p4, total}`) alongside the existing
@@ -257,6 +269,22 @@ The other 24+ query functions (`get_top_issues`, `get_high_pressure`,
 `get_contractor_quality`, `get_sas_friction`, etc.) are **not yet surfaced
 in the UI**. They are accessible from Python but no button or screen
 triggers them today.
+
+---
+
+## RAW ↔ FLAT projection reference (Phase 8B, closed 2026-05-01)
+
+For RAW↔FLAT projection questions — why a RAW row appears or doesn't appear
+in FLAT, why SAS REF row counts differ between layers, what the SAS REF
+projection rules are — use `docs/RAW_TO_FLAT_GED_KNOWLEDGE.md` and the
+Phase 8B final report at `output/debug/PHASE_8B_FINAL_REPORT.md`.
+
+Phase 8B proved the identity contract holds (RAW unique numero == FLAT
+unique numero == 2,819; RAW unique (numero, indice) == FLAT == 4,848 after
+`_MISSING_` filter) and classified the SAS REF projection gap to 99.3%
+coverage (830/836 rows accounted for). The 6 remaining UNEXPLAINED rows in
+the 28xxx /A C1 cluster are tracked as future backlog (see
+`context/07_OPEN_ITEMS.md` Phase 8 family closure section).
 
 ---
 

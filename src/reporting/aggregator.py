@@ -30,6 +30,26 @@ def _safe_str(val, fallback="?"):
     return s
 
 
+def resolve_visa_global(ctx, doc_id):
+    """Prefer meta-visa; pull date from WorkflowEngine since flat_doc_meta
+    does not carry visa_global_date today.
+
+    Phase 8 step 3 addendum (2026-04-30): the original step-3 patch
+    returned (visa, None) when meta supplied the visa. That silently
+    broke avg_days_to_visa at compute_project_kpis (aggregator.py:84),
+    which feeds ui_adapter.adapt_overview ("avg_days_to_visa" KPI).
+    Fix: keep meta visa, fetch vdate from WorkflowEngine.
+    """
+    meta = getattr(ctx, "flat_ged_doc_meta", None) or {}
+    entry = meta.get(doc_id)
+    if entry:
+        visa = entry.get("visa_global")
+        if visa:
+            _, vdate = ctx.workflow_engine.compute_visa_global_with_date(doc_id)
+            return visa, vdate
+    return ctx.workflow_engine.compute_visa_global_with_date(doc_id)
+
+
 def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] = None) -> dict:
     """
     Compute project-wide KPI numbers.
@@ -67,7 +87,6 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
 
     # Full computation from GED data
     dernier = ctx.dernier_df
-    we = ctx.workflow_engine
     resp = ctx.responsible_parties or {}
 
     # Focus mode: use FULL dernier for visa distribution (historical performance)
@@ -81,7 +100,7 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
     visa_dates = []
     for _, row in dernier.iterrows():
         did = row["doc_id"]
-        visa, vdate = we.compute_visa_global_with_date(did)
+        visa, vdate = resolve_visa_global(ctx, did)
         if visa:
             visa_counts[visa] += 1
             if vdate and row.get("created_at") is not None:
@@ -172,7 +191,6 @@ def compute_monthly_timeseries(
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
 
-    we = ctx.workflow_engine
     dernier = ctx.dernier_df
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
         dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)]
@@ -186,7 +204,7 @@ def compute_monthly_timeseries(
             continue
         month_key = created.strftime("%Y-%m")
 
-        visa, _ = we.compute_visa_global_with_date(did)
+        visa, _ = resolve_visa_global(ctx, did)
         monthly[month_key]["total"] += 1
         if visa == "VSO":
             monthly[month_key]["vso"] += 1
@@ -216,7 +234,6 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
 
-    we = ctx.workflow_engine
     # Use FULL dernier for historical avis (VSO/VAO/REF/HM are performance data)
     # Only the "open" bucket should reflect the focused set
     dernier = ctx.dernier_df
@@ -234,7 +251,7 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
         iso = created.isocalendar()
         week_key = f"{iso[0]}-S{iso[1]:02d}"
 
-        visa, _ = we.compute_visa_global_with_date(did)
+        visa, _ = resolve_visa_global(ctx, did)
         weekly[week_key]["total"] += 1
         if visa == "VSO":
             weekly[week_key]["vso"] += 1
@@ -340,7 +357,7 @@ def compute_consultant_summary(
             for _, ar in grp.iterrows():
                 if ar["date_status_type"] in ("PENDING_IN_DELAY", "PENDING_LATE"):
                     doc_id = ar["doc_id"]
-                    visa, _ = ctx.workflow_engine.compute_visa_global_with_date(doc_id)
+                    visa, _ = resolve_visa_global(ctx, doc_id)
                     if visa is None:
                         blocking += 1
 
@@ -442,7 +459,6 @@ def compute_contractor_summary(
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
 
-    we = ctx.workflow_engine
     # Group dernier docs by emetteur
     by_emetteur = defaultdict(lambda: {"docs": 0, "vso": 0, "vao": 0, "ref": 0, "sas_ref": 0, "open": 0, "lots": set()})
 
@@ -458,7 +474,7 @@ def compute_contractor_summary(
         by_emetteur[em]["docs"] += 1
         by_emetteur[em]["lots"].add(lot)
 
-        visa, _ = we.compute_visa_global_with_date(did)
+        visa, _ = resolve_visa_global(ctx, did)
         if visa == "VSO":
             by_emetteur[em]["vso"] += 1
         elif visa == "VAO":

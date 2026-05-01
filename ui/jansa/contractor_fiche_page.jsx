@@ -110,17 +110,57 @@ function peerTone(value, peer) {
 
 function KpiInfoIcon({ text }) {
   if (!text) return null;
+  const [open, setOpen] = React.useState(false);
+  const show = () => setOpen(true);
+  const hide = () => setOpen(false);
   return (
     <span
-      title={text}
+      tabIndex={0}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
       style={{
+        position: "relative",
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 14, height: 14, marginLeft: 6, borderRadius: "50%",
         border: "1px solid " + C.line2, color: C.text3,
         fontSize: 10, fontFamily: FONT_UI, fontWeight: 500,
         cursor: "help", userSelect: "none",
+        outline: "none",
       }}
-    >ⓘ</span>
+    >
+      ⓘ
+      {open && (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            minWidth: 240,
+            maxWidth: 320,
+            padding: "10px 12px",
+            background: C.surf2,
+            border: "1px solid " + C.line2,
+            borderRadius: 8,
+            boxShadow: "0 6px 24px rgba(0,0,0,0.35)",
+            color: C.text2,
+            fontFamily: FONT_UI,
+            fontSize: 11.5,
+            lineHeight: 1.45,
+            fontWeight: 400,
+            whiteSpace: "pre-line",
+            textAlign: "left",
+            zIndex: 100,
+            pointerEvents: "none",
+          }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
   );
 }
 

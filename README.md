@@ -6,9 +6,24 @@ This repository is not a generic Excel updater. It is a single-project operation
 
 ---
 
-## Phase 0 — Backend Data Audit (current, blocking)
+## Phase 8 family — release status (2026-05-01)
 
-**Status:** Active as of 2026-04-29. Phase 7 (contractor quality fiche) is paused mid-flight at the visual smoke stage.
+| Phase | Status |
+|---|---|
+| **Phase 8 — Count Lineage Fix** | ✅ CLOSED |
+| **Phase 8A — Downstream Hardening** | ✅ CLOSED FOR CURRENT RELEASE (LOW-risk audits closed 2026-05-01; MEDIUM-risk hardening deferred) |
+| **Phase 8B — RAW → FLAT GED Reconciliation** | ✅ CLOSED (Outcome C; identity contract passed; SAS REF gap 99.3% explained) |
+| **Phase 8C — Future optional cleanup** | ⏸ FUTURE BACKLOG ONLY / NOT ACTIVE |
+
+The remaining Phase 8-family items (D-010 broad WorkflowEngine cleanup, Chain+Onion BLOCK-mode flip, the 6 SAS REF UNEXPLAINED rows, the 67 non-SAS UNEXPLAINED response rows, the 132 actor-call UNEXPLAINED rows, GEDDocumentSkip cleanup, optional UI snapshot layer, optional audit glob lock-file fix) are backlog / hardening / forensic items and are **not blockers for software finalisation**. See `context/07_OPEN_ITEMS.md` for the full list.
+
+**Current priority:** product finalisation, app stabilisation, final delivery items.
+
+---
+
+## Phase 0 — Backend Data Audit (completed 2026-04-29)
+
+**Status:** ✅ Completed and signed-off 2026-04-29 by project owner. Phase 7 (contractor quality fiche) resumed and shipped 2026-05-01 — see next section. Audit harness (8 scripts under `scripts/audit/`) and findings (`docs/audit/DIVERGENCE_REPORT.md`, `TRIAGE.md`, `SIGN_OFF.md`) remain in repo for future re-runs.
 
 **Why we paused.** Phase 7's visual smoke surfaced a series of data integrity issues that revealed a systemic gap: there is no test harness comparing numbers across pipeline stages. Specifically:
 
@@ -39,6 +54,63 @@ This repository is not a generic Excel updater. It is a single-project operation
 7. `docs/audit/SIGN_OFF.md` signed by the project owner.
 
 **Resumption path.** Once §12 is green: Phase 7 resumes at Step 11a (re-run UI smoke checklist with corrected backend numbers), then Step 11b (report + final context + plan-file cleanup).
+
+**Outcome.** All 7 green-light criteria met (3 fix-now items closed: cache-version mechanism, AMP 199 % long-chains share fix, chain attribution artifact regeneration with atomic-write hardening). 3 items deferred with rationale (D-003 raw↔flat SAS REF gap → upstream rework; D-006 AAI 1-row mystery → investigation; D-010 engine vs meta visa source → investigation). See `docs/audit/SIGN_OFF.md` for the full checklist.
+
+---
+
+## Phase 7 — Contractor Quality Fiche (completed 2026-05-01)
+
+**Status:** ✅ Shipped. Per-contractor quality fiche live on the JANSA UI. Reachable from the dashboard "Entreprise de la semaine" card and from any enriched contractor card on the Contractors tab.
+
+**What's live.** Header (canonical name, code, lots, buildings, "Documents Actifs") · 5-tile KPI strip with peer bands (Taux SAS REF historique · REF dormants · Chaînes > 120 j · Délai moyen entreprise · Taux SUS SOCOTEC) and React-popover ⓘ formula tooltips · 12-sector polar histogram of contractor-attributed delay per chain (with sub-10-day footer count) · long-chains panel · open/finished chains card · two dormant queues (REF + SAS REF) drilling into the existing Document Command Center · focus-mode notice (focus behavior deferred to V2).
+
+**Backend.** New sibling module `src/reporting/contractor_quality.py`. Existing `contractor_fiche.py` untouched. Wrapper `app.py::get_contractor_fiche_for_ui` (line 1070) delegates to the original builder for header data + lots/buildings, then merges quality payload under `payload.quality`. Bridge: `loadContractorFiche` populates `window.CONTRACTOR_FICHE_DATA`.
+
+**Documentation.** `docs/implementation/PHASE_7_REPORT.md` is the canonical record. The two plan files (`PHASE_7_CONTRACTOR_FICHE_WIRING.md`, `PHASE_7_CONTRACTOR_QUALITY_FICHE.md`) are kept for audit and clearly marked SUPERSEDED/CLOSED.
+
+**V2 backlog.** Polar visual polish · drilldowns from polar/long-chains/KPI tiles · focus mode behavior on contractor fiche · 3 Phase 0 deferred items (D-003, D-006, D-010) · "Entreprise de la semaine" selection criteria. See `context/07_OPEN_ITEMS.md` "V2 backlog" section and `docs/implementation/PHASE_7_REPORT.md` §7.
+
+---
+
+## Phase 8 — Count Lineage Fix (closed 2026-04-30 — read-only reference)
+
+**Status:** ✅ Fully closed 2026-04-30. Steps 1 + 2 + 2.5 + 3 + 4 + 5 + 6 shipped and Windows-shell verified end-to-end. **57 Phase 8 tests passing on Windows native** (`pytest tests/test_resolve_visa_global.py tests/test_cache_meta_v2.py tests/test_chain_onion_source_check.py tests/test_audit_counts_lineage.py -q` → 57 passed in 138.62s). Final audit lines verbatim: `AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX` and `UI_PAYLOAD: compared=10 matches=10 mismatches=0; OK - all compared fields match`. The remaining audit FAIL is the upstream D-011 SAS REF projection gap, intentionally not silenced. Step 7 (Run completion gate) is deferred per the plan.
+
+**Carry-forward routing.** Phase 8 carry-forward items are split into two new buckets, neither yet opened:
+- **Phase 8A — Downstream Hardening:** D-010 (route `_precompute_focus_columns` through `resolve_visa_global`), Step 5 BLOCK-mode flip (after WARN-clean across a full pipeline cycle), Step 6 widened UI coverage (chase the 7 aggregator-only fields into `adapt_consultants` / `adapt_contractors_list` / `adapt_contractors_lookup`).
+- **Phase 8B — Upstream RAW → FLAT Reconciliation + Report Integration:** D-011 (RAW 836 → FLAT 284 SAS REF projection in `src/flat_ged/transformer.py`) plus operator-facing report integration of the audit lineage / probe / D-012 receipts.
+
+Bucket assignments live in `context/07_OPEN_ITEMS.md`. Plan documents for 8A and 8B are next-session work. The Phase 8 plan doc (`docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md`) is now read-only reference material — do not continue implementation inside it.
+
+**Step 3 in one line:** the aggregator now resolves `visa_global` from `RunContext.flat_ged_doc_meta` (authoritative per `FLAT_GED_CONTRACT`) instead of recomputing it via `WorkflowEngine.compute_visa_global_with_date`. Date is still pulled from WorkflowEngine because `flat_doc_meta` does not carry `visa_global_date`. KPI behaviour preserved end-to-end (`avg_days_to_visa = 79.1`, no count-category shifts at L4 because the two sources happened to agree on every doc in run 0). The patch is preventative: any future doc whose engine recomputation would diverge from the meta now resolves to the meta.
+
+**Step 4 in one line:** `CACHE_SCHEMA_VERSION` bumped `"v1"` → `"v2"`; `_save_flat_normalized_cache` now writes 8 audit fields into `FLAT_GED_cache_meta.json` (sha256, mtime, docs_df_rows=4834, responses_df_rows=27237, active_version_count=4834, family_count=2819, status_counts populated, generated_at). Schema bump auto-rejected the v1 cache on the verification run, forcing a fresh ~30s Windows-shell rebuild that wrote a clean v2 cache. Audit one-liner unchanged across the rebuild. Cross-check vs. RunContext: 4 invariants ✓. Reader untouched (already tolerates extra keys). Full receipts in §22 of `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md`.
+
+**Step 5 in one line:** `_check_flat_ged_alignment` helper added to `src/chain_onion/source_loader.py` (line 199, invoked at line 332 immediately before the existing `pd.read_excel`). Resolves the latest registered FLAT_GED via `data_loader._resolve_latest_run` + `_get_artifact_path`, compares against the path Chain+Onion is reading, and writes `output/debug/chain_onion_source_check.json` per run with a one-line `[CHAIN_ONION_SOURCE_CHECK] result=...` log. WARN-only — wrapped in try/except, never raises, never blocks Chain+Onion. First production run: `result=OK` (registered and using paths identical), `run_chain_onion.py` exit 0, audit one-liner unchanged. BLOCK-mode flip is a separate later decision. Full receipts in §23.
+
+**Step 6 in one line:** UI payload verification block added to `scripts/audit_counts_lineage.py` (no production source touched). 20-entry `UI_PAYLOAD_FIELD_MAP` declared as data; `_compare_ui_payload` driver runs per audit and compares `compute_project_kpis` vs `adapt_overview` field-by-field. Outputs: new `ui_payload_mismatches` xlsx sheet + `ui_payload_comparison` block in JSON + new `UI_PAYLOAD: compared=10 matches=10 mismatches=0; OK - all compared fields match` stdout line below the existing AUDIT one-liner. The 10 skipped entries are out-of-scope-by-design (7 aggregator-only fields not on `adapt_overview`, 2 intentional REF/SAS_REF merge in adapter, 1 conditional focus_stats). 10/10 compared fields match — no aggregator/adapter divergence in current run. Full receipts in §24.
+
+**Phase 8 outcome summary.** Audit harness in production with provenance probe and 16-category cross-layer comparison. RAW baseline refreshed with provenance. SAS REF reader fixed. Aggregator routes `visa_global` through `flat_doc_meta` (authoritative source) with engine-vdate fallback. Cache schema bumped to v2 with 8 audit fields. Chain+Onion source alignment WARN-check running per run. UI payload check running per audit. Outstanding: Windows-shell pytest pass for the 4 new test files (mechanical), plus separate D-010 / D-011 / step-5-BLOCK-flip tickets carried forward outside Phase 8.
+
+**Why.** UI numbers, aggregator KPIs, RunContext, FLAT_GED.xlsx, and Chain+Onion outputs disagree in places, and there was no harness comparing them across layers. Phase 8 built that harness FIRST (read-only, writes only to `output/debug/`); the next steps apply the smallest patches needed to make the audit pass — visa_global source mismatch, cache audit fields, and Chain+Onion source alignment.
+
+**Audit one-liner after step 2.5:** `PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX`. The single remaining FAIL is the real RAW→FLAT SAS REF projection gap (D-011), intentionally not silenced — it is upstream of Phase 8 and on the do-not-touch list.
+
+**Deliverables on disk after step 2.5.**
+- `scripts/audit_counts_lineage.py` (~1869 lines) — compares L0_RAW_GED → L1_FLAT_GED_XLSX → L2_STAGE_READ_FLAT → L3_RUNCONTEXT_CACHE → L4_AGGREGATOR → L5_UI_ADAPTER → L6_CHAIN_ONION. Default run plus `--probe` provenance mode plus the D-012 confirmation helper baked into every run.
+- `tests/test_audit_counts_lineage.py` (~452 lines) — 25 tests, all passing.
+- `output/debug/counts_lineage_audit.{xlsx,json}` — default audit output. `expected_baselines.raw_submission_rows` carries inline provenance after the step-2 baseline refresh (6155 → 6901, source `input/GED_export.xlsx` mtime 2026-04-22).
+- `output/debug/counts_lineage_probe.{xlsx,json}` — 119 records covering L0..L6 × 17 categories, each tagged with `value_origin_type` so every reported number traces to a measured source, a computed dataframe, or a baseline literal. No hidden hardcoded layer values.
+- `output/debug/sas_pre2026_confirmation.json` — D-012 receipts. The L1→L2 SAS REF 2-row gap decomposes into two non-bug mechanisms: (1) SAS pre-2026 filter excludes pair `051020|A` (1 row), (2) RunContext normalises the multi-cycle pair `152012|A` from 2 rows to 1 (1 row). Verdict: `PARTIAL_CONFIRMED`. Both are documented behaviour.
+
+**SAS REF reader fix landed in step 2.** Real values are now: L0 = 836, L1 = 284, L2/L3/L4 = 282 (previously reported 0 across the board). The 836 → 284 RAW → FLAT drop is a separate upstream open item (D-011 in `07_OPEN_ITEMS.md`) — `src/flat_ged/*` is on the do-not-touch list during Phase 8.
+
+**Plan.** `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md` is self-contained. §17 lists open questions; §18 = step-1 execution report; §19 = step-2 execution report; §20 = step-2.5 execution report.
+
+**What stays untouched.** No production source modified by steps 1, 2, or 2.5. Step 3 (visa_global), step 5 (Chain+Onion alignment in BLOCK mode), and step 6 (ui_adapter rename) all require explicit re-approval and only land via the Edit tool — never via in-place bash rewrites (see `context/11_TOOLING_HAZARDS.md` H-1.1).
+
+**Validation.** `python scripts/audit_counts_lineage.py` (default) or `--probe` (provenance). Detailed in `context/10_VALIDATION_COMMANDS.md` §L.
 
 ---
 

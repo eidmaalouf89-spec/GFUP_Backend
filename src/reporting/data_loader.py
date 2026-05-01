@@ -10,7 +10,7 @@ import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -54,6 +54,7 @@ class RunContext:
     ged_status_labels: dict = field(default_factory=dict)  # e.g. {"Terrell": {"s1": "VSO", "s2": "OBS", "s3": "REF"}}
     bet_merge_stats: dict = field(default_factory=dict)  # from BET report merger
     moex_countdown: dict = field(default_factory=dict)   # {doc_id: countdown_info}
+    flat_ged_doc_meta: dict = field(default_factory=dict)  # {doc_id: {"visa_global": ..., ...}} — flat mode only; empty in legacy fallback
 
 
 # Module-level cache
@@ -84,7 +85,8 @@ def clear_cache():
 #   - normalize_responses / normalize_docs add or rename columns
 #   - flat_doc_meta structure changes
 #   - pandas-side pickle compatibility breaks (rare)
-CACHE_SCHEMA_VERSION = "v1"
+#   - cache_meta payload gains audit fields (Phase 8 step 4, 2026-04-30)
+CACHE_SCHEMA_VERSION = "v2"
 
 
 def _flat_cache_paths(flat_ged_path: str):
@@ -140,6 +142,25 @@ def _save_flat_normalized_cache(flat_ged_path: str, docs_df, responses_df,
                 "cache_schema_version": CACHE_SCHEMA_VERSION,
                 "approver_names": approver_names,
                 "flat_doc_meta": flat_doc_meta,
+                # ── audit fields (Phase 8 step 4, 2026-04-30) ──
+                "source_flat_ged_sha256": _sha256(flat_ged_path),
+                "source_flat_ged_mtime":  Path(flat_ged_path).stat().st_mtime,
+                "docs_df_rows":           int(len(docs_df)),
+                "responses_df_rows":      int(len(responses_df)),
+                "active_version_count":   (
+                    int(docs_df["doc_id"].nunique())
+                    if "doc_id" in docs_df.columns else None
+                ),
+                "family_count":           (
+                    int(docs_df["numero"].nunique())
+                    if "numero" in docs_df.columns else None
+                ),
+                "status_counts":          (
+                    {str(k): int(v)
+                     for k, v in responses_df["status_clean"].value_counts().items()}
+                    if "status_clean" in responses_df.columns else {}
+                ),
+                "generated_at":           datetime.now(timezone.utc).isoformat(),
             }, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
@@ -548,6 +569,7 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
             ged_status_labels={},
             bet_merge_stats={},
             moex_countdown=moex_countdown,
+            flat_ged_doc_meta=flat_doc_meta or {},
         )
 
     except Exception as e:

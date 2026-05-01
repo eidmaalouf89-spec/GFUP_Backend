@@ -109,6 +109,10 @@ Constants in this file (`ENTREPRISE_DELAY_THRESHOLD_DAYS=15`,
 `TRES_ANCIEN_THRESHOLD_DAYS=60`, etc.) have direct user-visible meaning.
 See `context/06_EXCEPTIONS_AND_MAPPINGS.md` § I.3 before touching.
 
+### `src/reporting/contractor_quality.py` — Phase 7 backend module
+
+Business logic includes the BENTIN_OLD legacy filter, the dormant-time extension on `_contractor_delay_for_chain`, and the strip-dormant patch on `_long_chains` share (Phase 0 D-004). Read-only; modify only via a new phase plan.
+
 ### `src/reporting/chain_timeline_attribution.py` (DCC chain-time layer)
 
 Reads `output/chain_onion/CHAIN_*.csv` + RunContext, applies the 10-day
