@@ -107,7 +107,7 @@ function OvSpark({ values, color = 'var(--accent)', height = 34 }) {
 }
 
 /* ── KPI Row (4 cards) — Total Docs · Pending · Best Consultant · Best Contractor ── */
-function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor }) {
+function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor, onDrill }) {
   const trend = (data.weekly || []).map(w => w.closed);
   const pendTrend = (data.weekly || []).map(w => w.opened - w.closed).map((_, i, a) => {
     // running pending estimate
@@ -131,6 +131,7 @@ function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor }) {
         sub={`Semaine ${data.week_num} · run #${data.run_number}`}
         spark={trend}
         accent="#0A84FF"
+        onClick={() => onDrill && onDrill('submitted')}
       />
       <HeroKpi
         eyebrow="Bloquants en attente"
@@ -140,6 +141,7 @@ function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor }) {
         sub={pendingSub}
         spark={pendTrend}
         accent="#FF453A"
+        onClick={() => onDrill && onDrill('pending_blocking')}
       />
       <BestPerformerCard
         eyebrow="Consultant de la semaine"
@@ -235,7 +237,7 @@ function BestPerformerCard({ eyebrow, name, value, delta, medal, accent, onClick
 }
 
 /* ── Visa flow — 3-stage Sankey-style (replaces old visa bar) ── */
-function VisaFlow({ data }) {
+function VisaFlow({ data, onDrill }) {
   const f = data.visa_flow;
   const total = f.submitted;
 
@@ -278,17 +280,17 @@ function VisaFlow({ data }) {
         ]}/>
 
         <VisaStage label="Avis rendus" value={f.answered} total={f.answered} segments={[
-          { label:'VSO', value: f.vso, color:'#30D158' },
-          { label:'VAO', value: f.vao, color:'#FFD60A' },
-          { label:'REF', value: f.ref, color:'#FF453A' },
-          { label:'HM',  value: f.hm,  color:'#8E8E93' },
-        ]}/>
+          { label:'VSO', value: f.vso, color:'#30D158', segment: 'VSO' },
+          { label:'VAO', value: f.vao, color:'#FFD60A', segment: 'VAO' },
+          { label:'REF', value: f.ref, color:'#FF453A', segment: 'REF' },
+          { label:'HM',  value: f.hm,  color:'#8E8E93', segment: 'HM' },
+        ]} onDrill={onDrill}/>
 
         {f.on_time != null && f.late != null ? (
           <VisaStage label="En attente" value={f.pending} total={f.pending} segments={[
-            { label:'Dans les délais', value: f.on_time, color:'#0A84FF' },
-            { label:'En retard',       value: f.late,    color:'#FF453A' },
-          ]}/>
+            { label:'Dans les délais', value: f.on_time, color:'#0A84FF', segment: 'PENDING_ON_TIME' },
+            { label:'En retard',       value: f.late,    color:'#FF453A', segment: 'PENDING_LATE' },
+          ]} onDrill={onDrill}/>
         ) : (
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ fontSize:11.5, color:'var(--text-2)', fontWeight:500 }}>En attente</span>
@@ -300,7 +302,7 @@ function VisaFlow({ data }) {
   );
 }
 
-function VisaStage({ label, value, total, segments }) {
+function VisaStage({ label, value, total, segments, onDrill }) {
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 6 }}>
@@ -311,7 +313,11 @@ function VisaStage({ label, value, total, segments }) {
         {segments.map((s, i) => {
           const pct = (s.value / total) * 100;
           return (
-            <div key={i} title={`${s.label}: ${ovFmt(s.value)} (${pct.toFixed(1)}%)`} style={{
+            <div key={i} title={`${s.label}: ${ovFmt(s.value)} (${pct.toFixed(1)}%)`} onClick={() => {
+              if (onDrill && s.segment) {
+                onDrill('visa_segment', { segment: s.segment });
+              }
+            }} style={{
               width: `${pct}%`, height:'100%',
               background: s.color,
               display:'flex', alignItems:'center', justifyContent:'flex-start',
@@ -320,6 +326,7 @@ function VisaStage({ label, value, total, segments }) {
               fontVariantNumeric:'tabular-nums',
               minWidth: s.value > 0 ? 3 : 0,
               transition:'width 0.6s cubic-bezier(.4,0,.2,1)',
+              cursor: s.segment ? 'pointer' : 'default',
             }}>
               {pct > 12 && `${s.label} ${ovFmt(s.value)}`}
             </div>
@@ -343,7 +350,7 @@ function VisaStage({ label, value, total, segments }) {
 }
 
 /* ── Weekly activity chart (replaces monthly) — area + opened/closed bars ── */
-function WeeklyActivity({ data, focusMode }) {
+function WeeklyActivity({ data, focusMode, onDrill }) {
   const W = 820, H = 220, pad = { l: 36, r: 16, t: 20, b: 34 };
   const weekly = data.weekly || [];
   const weeks = focusMode ? weekly.slice(-12) : weekly;
@@ -426,6 +433,26 @@ function WeeklyActivity({ data, focusMode }) {
         <path d={refLine} fill="none" stroke="#FF453A" strokeWidth="1.4"
           strokeDasharray="4 3" opacity="0.85"/>
 
+        {/* Hit-targets for drilldown (transparent rects) */}
+        {weeks.map((w, i) => (
+          <rect key={`hit-${i}`}
+            x={xBar(i, 0)} y={pad.t} width={xStep} height={H - pad.t - pad.b}
+            fill="transparent" pointerEvents="all"
+            onClick={() => {
+              if (onDrill) {
+                onDrill('weekly', { week_label: w.label, metric: 'opened' });
+              }
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.fill = 'rgba(255,255,255,0.05)';
+              e.currentTarget.style.cursor = 'pointer';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.fill = 'transparent';
+            }}
+          />
+        ))}
+
         {/* X labels (every other for density) */}
         {weeks.map((w, i) => {
           if (focusMode ? false : (i % 2 !== 0 && i !== weeks.length - 1)) return null;
@@ -443,7 +470,7 @@ function WeeklyActivity({ data, focusMode }) {
 }
 
 /* ── FOCUS MODE visuals — replaces the old priority cue list ── */
-function FocusPanel({ data, onNavigate, onOpenConsultant }) {
+function FocusPanel({ data, onNavigate, onOpenConsultant, onDrill }) {
   const f = data.focus || { focused: 0, p1_overdue: 0, p2_urgent: 0, p3_soon: 0, p4_ok: 0, by_consultant: [] };
 
   return (
@@ -457,7 +484,7 @@ function FocusPanel({ data, onNavigate, onOpenConsultant }) {
           </div>
           <span style={{ fontSize: 12, color:'var(--text-3)' }}>Total focus · <b style={{ color:'var(--text)' }}>{f.focused}</b></span>
         </div>
-        <FocusRadial f={f}/>
+        <FocusRadial f={f} onDrill={onDrill}/>
       </OvCard>
 
       {/* Waterfall by consultant */}
@@ -473,12 +500,12 @@ function FocusPanel({ data, onNavigate, onOpenConsultant }) {
 }
 
 /* Radial focus chart: concentric arcs for P1..P4 */
-function FocusRadial({ f }) {
+function FocusRadial({ f, onDrill }) {
   const rings = [
-    { key:'p1_overdue', label:'P1 · en retard',  value: f.p1_overdue, color:'#FF453A', r: 98 },
-    { key:'p2_urgent',  label:'P2 · urgent ≤5j',  value: f.p2_urgent,  color:'#FF9F0A', r: 80 },
-    { key:'p3_soon',    label:'P3 · bientôt ≤15j',value: f.p3_soon,    color:'#FFD60A', r: 62 },
-    { key:'p4_ok',      label:'P4 · ok',          value: f.p4_ok,      color:'#30D158', r: 44 },
+    { key:'p1_overdue', label:'P1 · en retard',  value: f.p1_overdue, color:'#FF453A', r: 98, priority: 1 },
+    { key:'p2_urgent',  label:'P2 · urgent ≤5j',  value: f.p2_urgent,  color:'#FF9F0A', r: 80, priority: 2 },
+    { key:'p3_soon',    label:'P3 · bientôt ≤15j',value: f.p3_soon,    color:'#FFD60A', r: 62, priority: 3 },
+    { key:'p4_ok',      label:'P4 · ok',          value: f.p4_ok,      color:'#30D158', r: 44, priority: 4 },
   ];
   const total = rings.reduce((s, r) => s + r.value, 0);
   const maxValue = Math.max(...rings.map(r => r.value));
@@ -490,15 +517,22 @@ function FocusRadial({ f }) {
           const pct = ring.value / maxValue;
           const circumference = 2 * Math.PI * ring.r;
           return (
-            <g key={ring.key} style={{ transformOrigin:'120px 120px', transform: 'rotate(-90deg)' }}>
+            <g key={ring.key} style={{ transformOrigin:'120px 120px', transform: 'rotate(-90deg)', cursor: onDrill ? 'pointer' : 'default' }}>
               <circle cx="120" cy="120" r={ring.r} fill="none"
                 stroke="var(--bg-chip)" strokeWidth="9"/>
               <circle cx="120" cy="120" r={ring.r} fill="none"
                 stroke={ring.color} strokeWidth="9" strokeLinecap="round"
                 strokeDasharray={`${pct * circumference} ${circumference}`}
+                onClick={() => {
+                  if (onDrill && ring.priority) {
+                    onDrill('focus_priority', { priority: ring.priority });
+                  }
+                }}
                 style={{
                   transition:'stroke-dasharray 1s cubic-bezier(.4,0,.2,1)',
                   filter:`drop-shadow(0 0 6px ${ring.color}66)`,
+                  pointerEvents: onDrill ? 'stroke' : 'none',
+                  strokeOpacity: onDrill ? 1 : 0.85,
                 }}/>
             </g>
           );
@@ -717,9 +751,281 @@ function QuickActions({ onNavigate }) {
   );
 }
 
+/* ── Drilldown Drawer (local to Overview) ── */
+function DrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) {
+  const [payload, setPayload] = useStateOv(null);
+  const [loading, setLoading] = useStateOv(true);
+  const [error, setError] = useStateOv(null);
+
+  // Header copy mapping per kind
+  const headerMap = {
+    submitted: "Tous les documents soumis",
+    pending_blocking: "Bloquants en attente",
+    visa_segment: {
+      VSO: "Documents en VSO",
+      VAO: "Documents en VAO",
+      REF: "Documents en refus (REF)",
+      SAS_REF: "Documents bloqués SAS",
+      HM: "Documents Hors Marché",
+      PENDING_ON_TIME: "En attente · dans les délais",
+      PENDING_LATE: "En attente · en retard",
+    },
+    weekly: (label) => `Documents — semaine ${label}`,
+    focus_priority: (pri) => `Focus · P${pri}`,
+  };
+
+  const getHeader = () => {
+    if (!drill) return "—";
+    if (drill.kind === "submitted") return headerMap.submitted;
+    if (drill.kind === "pending_blocking") return headerMap.pending_blocking;
+    if (drill.kind === "visa_segment") return headerMap.visa_segment[drill.params.segment] || "—";
+    if (drill.kind === "weekly") return headerMap.weekly(drill.params.week_label);
+    if (drill.kind === "focus_priority") return headerMap.focus_priority(drill.params.priority);
+    return "—";
+  };
+
+  useEffectOv(() => {
+    if (!drill) return;
+    setLoading(true);
+    setError(null);
+    setPayload(null);
+
+    (async () => {
+      try {
+        const result = await window.jansaBridge.loadDrilldown(
+          drill.kind,
+          drill.params,
+          focusMode,
+          staleDays
+        );
+        if (result && result.error) {
+          setError(result.error);
+        } else {
+          setPayload(result);
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [drill]);
+
+  if (!drill) return null;
+
+  const header = getHeader();
+  const rows = payload?.rows || [];
+  const totalCount = payload?.total_count || 0;
+  const truncated = payload?.truncated || false;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.3)",
+          zIndex: 999,
+        }}
+      />
+
+      {/* Drawer */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: "45%",
+          maxWidth: "600px",
+          background: "var(--bg)",
+          borderLeft: "1px solid var(--line)",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 1000,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          animation: "slideInRight 0.3s cubic-bezier(.4,0,.2,1)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "24px 28px",
+            borderBottom: "1px solid var(--line)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+              {header}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6 }}>
+              Tri : du plus récent au plus ancien · {totalCount} document(s)
+            </div>
+            {truncated && (
+              <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>
+                Affichage limité aux 1 000 plus récents
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              fontSize: 20,
+              color: "var(--text-3)",
+              cursor: "pointer",
+              padding: "4px 8px",
+              fontFamily: "inherit",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {loading && (
+            <div
+              style={{
+                padding: 32,
+                textAlign: "center",
+                color: "var(--text-3)",
+                fontSize: 14,
+              }}
+            >
+              Chargement…
+            </div>
+          )}
+
+          {error && (
+            <div
+              style={{
+                padding: 16,
+                margin: 16,
+                background: "var(--bad-soft)",
+                border: "1px solid var(--bad)",
+                borderRadius: 8,
+                color: "var(--bad)",
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && rows.length === 0 && (
+            <div
+              style={{
+                padding: 32,
+                textAlign: "center",
+                color: "var(--text-3)",
+                fontSize: 13,
+              }}
+            >
+              Aucun document.
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {rows.map((row, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (window.openDocumentCommandCenter) {
+                      window.openDocumentCommandCenter(row.numero, row.indice);
+                    }
+                  }}
+                  style={{
+                    padding: "12px 24px",
+                    borderBottom: "1px solid var(--line)",
+                    background: "transparent",
+                    border: "none",
+                    textAlign: "left",
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--bg-elev)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {row.numero} · {row.indice}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-2)",
+                      marginBottom: 4,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {row.titre}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-3)",
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 8,
+                    }}
+                  >
+                    <span>{row.emetteur_name}</span>
+                    <span style={{ textAlign: "right" }}>
+                      {row.last_action_date}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+    </>
+  );
+}
+
 /* ── Page ── */
 function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContractor }) {
   const data = window.OVERVIEW;
+  const [drill, setDrill] = useStateOv(null);
+  const openDrill = (kind, params = {}) => setDrill({ kind, params });
+  const closeDrill = () => setDrill(null);
+
   return (
     <div style={{ padding: 32, animation: 'fadeInUp 0.4s cubic-bezier(.4,0,.2,1)' }}>
       {/* Degraded mode banner */}
@@ -739,10 +1045,10 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
       </div>
 
       {/* KPI row */}
-      <KpiRow data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onOpenContractor={onOpenContractor}/>
+      <KpiRow data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onOpenContractor={onOpenContractor} onDrill={openDrill}/>
 
       {/* Focus panel (replaces cue list) */}
-      {focusMode && <FocusPanel data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant}/>}
+      {focusMode && <FocusPanel data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onDrill={openDrill}/>}
 
       {focusMode && window.OVERVIEW && window.OVERVIEW.legacy_backlog_count > 0 && (
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
@@ -752,8 +1058,8 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
 
       {/* Visa flow + Weekly activity */}
       <div style={{ display:'grid', gridTemplateColumns: focusMode ? '1fr' : '1.2fr 1fr', gap: 14, marginBottom: 20 }}>
-        {!focusMode && <VisaFlow data={data}/>}
-        <WeeklyActivity data={data} focusMode={focusMode}/>
+        {!focusMode && <VisaFlow data={data} onDrill={openDrill}/>}
+        <WeeklyActivity data={data} focusMode={focusMode} onDrill={openDrill}/>
       </div>
 
       {/* Chain+Onion intelligence panel */}
@@ -770,6 +1076,9 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
         <ProjectStatsCard stats={data.project_stats}/>
         <SystemStatusCard status={data.system_status}/>
       </div>
+
+      {/* Drilldown drawer */}
+      {drill && <DrilldownDrawer drill={drill} focusMode={focusMode} staleDays={90} onClose={closeDrill}/>}
     </div>
   );
 }
@@ -865,12 +1174,12 @@ function ChainOnionPanel() {
       {/* Column headers */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '32px 76px 84px 180px 110px 1fr',
+        gridTemplateColumns: '32px 76px 110px minmax(180px, 1.2fr) 84px 160px 90px minmax(220px, 1.5fr)',
         gap: 8, padding: '0 8px 6px',
         borderBottom: '1px solid var(--line)',
         marginBottom: 4,
       }}>
-        {['#', 'Numéro', 'Urgence', 'État', 'Score', 'Synthèse'].map((h, i) => (
+        {['#', 'Numéro', 'Émetteur', 'Titre', 'Urgence', 'État', 'Score', 'Synthèse'].map((h, i) => (
           <div key={i} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{h}</div>
         ))}
       </div>
@@ -892,7 +1201,7 @@ function ChainOnionPanel() {
               }}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '32px 76px 84px 180px 110px 1fr',
+                gridTemplateColumns: '32px 76px 110px minmax(180px, 1.2fr) 84px 160px 90px minmax(220px, 1.5fr)',
                 alignItems: 'center', gap: 8,
                 padding: '7px 8px', borderRadius: 8,
                 background: 'transparent',
@@ -909,6 +1218,17 @@ function ChainOnionPanel() {
               {/* Numero */}
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace', letterSpacing: '.01em' }}>
                 {issue.numero}
+              </div>
+              {/* Émetteur */}
+              <div style={{ fontSize: 11, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {issue.emetteur_name || issue.emetteur_code || '—'}
+              </div>
+              {/* Titre */}
+              <div
+                title={issue.titre || ''}
+                style={{ fontSize: 11, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                {issue.titre || '—'}
               </div>
               {/* Urgency badge */}
               <span style={{

@@ -1,5 +1,14 @@
 # Phase 4 — Chain+Onion Priority Table Enrichment (Émetteur + Titre)
 
+> **STATUS: ✅ SHIPPED 2026-05-01.** Backend, exporter, harness loader fix, and UI
+> all live. `top_issues.json` now carries `emetteur_code`, `emetteur_name`,
+> `titre` per record. `ChainOnionPanel` renders 8 columns with ellipsis
+> truncation and tooltip on Titre. Validation harness `_load_csv` dtype fix
+> (`family_key`, `numero`, `version_key` forced to string) shipped alongside.
+> Phase 3 drilldown backend was completed in the same cycle (see
+> `PHASE_3_DRILLDOWNS.md`). Known warning: H38 escalated-chain ratio
+> (pre-existing, out of scope). See `context/07_OPEN_ITEMS.md` Item 4.
+
 This MD is **self-contained**. An agent assigned only this phase can execute it cold without reading any other file in `docs/implementation/`.
 
 ---

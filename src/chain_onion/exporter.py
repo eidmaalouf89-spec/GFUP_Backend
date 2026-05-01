@@ -21,6 +21,7 @@ export_chain_onion_outputs(
     portfolio_metrics,
     onion_portfolio_summary,
     output_dir="output/chain_onion",
+    issue_meta_df=None,
 ) -> dict[str, str]   # artifact_name -> absolute file path
 
 Rules
@@ -43,6 +44,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+from reporting.contractor_fiche import resolve_emetteur_name
 
 _LOG = logging.getLogger(__name__)
 
@@ -90,8 +93,16 @@ def export_chain_onion_outputs(
     portfolio_metrics: dict,
     onion_portfolio_summary: dict,
     output_dir: str = "output/chain_onion",
+    issue_meta_df: pd.DataFrame | None = None,
 ) -> dict[str, str]:
-    """Export all Chain + Onion artifacts. Returns dict of artifact_name -> path."""
+    """Export all Chain + Onion artifacts. Returns dict of artifact_name -> path.
+
+    Parameters
+    ----------
+    issue_meta_df : pd.DataFrame | None
+        Optional metadata DataFrame carrying (numero, indice, emetteur, titre, ...).
+        When provided, enriches top_issues.json with emetteur_code, emetteur_name, titre.
+    """
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -110,7 +121,7 @@ def export_chain_onion_outputs(
     artifacts.update(_export_csvs(reg, ver, evn, mtr, lay, scr, nar, out))
 
     # ── JSON ──────────────────────────────────────────────────────────────────
-    artifacts.update(_export_json(scr, nar, portfolio_metrics, onion_portfolio_summary, out))
+    artifacts.update(_export_json(scr, nar, portfolio_metrics, onion_portfolio_summary, out, issue_meta_df, chain_register_df))
 
     # ── XLSX ──────────────────────────────────────────────────────────────────
     artifacts.update(_export_xlsx(reg, ver, evn, mtr, lay, scr, nar, portfolio_metrics, onion_portfolio_summary, out))
@@ -144,7 +155,7 @@ def _export_csvs(reg, ver, evn, mtr, lay, scr, nar, out: Path) -> dict[str, str]
 
 # ── JSON exports ──────────────────────────────────────────────────────────────
 
-def _export_json(scr, nar, portfolio_metrics, onion_portfolio_summary, out: Path) -> dict[str, str]:
+def _export_json(scr, nar, portfolio_metrics, onion_portfolio_summary, out: Path, issue_meta_df: pd.DataFrame | None = None, chain_register_df: pd.DataFrame | None = None) -> dict[str, str]:
     results = {}
 
     # dashboard_summary.json
@@ -154,7 +165,7 @@ def _export_json(scr, nar, portfolio_metrics, onion_portfolio_summary, out: Path
     results["dashboard_summary.json"] = str(dash_path)
 
     # top_issues.json
-    top_issues = _build_top_issues(nar, scr)
+    top_issues = _build_top_issues(nar, scr, issue_meta_df, chain_register_df)
     issues_path = out / "top_issues.json"
     _write_json(top_issues, issues_path)
     results["top_issues.json"] = str(issues_path)
@@ -232,7 +243,7 @@ def _derive_top_theme(scr: pd.DataFrame, onion_portfolio_summary: dict) -> str:
     return "UNKNOWN"
 
 
-def _build_top_issues(nar: pd.DataFrame, scr: pd.DataFrame) -> list[dict]:
+def _build_top_issues(nar: pd.DataFrame, scr: pd.DataFrame, issue_meta_df: pd.DataFrame | None = None, chain_register_df: pd.DataFrame | None = None) -> list[dict]:
     if nar.empty:
         return []
 
@@ -250,6 +261,34 @@ def _build_top_issues(nar: pd.DataFrame, scr: pd.DataFrame) -> list[dict]:
             how="left",
         )
 
+    # Build metadata lookup: family_key -> {emetteur, titre}
+    # Primary path: use chain_register_df.latest_version_key to select from issue_meta_df
+    # Fallback: sort issue_meta_df by (numero, indice) and take last per numero
+    numero_meta: dict[str, dict[str, str]] = {}
+    if issue_meta_df is not None and not issue_meta_df.empty:
+        if chain_register_df is not None and "latest_version_key" in chain_register_df.columns:
+            # Primary path: family_key → latest_version_key → metadata row
+            reg = chain_register_df.set_index("family_key")["latest_version_key"]
+            meta_by_vkey = (
+                issue_meta_df.drop_duplicates("version_key")
+                             .set_index("version_key")[["emetteur", "titre"]]
+                             .to_dict(orient="index")
+            )
+            for fam_key, vkey in reg.items():
+                m = meta_by_vkey.get(str(vkey))
+                if m is not None:
+                    numero_meta[str(fam_key)] = m
+        else:
+            # Documented fallback: deterministic last-indice tiebreaker.
+            # Triggered only if chain_register_df is missing or lacks latest_version_key.
+            fb = (
+                issue_meta_df.sort_values(["numero", "indice"])
+                             .drop_duplicates("numero", keep="last")
+                             .set_index("numero")[["emetteur", "titre"]]
+                             .to_dict(orient="index")
+            )
+            numero_meta = {str(k): v for k, v in fb.items()}
+
     records = []
     for _, row in base.iterrows():
         rec: dict[str, Any] = {
@@ -265,6 +304,13 @@ def _build_top_issues(nar: pd.DataFrame, scr: pd.DataFrame) -> list[dict]:
             "recommended_focus": _safe_val(row.get("recommended_focus")),
             "escalation_flag": bool(row.get("escalation_flag", False)),
         }
+        # Append Phase 4 metadata fields
+        numero_str = str(rec["numero"])
+        meta = numero_meta.get(numero_str, {})
+        code = (meta.get("emetteur") or "").strip()
+        rec["emetteur_code"] = code
+        rec["emetteur_name"] = resolve_emetteur_name(code) if code else ""
+        rec["titre"] = meta.get("titre") or ""
         records.append(rec)
     return records
 

@@ -949,6 +949,36 @@ class Api:
             traceback.print_exc()
             return _sanitize_for_json({"success": False, "error": str(exc)})
 
+    def get_documents_drilldown(self, kind, params=None, focus=False, stale_days=90):
+        """Return drilldown rows for an Overview interaction (Phase 3 wiring)."""
+        import traceback
+        try:
+            from reporting.data_loader import load_run_context
+            from reporting.drilldown_builder import build_drilldown
+            ctx = load_run_context(BASE_DIR)
+            focus_result = None
+            if focus:
+                from reporting.focus_filter import apply_focus_filter, FocusConfig
+                focus_config = FocusConfig(enabled=True, stale_threshold_days=int(stale_days))
+                focus_result = apply_focus_filter(ctx, focus_config)
+                _live_numeros, _legacy_count = self._build_live_operational_numeros()
+                self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
+            payload = build_drilldown(
+                ctx,
+                str(kind or ""),
+                params or {},
+                focus_result=focus_result,
+            )
+            return _sanitize_for_json(payload)
+        except Exception as exc:
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "error": str(exc),
+                "rows": [],
+                "total_count": 0,
+                "truncated": False,
+            })
+
     def validate_inputs(self, run_mode, ged_path=None, gf_path=None,
                         reports_dir=None):
         """

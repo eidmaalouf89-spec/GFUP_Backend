@@ -199,9 +199,11 @@ mode.
 > `src/reporting/contractor_fiche.resolve_emetteur_name(code)` (added Phase 5,
 > 2026-04-29). It reads `CONTRACTOR_REFERENCE` below and returns the canonical
 > company name, falling back to the code itself if unmapped. Used by
-> `ui_adapter.adapt_contractors_list`, `adapt_contractors_lookup`, and
-> `focus_filter.apply_focus_filter` (`by_contractor` aggregation). Do NOT
-> duplicate the lookup elsewhere — import the helper.
+> `ui_adapter.adapt_contractors_list`, `adapt_contractors_lookup`,
+> `focus_filter.apply_focus_filter` (`by_contractor` aggregation), and
+> `chain_onion.exporter._build_top_issues` (Phase 4, 2026-05-01 — populates
+> `emetteur_name` per `top_issues.json` record). Do NOT duplicate the
+> lookup elsewhere — import the helper.
 
 ### C.1 — Code → display name (`src/reporting/consultant_fiche.py:CONTRACTOR_REFERENCE`)
 

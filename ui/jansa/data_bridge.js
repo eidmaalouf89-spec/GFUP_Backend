@@ -200,6 +200,34 @@
       }
     },
 
+    /**
+     * Load drilldown list for Overview dashboard interactions.
+     * @param {string}  kind        drilldown type (submitted, pending_blocking, visa_segment, weekly, focus_priority)
+     * @param {object}  params      kind-specific filters
+     * @param {boolean} focusMode   whether to apply focus filtering
+     * @param {number}  staleDays   stale-threshold in days (default 90)
+     * @returns {Promise<object>}   {rows: [...], total_count, truncated, kind, params}
+     */
+    loadDrilldown: async function (kind, params, focusMode, staleDays) {
+      if (!bridge.api) return { rows: [], total_count: 0, truncated: false };
+      try {
+        var r = await bridge.api.get_documents_drilldown(
+          String(kind),
+          params || {},
+          !!focusMode,
+          staleDays != null ? staleDays : 90
+        );
+        if (r && r.error) {
+          console.error("[data_bridge] drilldown error:", r.error);
+          return r;
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] drilldown exception:", e);
+        return { rows: [], total_count: 0, truncated: false };
+      }
+    },
+
     // ── Internal ──────────────────────────────────────────────────
 
     _loadCoreData: async function (focus, staleDays) {

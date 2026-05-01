@@ -102,7 +102,7 @@ def _warn(code: str, category: str, message: str) -> dict:
 def _load_csv(path: Path) -> Optional[pd.DataFrame]:
     """Return DataFrame or None on any error."""
     try:
-        df = pd.read_csv(path, low_memory=False)
+        df = pd.read_csv(path, low_memory=False, dtype={"family_key": str, "numero": str, "version_key": str})
         return df
     except Exception:
         return None

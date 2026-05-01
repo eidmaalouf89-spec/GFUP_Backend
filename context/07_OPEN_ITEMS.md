@@ -418,9 +418,9 @@ The pipeline writes `DISCREPANCY_REPORT.xlsx`,
 "Discrepancies — review queue" page over `DISCREPANCY_REVIEW_REQUIRED.xlsx`
 is purely additive.
 
-### 4. Chain + Onion narratives + top issues — partially wired (2026-04-29)
+### 4. Chain + Onion narratives + top issues — fully wired (Phase 4, 2026-05-01)
 
-`output/chain_onion/top_issues.json` and `dashboard_summary.json` are now
+`output/chain_onion/top_issues.json` and `dashboard_summary.json` are
 rendered in the dashboard's `ChainOnionPanel` (`ui/jansa/overview.jsx`)
 via `app.Api.get_chain_onion_intel(20)` → `window.CHAIN_INTEL`. Synthèse
 column is rendered in French (Phase 2, see
@@ -428,13 +428,61 @@ column is rendered in French (Phase 2, see
 `context/06_EXCEPTIONS_AND_MAPPINGS.md` § K). Issue rows are clickable —
 they open the Document Command Center (Phase 5 Mod 2).
 
+**Phase 4 enrichment shipped 2026-05-01:** `top_issues.json` now carries
+`emetteur_code`, `emetteur_name` (canonical name via
+`reporting.contractor_fiche.resolve_emetteur_name`), and `titre` (raw PDF
+filename) per record. Sourced from in-memory `ops_df` joined via
+`chain_register_df.latest_version_key`. `ChainOnionPanel` in
+`overview.jsx` extended from 6 to 8 columns (Émetteur and Titre between
+Numéro and Urgence; ellipsis truncation; `title=` tooltip on Titre).
+Validation harness `_load_csv` dtype fix (force `family_key`, `numero`,
+`version_key` to string) shipped alongside to resolve a pre-existing
+F32 false-failure that the new cross-reference exposed. See
+`docs/implementation/PHASE_4_CHAIN_ONION_TABLE_ENRICHMENT.md`.
+
+**Phase 3 drilldown backend completed 2026-05-01 (recovery cycle).**
+The dashboard drilldown drawer (KPI tiles, VisaFlow segments,
+WeeklyActivity bins, Focus rings) had been UI-wired since Phase 3 spec
+but the backend method was missing. `Api.get_documents_drilldown(self,
+kind, params=None, focus=False, stale_days=90)` added to `app.py`,
+delegating to the existing `reporting.drilldown_builder.build_drilldown`.
+Focus mode applies `apply_focus_filter` + `_build_live_operational_numeros`
++ `_apply_live_narrowing` (same shape as `get_dashboard_data`). Validated
+end-to-end 2026-05-01: Documents soumis (4834), Bloquants en attente
+(3723), REF segment (320), Weekly bin (107), Focus P1 (3093) — all return
+rows; row click → DCC preserved. See
+`docs/implementation/PHASE_3_DRILLDOWNS.md`.
+
+**Known warning (out of scope):** H38 — `escalated_chain_count > 25% of
+live_chains` (current run: 2453 vs 1968). Pre-existing; the chain_onion
+validation harness flags it as WARN. Not Phase 4 territory; would need
+operational review of the escalation trigger thresholds in
+`onion_scoring.py` if pursued.
+
+**Optional future polish:** widen the Focus radial click target.
+`overview.jsx:526` arc has `pointerEvents:'stroke'` on a 9px SVG stroke,
+which is precise but hard to hit. Switching to `pointerEvents:'visiblePainted'`
+on the parent `<g>` or adding a clickable legend row would improve
+accessibility and test automation. UI-only; LOW risk.
+
 **Still not surfaced:**
 - `CHAIN_NARRATIVES.csv` per-chain detail (only the top 20 from
   `top_issues.json` are exposed).
 - `primary_driver_fr` and `recommended_focus_fr` are present in the
-  payload but not rendered — Phase 4 enrichment territory.
+  payload but not rendered — separate enrichment, not part of the
+  Phase 4 above.
 - `dashboard_summary` fields beyond what `ChainOnionPanel` already shows
   (live/escalated/avg_pressure pills + top theme).
+
+### Implementation status as of 2026-05-01
+
+Of the per-feature implementation plans in `docs/implementation/`, the
+only phase still requiring substantial development is **Phase 6** (the
+"Intelligence layer"). Sub-plans `PHASE_6A_INTELLIGENCE_ARTIFACT.md`,
+`PHASE_6B_INTELLIGENCE_ENDPOINTS.md`, `PHASE_6C_INTELLIGENCE_UI_PAGE.md`,
+and `PHASE_6D_INTELLIGENCE_EXPORT_AND_TREATED.md` exist but are
+unimplemented. This is the next major work-stream — the "killer module".
+Phases 0–5, 7, 8 (and family) are shipped or read-only reference.
 
 ---
 

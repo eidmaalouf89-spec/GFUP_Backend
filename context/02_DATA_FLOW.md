@@ -180,6 +180,30 @@ emetteur names (Bentin, Legendre, …) are applied via
 `reporting.contractor_fiche.resolve_emetteur_name` — the single source
 of truth for code → company name.
 
+### Dashboard drilldown lane (Phase 3, completed via recovery 2026-05-01)
+
+```
+KPI tile click / VisaFlow segment click / WeeklyActivity bar click /
+FocusRadial ring click  →  overview.jsx:openDrill(kind, params)
+  →  data_bridge.js:loadDrilldown(kind, params, focusMode, staleDays)
+  →  app.py:Api.get_documents_drilldown(kind, params, focus, stale_days)
+       load_run_context(BASE_DIR)
+       focus on  →  apply_focus_filter + _build_live_operational_numeros
+                     + _apply_live_narrowing  →  focus_result
+       focus off →  focus_result = None
+       reporting.drilldown_builder.build_drilldown(ctx, kind, params, focus_result=focus_result)
+  →  _sanitize_for_json(payload)  →  {rows, total_count, truncated, kind, params}
+  →  DrilldownDrawer renders rows; row click → window.openDocumentCommandCenter(numero, indice)
+```
+
+`build_drilldown` was authored in Phase 3 but the `Api` exposure was missing
+until 2026-05-01 — the JS bridge had been calling a non-existent method,
+causing every drilldown to fail at the bridge layer. The recovery method
+mirrors the focus-handling pattern of `Api.get_dashboard_data`. Contract:
+`build_drilldown` returns `{rows, total_count, truncated, kind, params}`;
+on exception, `Api.get_documents_drilldown` returns the same shape with an
+extra `error` field and `rows=[]`, which the UI already handles gracefully.
+
 ---
 
 ## Chain Timeline Attribution layer (post-Phase 2 of DCC project)
@@ -257,6 +281,27 @@ python run_chain_onion.py
     dashboard_summary.json
     top_issues.json
 ```
+
+**Phase 4 enrichment (2026-05-01):** `run_chain_onion.py` now passes
+`issue_meta_df=ops_df` into `export_chain_onion_outputs(...)`. The
+exporter's `_build_top_issues` joins each chain's `family_key` to
+`chain_register_df.latest_version_key` and pulls `emetteur` + `titre`
+from the matching `ops_df` row, then resolves the canonical company
+name via `reporting.contractor_fiche.resolve_emetteur_name`. Three
+new keys (`emetteur_code`, `emetteur_name`, `titre`) are appended to
+every `top_issues.json` record. CSV outputs are unchanged. The
+exporter remains pure (no Excel/CSV/parquet reads) — all metadata is
+in-memory pass-through.
+
+**Validation harness loader fix (2026-05-01):** `validation_harness._load_csv`
+now reads identity columns as strings — `pd.read_csv(path, ...,
+dtype={"family_key": str, "numero": str, "version_key": str})`.
+Previously, default dtype inference cast numeric-looking keys to int64
+and stripped leading zeros (e.g. `045080 → 45080`), which caused F32
+to falsely report all 20 `top_issues` family_keys as missing from
+ONION_SCORES. Numeric columns continue to use pandas inference; only
+identity columns are forced to string. Documented as a one-line
+chokepoint fix in `_load_csv`.
 
 The main UI consumes Chain+Onion **only** through
 `app.Api._build_live_operational_numeros` → `chain_onion.query_hooks`:

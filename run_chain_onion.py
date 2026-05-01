@@ -150,6 +150,7 @@ def run():
         portfolio_metrics=portfolio_metrics,
         onion_portfolio_summary=onion_portfolio_summary,
         output_dir=str(OUTPUT_DIR),
+        issue_meta_df=ops_df,
     )
     for name, path in artifacts.items():
         _LOG.info("   → %s", path)

@@ -73,6 +73,42 @@ The remaining Phase 8-family items (D-010 broad WorkflowEngine cleanup, Chain+On
 
 ---
 
+## Phase 3 — Dashboard Drilldowns (completed 2026-05-01)
+
+**Status:** ✅ Shipped. Backend wired via recovery cycle 2026-05-01. Every Overview interaction (KPI tile, VisaFlow segment, WeeklyActivity bar, Focus radial ring) opens a backend-driven drilldown drawer with rows and a row-click hand-off to the Document Command Center.
+
+**What's live.** `Api.get_documents_drilldown(kind, params, focus, stale_days)` exposed on the `Api` class; delegates to `reporting.drilldown_builder.build_drilldown` (which had been authored in Phase 3 but never wired). Validated 2026-05-01: Documents soumis (4834), Bloquants en attente (3723), VisaFlow REF (320), WeeklyActivity bin (107), Focus P1 (3093) — all return rows. Row click opens DCC.
+
+**Backend.** Single new method on `Api` in `app.py`. Focus-handling mirrors `get_dashboard_data` (FocusConfig + `apply_focus_filter` + `_build_live_operational_numeros` + `_apply_live_narrowing`). `drilldown_builder.py` was already on disk — no source changes there. JS bridge (`data_bridge.js:loadDrilldown`) was already correct. Drawer (`overview.jsx:DrilldownDrawer`) was already correct.
+
+**Documentation.** `docs/implementation/PHASE_3_DRILLDOWNS.md` (closure stamp added). `context/02_DATA_FLOW.md` "Dashboard drilldown lane". `context/03_UI_FEED_MAP.md` updated with the new endpoint row.
+
+**Optional polish.** Widen the Focus radial click target — current 9px arc with `pointerEvents:'stroke'` is precision-dependent. Switch to `pointerEvents:'visiblePainted'` on the parent `<g>` or add a clickable legend row. UI-only; LOW risk.
+
+---
+
+## Phase 4 — Chain+Onion Priority Table Enrichment (completed 2026-05-01)
+
+**Status:** ✅ Shipped. Émetteur (canonical company name) and Titre (raw PDF filename) appended to every record in `output/chain_onion/top_issues.json` and surfaced in the Overview dashboard's Chain+Onion priority table.
+
+**What's live.** `top_issues.json` carries 14 fields per record — the 11 original keys plus `emetteur_code`, `emetteur_name`, `titre` appended at export. `ChainOnionPanel` in `overview.jsx` extended from 6 to 8 columns (Émetteur and Titre between Numéro and Urgence). Ellipsis truncation; `title=` tooltip on the Titre cell. Row click → DCC preserved. LGD → "Legendre", BEN → "Bentin", etc. via the canonical `resolve_emetteur_name` helper.
+
+**Backend.** `run_chain_onion.py` passes `issue_meta_df=ops_df` into `export_chain_onion_outputs`. Inside `_build_top_issues`, the join uses `chain_register_df.latest_version_key` to pick the latest `(emetteur, titre)` per family; documented sort+drop_duplicates fallback if `latest_version_key` is unavailable. Exporter remains pure — no Excel/CSV/parquet reads inside. CSV schemas unchanged.
+
+**Bonus fix shipped alongside.** `validation_harness._load_csv` previously read identity columns with default dtype inference, casting `family_key`/`numero` to int64 and stripping leading zeros (e.g. `045080 → 45080`). Phase 4's new cross-reference exposed this latent bug as a false F32 failure. Fix: `pd.read_csv(path, ..., dtype={"family_key": str, "numero": str, "version_key": str})`. F32 now passes; harness status WARN for the pre-existing H38 escalation ratio only.
+
+**Known warning (out of scope).** H38 — `escalated_chain_count=2453 > 25% of live_chains=1968`. Pre-existing; would need operational review of the escalation-trigger thresholds in `onion_scoring.py` if pursued.
+
+**Documentation.** `docs/implementation/PHASE_4_CHAIN_ONION_TABLE_ENRICHMENT.md` (closure stamp added). `context/02_DATA_FLOW.md` Phase 4 enrichment paragraph + harness fix note. `context/05_OUTPUT_ARTIFACTS.md` `top_issues.json` field shape. `context/06_EXCEPTIONS_AND_MAPPINGS.md` `chain_onion.exporter._build_top_issues` added to the `resolve_emetteur_name` consumer list. `context/07_OPEN_ITEMS.md` Item 4 closure note.
+
+---
+
+## Implementation status (as of 2026-05-01)
+
+Phases 0, 1, 2, 3, 4, 5, 7 are shipped. Phase 8 family is closed for the current release. The only remaining major implementation work is **Phase 6** — the Intelligence layer. Sub-plans `PHASE_6A_INTELLIGENCE_ARTIFACT.md`, `PHASE_6B_INTELLIGENCE_ENDPOINTS.md`, `PHASE_6C_INTELLIGENCE_UI_PAGE.md`, `PHASE_6D_INTELLIGENCE_EXPORT_AND_TREATED.md` exist but are unimplemented. This is the next "killer module" work-stream.
+
+---
+
 ## Phase 8 — Count Lineage Fix (closed 2026-04-30 — read-only reference)
 
 **Status:** ✅ Fully closed 2026-04-30. Steps 1 + 2 + 2.5 + 3 + 4 + 5 + 6 shipped and Windows-shell verified end-to-end. **57 Phase 8 tests passing on Windows native** (`pytest tests/test_resolve_visa_global.py tests/test_cache_meta_v2.py tests/test_chain_onion_source_check.py tests/test_audit_counts_lineage.py -q` → 57 passed in 138.62s). Final audit lines verbatim: `AUDIT: PASS=16 WARN=0 FAIL=1; first_unexpected_divergence=status_SAS_REF@L1_FLAT_GED_XLSX` and `UI_PAYLOAD: compared=10 matches=10 mismatches=0; OK - all compared fields match`. The remaining audit FAIL is the upstream D-011 SAS REF projection gap, intentionally not silenced. Step 7 (Run completion gate) is deferred per the plan.
@@ -400,7 +436,7 @@ Terminal states: `CLOSED_VAO`, `CLOSED_VSO`, `VOID_CHAIN`, `DEAD_AT_SAS_A`.
 | `ONION_SCORES.csv` | Chain-level scores, ranks, escalation flags |
 | `CHAIN_NARRATIVES.csv` | Management summaries with urgency/confidence labels |
 | `dashboard_summary.json` | Portfolio KPI snapshot (totals, ratios, top theme) |
-| `top_issues.json` | Top 20 chains by `action_priority_rank` |
+| `top_issues.json` | Top 20 chains by `action_priority_rank`; each record includes `emetteur_code`, `emetteur_name`, `titre` sourced from in-memory `ops_df` via `chain_register_df.latest_version_key` |
 | `CHAIN_ONION_SUMMARY.xlsx` | 11-sheet management workbook |
 
 ### Running the Chain + Onion Layer

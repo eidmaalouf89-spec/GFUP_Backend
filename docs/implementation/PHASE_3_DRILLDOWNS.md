@@ -1,5 +1,14 @@
 # Phase 3 — Dashboard Drilldowns (KPIs, Charts, Visa Flow)
 
+> **STATUS: ✅ SHIPPED 2026-05-01** (backend wiring completed via Phase 4 recovery cycle).
+> The `Api.get_documents_drilldown` method was added to `app.py` to expose the
+> previously-orphaned `src/reporting/drilldown_builder.py:build_drilldown` function.
+> Frontend, JS bridge, and backend builder were already in place; only the
+> `Api`-class method was missing. End-to-end validated 2026-05-01: Documents
+> soumis, Bloquants en attente, VisaFlow segments, WeeklyActivity bins, Focus
+> rings — all return rows. Row click → Document Command Center preserved.
+> See `context/07_OPEN_ITEMS.md` Item 4.
+
 This MD is **self-contained**. An agent assigned only this phase can execute it cold without reading any other file in `docs/implementation/`.
 
 ---

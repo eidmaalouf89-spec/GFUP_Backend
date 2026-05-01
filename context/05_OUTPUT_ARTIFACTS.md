@@ -129,6 +129,20 @@ Produced by `python run_chain_onion.py`, NOT by the main pipeline.
 `output/chain_onion/dashboard_summary.json` is NOT directly read by the
 UI today; it would be the natural input for a future "Top issues" screen.
 
+`output/chain_onion/top_issues.json` (Phase 4, 2026-05-01) carries 14 fields
+per record: the 11 original keys (`family_key`, `numero`,
+`action_priority_rank`, `normalized_score_100`, `urgency_label`,
+`portfolio_bucket`, `current_state`, `executive_summary`,
+`primary_driver_text`, `recommended_focus`, `escalation_flag`) plus three
+new identity fields appended at export time: `emetteur_code` (3-letter
+code), `emetteur_name` (canonical company name resolved via
+`reporting.contractor_fiche.resolve_emetteur_name`), and `titre` (raw PDF
+filename from GED_OPERATIONS). The three new fields are sourced from the
+in-memory `ops_df` passed into `export_chain_onion_outputs(...)` as
+`issue_meta_df`; the lookup picks `chain_register_df.latest_version_key`
+for each family. Unmapped emetteur codes fall back to the code itself
+(documented `resolve_emetteur_name` behavior).
+
 ---
 
 ## State databases
