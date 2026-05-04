@@ -228,6 +228,104 @@
       }
     },
 
+    /**
+     * Phase 6B — Counter-Attack home payload (bucket counts + summary).
+     * On-demand: NOT eager-loaded by _loadCoreData. Caller owns state.
+     * @returns {Promise<object>}  { available, summary, buckets }
+     */
+    loadCounterAttackHome: async function () {
+      if (!bridge.api) {
+        return {
+          available: false,
+          message: "Backend not connected.",
+          summary: { total_today: 0, recommended_first_bucket: null },
+          buckets: [],
+        };
+      }
+      try {
+        var r = await bridge.api.get_counter_attack_home();
+        if (r && r.error) {
+          console.error("[data_bridge] counter-attack home error:", r.error);
+          return r;
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] counter-attack home exception:", e);
+        return {
+          available: false,
+          message: "Backend exception.",
+          summary: { total_today: 0, recommended_first_bucket: null },
+          buckets: [],
+        };
+      }
+    },
+
+    /**
+     * Phase 6B — Counter-Attack queue payload for a single bucket.
+     * @param {string}  bucket   one of FERMER_MAINTENANT / SECONDAIRE_EXPIRE / ...
+     * @param {number}  limit    max rows (default 500)
+     * @returns {Promise<object>}  { available, bucket, bucket_label, count, rows }
+     */
+    loadCounterAttackQueue: async function (bucket, limit) {
+      if (!bridge.api) {
+        return {
+          available: false,
+          message: "Backend not connected.",
+          bucket: String(bucket || ""),
+          rows: [],
+        };
+      }
+      try {
+        var r = await bridge.api.get_counter_attack_queue(
+          String(bucket || ""),
+          limit != null ? limit : 500
+        );
+        if (r && r.error) {
+          console.error("[data_bridge] counter-attack queue error:", r.error);
+          return r;
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] counter-attack queue exception:", e);
+        return {
+          available: false,
+          message: "Backend exception.",
+          bucket: String(bucket || ""),
+          rows: [],
+        };
+      }
+    },
+
+    /**
+     * Phase 6B — Counter-Attack single-item detail payload.
+     * @param {string}  itemId   stable item_id from a queue row
+     * @returns {Promise<object>}  { available, found, header?, why_here?, ... }
+     */
+    loadCounterAttackItem: async function (itemId) {
+      if (!bridge.api) {
+        return {
+          available: false,
+          found: false,
+          message: "Backend not connected.",
+        };
+      }
+      try {
+        var r = await bridge.api.get_counter_attack_item(String(itemId || ""));
+        if (r && r.error) {
+          console.error("[data_bridge] counter-attack item error:", r.error);
+          return r;
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] counter-attack item exception:", e);
+        return {
+          available: false,
+          found: false,
+          message: "Backend exception.",
+        };
+      }
+    },
+
     // ── Internal ──────────────────────────────────────────────────
 
     _loadCoreData: async function (focus, staleDays) {

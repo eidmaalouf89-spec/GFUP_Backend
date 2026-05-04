@@ -46,3 +46,4 @@ data/run_memory.db,stage_init_run + stage_finalize_run + run_orchestrator,run_me
 data/report_memory.db,stage_report_memory,report_memory.*,stage_report_memory + chain_onion.source_loader,sqlite,Persistent consultant truth
 runs/run_NNNN/*,stage_finalize_run,run_memory.copy_artifact_to_run_dir,run_explorer.export_run_bundle,many,Immutable per-run snapshot
 output/exports/run_N_bundle.zip,app.Api.export_run_bundle,run_explorer.export_run_bundle,user (Explorer),zip,Per-run ZIP
+intermediate/COUNTER_ATTACK_ITEMS.csv,standalone Phase 6A script,scripts/build_counter_attack.py + reporting.counter_attack_builder.build_counter_attack_items,future Phase 6B read API / future Counter-Attack UI,csv,28-column deterministic action artifact; generated from DCC tags + Chain/Onion current_state/metrics/scores/narratives + response evidence; not registered in run_memory in 6A.

@@ -1192,6 +1192,64 @@ class Api:
             traceback.print_exc()
             return _sanitize_for_json({"error": str(exc), "numero": numero})
 
+    # ── Phase 6B — Counter-Attack Read API ──────────────────────
+    def get_counter_attack_home(self):
+        """Return Counter-Attack home payload: bucket counts + summary.
+
+        Read-only over output/intermediate/COUNTER_ATTACK_ITEMS.csv.
+        Missing artifact returns the friendly empty-state payload.
+        """
+        try:
+            from reporting.counter_attack_query import (
+                get_counter_attack_home as _impl,
+            )
+            return _sanitize_for_json(_impl())
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "available": False,
+                "message": "Le module Contre-attaque n'est pas encore disponible.",
+                "summary": {"total_today": 0, "recommended_first_bucket": None},
+                "buckets": [],
+                "error": str(exc),
+            })
+
+    def get_counter_attack_queue(self, bucket, limit=500):
+        """Return up to `limit` Counter-Attack rows for a given bucket key."""
+        try:
+            from reporting.counter_attack_query import (
+                get_counter_attack_queue as _impl,
+            )
+            return _sanitize_for_json(_impl(str(bucket or ""), int(limit)))
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "available": False,
+                "message": "Le module Contre-attaque n'est pas encore disponible.",
+                "bucket": str(bucket or ""),
+                "rows": [],
+                "error": str(exc),
+            })
+
+    def get_counter_attack_item(self, item_id):
+        """Return the full detail payload for a single Counter-Attack item_id."""
+        try:
+            from reporting.counter_attack_query import (
+                get_counter_attack_item as _impl,
+            )
+            return _sanitize_for_json(_impl(str(item_id or "")))
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "available": False,
+                "found": False,
+                "message": "Le module Contre-attaque n'est pas encore disponible.",
+                "error": str(exc),
+            })
+
 # ── Main ─────────────────────────────────────────────────────
 def main():
     ui_url = _resolve_ui()

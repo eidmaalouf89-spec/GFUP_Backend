@@ -1,0 +1,11 @@
+# Global Development Guardrail — Reuse Existing Composed Intelligence First
+
+This project already contains composed operational intelligence layers.
+
+Before creating any new builder, artifact, API, UI page, or feature, the agent must first check whether the needed information already exists in an existing composed module, adapter, artifact, or cockpit layer.
+
+The default rule is:
+
+```text
+Use the highest-level existing composed truth first.
+Only fall back to raw artifacts when the composed layer does not expose the required field.

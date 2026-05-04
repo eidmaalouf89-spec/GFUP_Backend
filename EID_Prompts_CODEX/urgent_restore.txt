@@ -1,0 +1,21 @@
+Close Phase 6X.
+
+Important authorship note:
+This phase started with Cowork managing the audits and step planning, but after the counter_attack_builder.py truncation incident, final recovery/reconstruction and R1/R2/R3 validation were completed by Codex. The closure record must mention this clearly.
+
+Do documentation/closure only.
+No source code changes.
+No artifact rebuild.
+No UI changes.
+No API changes.
+
+Create/update:
+- docs/implementation/PHASE_6X_ACTION_MOEX_DATA_TRUTH_CORRECTION.md
+- context/05_OUTPUT_ARTIFACTS.md
+- context/11_TOOLING_HAZARDS.md
+- context/03_UI_FEED_MAP.md only if needed
+
+Return final closure package.
+
+Final status should be:
+VALIDATED — PHASE 6X CLOSED

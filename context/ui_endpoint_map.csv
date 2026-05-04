@@ -27,3 +27,6 @@ shell.jsx (DCC panel trigger),window.openDocumentCommandCenter(numero,indice),(s
 (no UI today),(none),Api.get_contractor_list,reporting.aggregator.compute_contractor_summary,reporting,list
 (no UI today),(none),Api.get_contractor_fiche,reporting.contractor_fiche.build_contractor_fiche,reporting,dict
 (no UI today),(none),Api.get_dashboard_data,reporting.aggregator.* + focus_filter,reporting,dict (used internally by get_overview_for_ui)
+(future Counter-Attack page Phase 6C),(no UI today; on-demand on page mount),jansaBridge.loadCounterAttackHome,Api.get_counter_attack_home,reporting.counter_attack_query.get_counter_attack_home,{available summary{total_today recommended_first_bucket} buckets[7]}
+(future Counter-Attack page Phase 6C),(click bucket card),jansaBridge.loadCounterAttackQueue,Api.get_counter_attack_queue,reporting.counter_attack_query.get_counter_attack_queue,{available bucket bucket_label count rows[{item_id numero indice subject_label actor reason recommended_action risk_level days_open days_late open_dcc_ref}]}
+(future Counter-Attack page Phase 6C),(click queue row),jansaBridge.loadCounterAttackItem,Api.get_counter_attack_item,reporting.counter_attack_query.get_counter_attack_item,{available found header why_here recommended_action evidence timeline=[] open_dcc_ref}

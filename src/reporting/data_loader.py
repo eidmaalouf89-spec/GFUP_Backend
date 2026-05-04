@@ -86,7 +86,7 @@ def clear_cache():
 #   - flat_doc_meta structure changes
 #   - pandas-side pickle compatibility breaks (rare)
 #   - cache_meta payload gains audit fields (Phase 8 step 4, 2026-04-30)
-CACHE_SCHEMA_VERSION = "v2"
+CACHE_SCHEMA_VERSION = "v3"  # bumped: interpret_date_field now handles int ns timestamps
 
 
 def _flat_cache_paths(flat_ged_path: str):

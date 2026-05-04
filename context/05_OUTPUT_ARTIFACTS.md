@@ -1,4 +1,4 @@
-# 05 — Output Artifacts
+﻿# 05 â€” Output Artifacts
 
 > Every artifact produced by a pipeline run, plus chain_onion outputs.
 > Reconstructed from `pipeline/paths.py`, the eleven stages, the registered
@@ -6,9 +6,9 @@
 
 Three places hold artifacts after a run:
 
-1. `output/` — flat copy of the latest run's outputs (UI consumes this).
-2. `runs/run_NNNN/` — immutable per-run snapshot (registered with sha256).
-3. `data/run_memory.db` (`run_artifacts` table) — registry of the above.
+1. `output/` â€” flat copy of the latest run's outputs (UI consumes this).
+2. `runs/run_NNNN/` â€” immutable per-run snapshot (registered with sha256).
+3. `data/run_memory.db` (`run_artifacts` table) â€” registry of the above.
 
 `run_explorer.export_run_bundle(run_number)` ZIPs the `runs/run_NNNN/`
 folder and writes it to `output/exports/run_N_bundle.zip`.
@@ -19,7 +19,7 @@ folder and writes it to `output/exports/run_N_bundle.zip`.
 
 | File | Producer stage | Producer module | Consumer | Notes |
 |---|---|---|---|---|
-| `GF_V0_CLEAN.xlsx` | `stage_write_gf` | `writer.GFWriter.write` | `stage_build_team_version` (template patch base); `data_loader` (registered as `FINAL_GF`) | Reconstructed GF — internal, NOT the team file |
+| `GF_V0_CLEAN.xlsx` | `stage_write_gf` | `writer.GFWriter.write` | `stage_build_team_version` (template patch base); `data_loader` (registered as `FINAL_GF`) | Reconstructed GF â€” internal, NOT the team file |
 | `GF_TEAM_VERSION.xlsx` | `stage_build_team_version` | `team_version_builder.build_team_version` | `app.Api.export_team_version` (UI) | Surgical patch of OGF (Grandfichier_v3.xlsx) using GF_V0_CLEAN as truth |
 | `Tableau de suivi de visa DD_MM_YYYY.xlsx` | `app.Api.export_team_version` | `data_loader` + shutil.copy2 | User (manual export) | Dated copy of GF_TEAM_VERSION; on-demand |
 | `DISCREPANCY_REPORT.xlsx` | `stage_discrepancy` | `writer.write_discrepancy_report` | (no UI consumer today; Discrepancies page is a stub) | All flag_types with severity |
@@ -54,6 +54,7 @@ the lookup used by `app.Api.export_team_version`.
 | `CHAIN_TIMELINE_ATTRIBUTION.json` | `reporting.chain_timeline_attribution.write_chain_timeline_artifact` | (Phase 4: Document Command Center) | Per-chain timeline + per-segment responsibility. NOT registered in run_memory.db. Auto-refreshed at app startup (Phase 3). |
 | `CHAIN_TIMELINE_ATTRIBUTION.csv` | same | Excel inspection | Flat per-segment-per-attribution rows. |
 | `FLAT_GED_cache_docs.pkl` / `FLAT_GED_cache_resp.pkl` / `FLAT_GED_cache_meta.json` | `data_loader._save_flat_normalized_cache` (writes alongside `FLAT_GED.xlsx`) | `data_loader._load_flat_normalized_cache` (skips xlsx re-parse on hot loads) | Pickle cache for normalized `docs_df` + `responses_df`. `cache_meta.json` carries `cache_schema_version` (currently `"v2"` post Phase 8 step 4), `approver_names`, `flat_doc_meta`, plus 8 audit fields: `source_flat_ged_sha256`, `source_flat_ged_mtime`, `docs_df_rows`, `responses_df_rows`, `active_version_count`, `family_count`, `status_counts`, `generated_at`. Freshness check rejects schema-version mismatches per Phase 0 D-001. Bump `CACHE_SCHEMA_VERSION` whenever stage_read_flat schema or pickle compatibility changes. NOT registered in `run_memory.db`. |
+| `COUNTER_ATTACK_ITEMS.csv` | `scripts/build_counter_attack.py` â†’ `reporting.counter_attack_builder.build_counter_attack_items` (Phase 6A/6X; standalone, NOT a pipeline stage) | Phase 6B read API; future Counter-Attack UI page | 28-column deterministic action artifact (1524 rows after Phase 6X R3 validation). Inputs: `compute_dcc_tags_bulk(ctx)` + chain_onion CSVs (CHAIN_REGISTER, CHAIN_METRICS, ONION_SCORES, CHAIN_NARRATIVES) + CHAIN_TIMELINE_ATTRIBUTION + ctx.responses_df for evidence. Uses DCC deadline truth (`primary_consultant_days_remaining`, `secondary_consultant_days_remaining`, `consultant_days_remaining`) and secondary backlog ladder. NOT registered in `run_memory.db`. |
 
 The first three (`FLAT_GED.xlsx`, `DEBUG_TRACE.csv`, `flat_ged_run_report.json`)
 are registered in `run_memory.db` as `FLAT_GED`, `FLAT_GED_DEBUG_TRACE`,
@@ -62,10 +63,61 @@ are registered in `run_memory.db` as `FLAT_GED`, `FLAT_GED_DEBUG_TRACE`,
 naming).
 
 `CHAIN_TIMELINE_ATTRIBUTION.*` is intentionally NOT registered in
-`run_memory.db` — it is computed on-demand from chain_onion CSVs +
+`run_memory.db` â€” it is computed on-demand from chain_onion CSVs +
 RunContext, and disk-only persistence is enough. Its JSON shape is the
 contract consumed by Phase 4. See `context/02_DATA_FLOW.md` and
 `docs/implementation/02_PHASE_2_REPORT.md` for the schema.
+
+`COUNTER_ATTACK_ITEMS.csv` (Phase 6A/6X) is similarly NOT registered in
+`run_memory.db`. It is generated on-demand by `scripts/build_counter_attack.py`
+after a pipeline run. Binding rules:
+
+- **Pre-bucket filter:** rows are excluded when `chain_register.current_state`
+  is in the terminal/non-actionable set:
+  `{"CLOSED_VAO", "CLOSED_VSO", "DEAD_AT_SAS_A", "ABANDONED_CHAIN", "VOID_CHAIN", "UNKNOWN_CHAIN_STATE"}`.
+- **`ENTREPRISE_A_RELANCER`:** fires only when
+  `current_state == "WAITING_CORRECTED_INDICE"` and the DCC `primary_tag`
+  confirms contractor-owned action (`Att Entreprise ...`). This route is
+  evaluated before secondary backlog routing so correction-pending REF rows
+  do not become MOEX exposure rows.
+- **Primary consultant lateness:** `CONSULTANT_A_ATTAQUER` is deadline-truth
+  only. It requires `primary_consultant_days_remaining < 0` (or trusted
+  `consultant_days_remaining < 0` fallback from DCC), computed against
+  `ctx.data_date`, never `date.today()` and never chain dwell.
+- **Secondary backlog ladder:** `secondary_wait_days` is used only as backlog
+  age for secondary/MOEX routing: `<=10` no bucket, `10..30` MOEX facile or
+  arbitrage buckets when DCC tag says so, `30..100` `SECONDAIRE_EXPIRE`,
+  `>100` `MOEX_SHAME_INTERNAL`. This is not consultant contractual lateness.
+- **Direct MOEX wait:** `OPEN_WAITING_MOEX` routes to `MOEX_SHAME_INTERNAL`
+  only when `moex_wait_days > 100`; otherwise DCC `Att MOEX - Facile` /
+  `Att MOEX - Arbitrage` select `FERMER_MAINTENANT` / `DECISION_MOEX`.
+- **`days_late` semantics after Phase 6X:** consultant rows use deadline
+  lateness, secondary backlog rows use `secondary_wait_days`, direct MOEX rows
+  use `moex_wait_days`, contractor rows use chain dwell (`stale_days` or
+  `open_days` fallback).- **Forbidden label:** the user-facing label for `MOEX_SHAME_INTERNAL` is
+  `"MOEX interne â€” exposition Ã  traiter"`. The string `"Honte MOEX"` must
+  not appear anywhere in the artifact, code, or documentation.
+- **Evidence columns (`chain_observations_*`, `consultant_reports_*`) are
+  enrichment-only.** They never influence `action_bucket`, `actor_to_call`,
+  `is_internal_moex_exposure`, `is_external_attackable`, or
+  `normalized_score_100`.
+- **Determinism:** same inputs â†’ byte-identical 28-column CSV. Verified by
+  consecutive sha256 match.
+- **No new ownership / tag / score logic.** The builder reuses
+  `compute_dcc_tags_bulk` (additive bulk wrapper around DCC private
+  helpers, no new rules) and the existing chain_onion CSVs.
+- **First consumer (Phase 6B):** `src/reporting/counter_attack_query.py`
+  exposes three read-only screen-payload functions
+  (`get_counter_attack_home`, `get_counter_attack_queue`,
+  `get_counter_attack_item`) over this artifact, surfaced as
+  `Api.get_counter_attack_home/queue/item` in `app.py` and as
+  `jansaBridge.loadCounterAttackHome/Queue/Item` in
+  `ui/jansa/data_bridge.js`. The query module reads the CSV with
+  identity columns (`item_id`, `numero`, `indice`, `family_key`,
+  `emetteur_code`) locked as `string` to preserve leading zeros, and
+  returns `available=false` empty-state payloads when the artifact is
+  missing. No artifact mutation. See
+  `docs/implementation/PHASE_6B_READ_API.md`.
 
 ---
 
@@ -89,23 +141,23 @@ under `DEBUG_*` artifact types.
 | `new_submittal_summary.xlsx` | diagnosis | Aggregate over NEW_SUBMITTAL |
 | `reconciliation_summary.xlsx` | discrepancy | Aggregate over reconciliation |
 | `routing_summary.xlsx` | route | Per-document routing decision |
-| `counts_lineage_audit.xlsx` | `scripts/audit_counts_lineage.py` (Phase 8 step 1; extended through step 6) | manual review | Sheets: `lineage`, `expected_baselines`, `divergences_unexpected`, `ui_payload_mismatches` (added step 6 — empty when all aligned, sheet always present). Compares L0_RAW_GED → L6_CHAIN_ONION counts. NOT registered in `run_memory.db`. |
-| `counts_lineage_audit.json` | same | same | Machine-readable companion. Top-level keys: lineage matrix, `expected_baselines` (with `raw_submission_rows.provenance` capturing source file / sheet / mtime as of step 2), `ui_payload_comparison` (added step 6 — `fields_compared`, `matches`, `mismatches`, `mismatch_rows[]`, `skipped[]`). Shape documented in `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md` §5.3 + §24. |
+| `counts_lineage_audit.xlsx` | `scripts/audit_counts_lineage.py` (Phase 8 step 1; extended through step 6) | manual review | Sheets: `lineage`, `expected_baselines`, `divergences_unexpected`, `ui_payload_mismatches` (added step 6 â€” empty when all aligned, sheet always present). Compares L0_RAW_GED â†’ L6_CHAIN_ONION counts. NOT registered in `run_memory.db`. |
+| `counts_lineage_audit.json` | same | same | Machine-readable companion. Top-level keys: lineage matrix, `expected_baselines` (with `raw_submission_rows.provenance` capturing source file / sheet / mtime as of step 2), `ui_payload_comparison` (added step 6 â€” `fields_compared`, `matches`, `mismatches`, `mismatch_rows[]`, `skipped[]`). Shape documented in `docs/implementation/PHASE_8_COUNT_LINEAGE_FIX.md` Â§5.3 + Â§24. |
 | `counts_lineage_probe.xlsx` | `python scripts/audit_counts_lineage.py --probe` (Phase 8 step 2) | manual review | One row per (count_category, layer). Columns: `value`, `value_origin_type`, `source_file`, `source_sheet`, `source_column`, `source_filter`, `function_or_code_path`, `is_hardcoded_baseline`, `confidence`. Use to prove provenance of every audit number. NOT registered. |
 | `counts_lineage_probe.json` | same | same | Same content as the xlsx, machine-readable. |
-| `sas_pre2026_confirmation.json` | `scripts/audit_counts_lineage.py:_confirm_sas_pre2026_gap` (Phase 8 step 2.5; refreshed every default audit run) | manual review; D-012 receipts | Decomposes the L1→L2 SAS REF row gap. Fields: `l1_sas_ref_row_count`, `l2_sas_ref_row_count`, `row_gap`, `excluded_unique_pair_count`, `excluded_l1_row_count`, `pair_to_l1_row_count`, `structural_duplicate_pairs`, `sas_filter_component`, `structural_component`, `verdict` (`CONFIRMED` / `PARTIAL_CONFIRMED` / `UNCONFIRMED` / `UNDETERMINED`). NOT registered. |
+| `sas_pre2026_confirmation.json` | `scripts/audit_counts_lineage.py:_confirm_sas_pre2026_gap` (Phase 8 step 2.5; refreshed every default audit run) | manual review; D-012 receipts | Decomposes the L1â†’L2 SAS REF row gap. Fields: `l1_sas_ref_row_count`, `l2_sas_ref_row_count`, `row_gap`, `excluded_unique_pair_count`, `excluded_l1_row_count`, `pair_to_l1_row_count`, `structural_duplicate_pairs`, `sas_filter_component`, `structural_component`, `verdict` (`CONFIRMED` / `PARTIAL_CONFIRMED` / `UNCONFIRMED` / `UNDETERMINED`). NOT registered. |
 | `chain_onion_source_check.json` | `src/chain_onion/source_loader.py:_check_flat_ged_alignment` (Phase 8 step 5; refreshed every Chain+Onion run) | manual review; step 5 receipts | WARN-only Chain+Onion source alignment receipts. Compares the FLAT_GED.xlsx path source_loader is reading against the latest registered FLAT_GED artifact in `data/run_memory.db`. Fields: `result` (`OK` / `WARN_PATH_MISMATCH_SAME_CONTENT` / `WARN_PATH_AND_CONTENT_MISMATCH` / `WARN_MTIME_ADVISORY` / `UNDETERMINED`), `registered_flat_ged_path`, `using_flat_ged_path`, `sha_match` (bool / null when paths identical), `reason`, `checked_at`. Helper never raises and never blocks Chain+Onion. NOT registered. |
 | `focus_visa_source_audit.xlsx` | `scripts/audit_focus_visa_source.py` (Phase 8A.1) | manual review; D-010 scope receipts | One sheet `call_sites` (10 rows, 9 columns). AST-walk catalogue of every `compute_visa_global_with_date` call site in `src/reporting/`. Columns: `function_name`, `file_path`, `line_number`, `uses_workflow_engine_directly`, `uses_flat_doc_meta`, `uses_resolve_visa_global_equivalent`, `affected_output_columns`, `count_of_docs_checked`, `count_of_disagreements`. NOT registered. |
 | `focus_visa_source_audit.json` | same | same | Machine-readable companion. Top-level keys: `generated_at`, `target_function`, `reporting_dir`, `call_sites[]`. |
 | `chain_onion_block_readiness.json` | `scripts/check_chain_onion_alignment_block_ready.py` (Phase 8A.3) | manual review; gate check before Phase 8A.4 BLOCK-mode flip | Verifies the WARN-only check has been clean across a fresh full pipeline cycle. Fields: `checked_at`, `block_mode_ready` (bool), `reason`, `latest_check_result`, `latest_run_completed_at`, `latest_flat_ged_mtime`, `helper_first_seen_at`. NOT registered. |
 | `ui_payload_full_surface_audit.{xlsx,json}` | `scripts/audit_ui_payload_full_surface.py` (Phase 8A.6) | manual review; widened UI payload audit | Compares aggregator/builder vs adapter outputs across 6 UI surfaces (overview, consultants_list, contractors_list, consultant_fiche, contractor_fiche, dcc, chain_onion_panel). Final result (2026-05-01): `UI_PAYLOAD_FULL: surfaces=6 compared=45 matches=45 mismatches=0; OK - all compared fields match`. Classification: NM=0, SF=0, ESD=0, TB=0. NOT registered. |
-| `raw_flat_reconcile.xlsx` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review; RAW↔FLAT identity / projection audit | 11-sheet workbook (~695 KB). Sheets cover identity contract, SAS REF decomposition, reasons audit, report integration trace, shadow-model rows. Output of Phase 8B reconciliation. NOT registered. |
+| `raw_flat_reconcile.xlsx` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review; RAWâ†”FLAT identity / projection audit | 11-sheet workbook (~695 KB). Sheets cover identity contract, SAS REF decomposition, reasons audit, report integration trace, shadow-model rows. Output of Phase 8B reconciliation. NOT registered. |
 | `flat_ged_trace.{csv,xlsx}` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review | Per-row FLAT projection trace with classification (CANONICAL / DUPLICATE_FAVORABLE_KEPT / DUPLICATE_MERGED / ACTIVE_VERSION_PROJECTION / MALFORMED_RESPONSE / UNEXPLAINED). NOT registered. |
 | `raw_ged_trace.csv` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review | Per-row RAW GED trace used as comparator for the FLAT projection. NOT registered. |
-| `report_to_flat_trace.{json,xlsx}` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review | Report-integration trace: `data/report_memory.db` rows mapped to FLAT destinations. Phase 8B totals: 1,245 reports → 0 NO_MATCH, 942 enrich FLAT, 58 supply primary, 226 blocked on confidence. NOT registered. |
+| `report_to_flat_trace.{json,xlsx}` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review | Report-integration trace: `data/report_memory.db` rows mapped to FLAT destinations. Phase 8B totals: 1,245 reports â†’ 0 NO_MATCH, 942 enrich FLAT, 58 supply primary, 226 blocked on confidence. NOT registered. |
 | `SHADOW_FLAT_GED_OPERATIONS.csv` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review; never overwrites production FLAT | Phase 8B shadow-corrected operational layer. 27,134 rows; UNEXPLAINED residual = 6. Disk-only diagnostic; NOT registered, NOT consumed by runtime. |
 | `SHADOW_FLAT_GED_TRACE.xlsx` | `scripts/raw_flat_reconcile.py` (Phase 8B) | manual review | Per-row shadow-FLAT trace. Companion to `SHADOW_FLAT_GED_OPERATIONS.csv`. NOT registered. |
-| `PHASE_8B_FINAL_REPORT.md` | Phase 8B closure | reference | Final report and §17 decision gate (Outcome C). Identity contract PASS; SAS REF gap 99.3% explained; 6 SAS REF rows remain UNEXPLAINED. NOT registered. |
+| `PHASE_8B_FINAL_REPORT.md` | Phase 8B closure | reference | Final report and Â§17 decision gate (Outcome C). Identity contract PASS; SAS REF gap 99.3% explained; 6 SAS REF rows remain UNEXPLAINED. NOT registered. |
 
 ---
 
@@ -151,24 +203,24 @@ for each family. Unmapped emetteur codes fall back to the code itself
 |---|---|---|---|
 | `data/run_memory.db` | `src.run_memory` | tables: `runs`, `run_inputs`, `run_artifacts`, `run_corrections`, `run_invalidation_log` | manual; `scripts/nuke_and_rebuild_run0.py` |
 | `data/report_memory.db` | `src.report_memory` | tables: `ingested_reports`, `persisted_report_responses` | `scripts/bootstrap_report_memory.py` |
-| `data/report_memory.db.malformed_bak` | (artifact of past corruption) | — | manual cleanup candidate |
+| `data/report_memory.db.malformed_bak` | (artifact of past corruption) | â€” | manual cleanup candidate |
 
 ---
 
-## On-disk leftovers (NOT current artifacts — candidates for cleanup)
+## On-disk leftovers (NOT current artifacts â€” candidates for cleanup)
 
 These exist on disk today (`/output/`, repo root) but are not produced by
 the active runtime:
 
 - `output/parity/`, `output/parity_raw_r1/`, `output/parity_raw_run1/`,
-  `output/parity_raw_run2/` — flat-vs-raw parity validation data, pre-Step 16.
-- `output/step9/legacy/` — legacy Step 9 outputs.
+  `output/parity_raw_run2/` â€” flat-vs-raw parity validation data, pre-Step 16.
+- `output/step9/legacy/` â€” legacy Step 9 outputs.
 - `output/parity_report.xlsx`, `output/ui_parity_report.xlsx`,
-  `output/clean_gf_diff_report.xlsx` — one-off validation reports.
-- `output/tmp63o7zaid.xlsx` — orphaned temp.
+  `output/clean_gf_diff_report.xlsx` â€” one-off validation reports.
+- `output/tmp63o7zaid.xlsx` â€” orphaned temp.
 - Repo root: `tmpxkmaioec.db`, `tmpyw_386pd.db`,
   `run_explorer_bundle_latest.zip`, `test_write_permission.tmp`,
-  `run_a.log` … `run_f.log`, `step15_debug.log`, `pipeline_run.log`,
+  `run_a.log` â€¦ `run_f.log`, `step15_debug.log`, `pipeline_run.log`,
   `fix_gf_schema_main.log`, `test1_main_no_baseline.log`,
   `test2_*.log`.
 - `backup/`, `backups/` (date-stamped backup folders).
@@ -184,4 +236,5 @@ Found in `output/`. Produced by a previous `export_team_version()` invocation
 on 2026-04-10. `app.Api.export_team_version` overwrites by deleting the
 existing dest before renaming the temp file in place, so a future export
 will replace it (or leave it if a different date stamp is generated). Not
-a leak — this is the user-facing dated team export.
+a leak â€” this is the user-facing dated team export.
+

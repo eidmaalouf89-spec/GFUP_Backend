@@ -5,6 +5,35 @@
 
 ---
 
+## Phase 6X — closed (status as of 2026-05-04)
+
+ACTION MOEX data-truth correction. Eight bucket-routing defects rooted in
+DCC `date.today()` fallbacks, an absent chain-state gate, and a missing
+deadline-truth signal. Plan: `docs/implementation/PHASE_6X_ACTION_MOEX_DATA_TRUTH_CORRECTION.md`.
+
+| Step | Status | Summary |
+|---|---|---|
+| **6X.B2** caller audit | ✅ CLOSED | Read-only trace of every `_resolve_data_date` call site + every `RunContext(...)` constructor. Verdict: `data_date` can be None on production paths if the GED Détails sheet is missing/malformed; safe-fix shape is RAISE. Audit: `outputs/PHASE_6X_B2_CALLER_AUDIT.md`. |
+| **6X.C** consultant_fiche fallback | ✅ CLOSED | Removed `date.today()` from `_resolve_data_date`. Falls back to `ctx.run_date` first, raises `ValueError` if both unavailable. Tests: `tests/test_consultant_fiche.py` (5 cases, all pass). |
+| **6X.D** contractor_quality fallbacks | ✅ CLOSED | Removed `date.today()` from `build_contractor_quality_peer_stats:322` and `build_contractor_quality:452`. Both raise `ValueError` if `ctx.data_date is None`. Tests: `tests/test_contractor_quality.py` (5 cases). |
+| **6X.E** DCC bulk deadline column | ✅ CLOSED | Added `min_open_consultant_deadline` + `consultant_days_remaining` to `compute_dcc_tags_bulk` (both duplicated copies). Reproduces 133005 indice C → `consultant_days_remaining=7` against real ctx. Tests: `tests/test_document_command_center.py` (5 cases). |
+| **6X.E2** DCC tier-split deadline columns | ✅ CLOSED | Added `primary_consultant_days_remaining` + `secondary_consultant_days_remaining` (and `min_open_*` mates) using `r["tier"]` from `classify_consultant`. |
+| **6X.F1** chain_metrics merge widening | ✅ CLOSED | Builder pulls in `moex_wait_days`, `primary_wait_days`, `secondary_wait_days` from `CHAIN_METRICS.csv`. |
+| **6X.F1.5** closed-state filter | ✅ CLOSED | Added terminal/unknown-state filter in `build_counter_attack_items` after the chain_register merge: drops `CLOSED_VAO`, `CLOSED_VSO`, `DEAD_AT_SAS_A`, `ABANDONED_CHAIN`, `VOID_CHAIN`, `UNKNOWN_CHAIN_STATE`. |
+| **6X.F2** strict chain-state gate | ❌ REJECTED | First attempt was `current_state == "OPEN_WAITING_MOEX"` AND `moex_wait_days > 0` per audit. Differential audit (`outputs/PHASE_6X_F2_DIFFERENTIAL_AUDIT.md`) showed the equality gate was too coarse: 2253 FERMER + 747 DECISION_MOEX rows fell through to "no bucket". Reverted in favour of F2-bis. |
+| **6X.F2-bis** approved routing tree | ✅ CLOSED | Replaced `_assign_bucket` with the 6-priority operational rule tree: WAITING_CORRECTED_INDICE → ENTREPRISE; primary open + late → CONSULTANT_A_ATTAQUER; secondary backlog ladder by `secondary_wait_days` (0–10 drop / 10–30 MOEX bucket / 30–100 SECONDAIRE_EXPIRE / >100 MOEX_SHAME_INTERNAL); direct MOEX → FERMER/DECISION (>100 → MOEX_SHAME_INTERNAL); contractor catch-all; SUJET_REUNION final escalation. See §L of `06_EXCEPTIONS_AND_MAPPINGS.md` for the full predicate list. |
+| **6X.J / 6X.K / 6X.L / 6X.M** | ✅ CLOSED via R1/R2/R3 | Recovery + reconstruction + final validation completed by Codex after the `counter_attack_builder.py` truncation incident (see `11_TOOLING_HAZARDS.md` 2026-05-04 change-log row). R3 artifact: 1524 rows, 28 columns, 0 duplicate `family_key`, 0 duplicate `(numero, indice)`, 0 terminal/unknown states, 128000 in MOEX_SHAME_INTERNAL with `days_late=741`, 133005 indice C absent. Bucket counts (final): FERMER 66, CONSULTANT_A_ATTAQUER 210, ENTREPRISE 122, DECISION_MOEX 8, MOEX_SHAME_INTERNAL 989, SECONDAIRE_EXPIRE 129, SUJET_REUNION 0. |
+
+**Phase 6C / 6D status:** RESUMABLE. The freeze on Phase 6C.6 is lifted.
+Phase 6C must consume the corrected `output/intermediate/COUNTER_ATTACK_ITEMS.csv`
+and the existing Phase 6B read payloads (which 6X did not change). Phase 6D
+follows after 6C lands.
+
+**Manual app smoke:** not run as part of 6X closure. UI changes were not in
+scope. Run `python app.py` before claiming the cockpit is operational.
+
+---
+
 ## Phase 8 family — closed for current release (status as of 2026-05-01)
 
 The Phase 8 family is closed for the current software finalisation cycle.
@@ -478,10 +507,13 @@ accessibility and test automation. UI-only; LOW risk.
 
 Of the per-feature implementation plans in `docs/implementation/`, the
 only phase still requiring substantial development is **Phase 6** (the
-"Intelligence layer"). Sub-plans `PHASE_6A_INTELLIGENCE_ARTIFACT.md`,
-`PHASE_6B_INTELLIGENCE_ENDPOINTS.md`, `PHASE_6C_INTELLIGENCE_UI_PAGE.md`,
-and `PHASE_6D_INTELLIGENCE_EXPORT_AND_TREATED.md` exist but are
-unimplemented. This is the next major work-stream — the "killer module".
+"Counter-Attack Intelligence" cockpit). The four older sub-plans
+(`PHASE_6A_INTELLIGENCE_ARTIFACT.md`, `PHASE_6B_INTELLIGENCE_ENDPOINTS.md`,
+`PHASE_6C_INTELLIGENCE_UI_PAGE.md`, `PHASE_6D_INTELLIGENCE_EXPORT_AND_TREATED.md`)
+are **superseded** — see `docs/implementation/PHASE_6_COUNTER_ATTACK_MASTER.md`
+for the authoritative plan. As of 2026-05-04: **6A and 6B are landed**, **6X
+is closed** (data-truth correction; see the dedicated section above), and
+**6C / 6D are resumable** against the corrected `COUNTER_ATTACK_ITEMS.csv`.
 Phases 0–5, 7, 8 (and family) are shipped or read-only reference.
 
 ---

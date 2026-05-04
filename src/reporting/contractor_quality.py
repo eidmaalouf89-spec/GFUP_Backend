@@ -319,7 +319,12 @@ def build_contractor_quality_peer_stats(ctx, chain_timelines: dict | None = None
     if chain_timelines is None:
         chain_timelines = _load_chain_timelines(ctx)
 
-    ref_today = ctx.data_date or date.today()
+    if ctx.data_date is None:
+        raise ValueError(
+            "data_date is required for peer-stats dormancy in "
+            "build_contractor_quality_peer_stats(); ctx.data_date is None"
+        )
+    ref_today = ctx.data_date
 
     sas_rates: list = []
     ref_counts: list = []
@@ -449,7 +454,12 @@ def build_contractor_quality(ctx, contractor_code: str,
     sas_refusal_rate = _sas_refusal_rate(ctx, emetteur_docs)
 
     # ── Dormant REF / SAS REF lists (must precede delay computation) ─────────
-    ref_today = ctx.data_date or date.today()
+    if ctx.data_date is None:
+        raise ValueError(
+            "data_date is required for dormancy/lateness in "
+            "build_contractor_quality(); ctx.data_date is None"
+        )
+    ref_today = ctx.data_date
     dormant_ref = _dormant_list(emetteur_dernier, "REF", ref_today)
     dormant_sas_ref = _dormant_list(emetteur_dernier, "SAS REF", ref_today)
 

@@ -582,3 +582,102 @@ for review but do not promote pending → answered.
   current role at runtime is unclear (probably consumed inside
   `normalize.load_mapping` if the env points there, but the path is
   defaulted). **Inspect `normalize.load_mapping` before changing.**
+
+---
+
+## L. ACTION MOEX bucket gate predicates (Phase 6X.F2-bis, closed 2026-05-04)
+
+`_assign_bucket` in `src/reporting/counter_attack_builder.py` decides which
+of the 7 ACTION MOEX buckets a row lands in. The post-6X-bis routing tree is:
+
+**Step 0 — Drop terminal / unclassifiable chain states (filter at the merge
+stage, before `_assign_bucket` runs).** Source: `build_counter_attack_items`
+right after the `chain_register` merge.
+
+```python
+_TERMINAL_CHAIN_STATES = {
+    "CLOSED_VAO", "CLOSED_VSO", "DEAD_AT_SAS_A",
+    "ABANDONED_CHAIN", "VOID_CHAIN", "UNKNOWN_CHAIN_STATE",
+}
+```
+
+**Step 1 — Contractor REF (latest indice waiting on resubmission).**
+
+```
+current_state == "WAITING_CORRECTED_INDICE"
+AND primary_tag in {"Att Entreprise — Dans les délais", "Att Entreprise — Hors délais"}
+→ ENTREPRISE_A_RELANCER
+```
+
+**Step 2 — Primary BET consultant open.** Detection: `primary_consultant_days_remaining is not None` (DCC has at least one open primary-tier response with a `date_limite`).
+
+```
+primary_consultant_days_remaining <= 0  → CONSULTANT_A_ATTAQUER
+primary_consultant_days_remaining > 0   → no bucket   (still in delay)
+```
+
+**Step 3 — Secondary BET consultant open (and no primary blocker).** Detection: `secondary_consultant_days_remaining is not None`. Ladder keyed off `secondary_wait_days` from `CHAIN_METRICS.csv`:
+
+```
+secondary_wait_days <= 10                         → no bucket
+10 < secondary_wait_days <= 30                    → FERMER_MAINTENANT (Att MOEX — Facile)
+                                                    DECISION_MOEX     (Att MOEX — Arbitrage)
+30 < secondary_wait_days <= 100                   → SECONDAIRE_EXPIRE
+secondary_wait_days > 100                         → MOEX_SHAME_INTERNAL
+```
+
+**Step 4 — Direct MOEX waiting (no consultant blocker).**
+
+```
+primary_tag in {"Att MOEX — Facile", "Att MOEX — Arbitrage"}:
+  moex_wait_days > 100                            → MOEX_SHAME_INTERNAL
+  Att MOEX — Arbitrage                            → DECISION_MOEX
+  Att MOEX — Facile                               → FERMER_MAINTENANT
+```
+
+**Step 5 — Contractor catch-all (DCC says contractor, no chain
+WAITING_CORRECTED_INDICE).**
+
+```
+primary_tag in {"Att Entreprise — Dans les délais", "Att Entreprise — Hors délais"}
+→ ENTREPRISE_A_RELANCER
+```
+
+**Step 6 — Final escalation catch-all.**
+
+```
+escalation_flag AND urgency_label in {"CRITICAL", "HIGH"} → SUJET_REUNION
+```
+
+Otherwise → no bucket.
+
+### Truth-source split (binding rule)
+
+| Question | Source of truth |
+|---|---|
+| What stage is the chain in? | `current_state` from `chain_register` (chain-onion lifecycle) |
+| Is the primary / secondary consultant open and late? | `*_consultant_days_remaining` from DCC bulk (Phase 6X.E2), derived from `responses_df.date_limite` against `ctx.data_date` and `r["tier"] == "PRIMARY"` / `"SECONDARY"` |
+| How long has the secondary been waiting? | `secondary_wait_days` from `CHAIN_METRICS.csv` |
+| How long has MOEX been holding? | `moex_wait_days` from `CHAIN_METRICS.csv` |
+| Within a stage, is it Facile or Arbitrage? | DCC `primary_tag` |
+
+**Stage decision = chain `current_state` + DCC deadline truth. Bucket label
+within a stage = DCC `primary_tag` + age ladder.** Do not collapse: they
+answer different questions and the two truths can disagree on the same row.
+
+### Forbidden patterns
+
+- `current_state == "OPEN_WAITING_MOEX"` as a strict equality MOEX gate
+  (the rejected first-cut F2 — see `outputs/PHASE_6X_F2_DIFFERENTIAL_AUDIT.md`).
+- `current_state == "CHRONIC_REF_CHAIN"` as a direct route to
+  `MOEX_SHAME_INTERNAL` (the dropped pre-F2 path; CHRONIC chains now route
+  through Step 1 / Step 5 via the contractor predicates, or drop).
+- Any `wait_days > N` threshold as consultant lateness (use
+  `*_consultant_days_remaining <= 0` instead).
+- Any `date.today()` / `datetime.now()` / `pd.Timestamp.now()` in
+  `_assign_bucket` or its inputs (use `ctx.data_date`).
+
+Final 2026-05-04 R3 distribution: FERMER_MAINTENANT 66, CONSULTANT_A_ATTAQUER
+210, ENTREPRISE_A_RELANCER 122, DECISION_MOEX 8, MOEX_SHAME_INTERNAL 989,
+SECONDAIRE_EXPIRE 129, SUJET_REUNION 0. Total 1524 rows on artifact (2026-04-10
+GED snapshot). See `docs/implementation/PHASE_6X_ACTION_MOEX_DATA_TRUTH_CORRECTION.md` §10.

@@ -11,6 +11,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 /* ── SVG icons — outline, 1.5px, matches SF Symbols weight ── */
 const shellIcons = {
   overview: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="6" height="6" rx="1.2"/><rect x="10" y="2" width="6" height="6" rx="1.2"/><rect x="2" y="10" width="6" height="6" rx="1.2"/><rect x="10" y="10" width="6" height="6" rx="1.2"/></svg>,
+  actionMoex: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="6.5"/><circle cx="9" cy="9" r="3"/><path d="M9 1.5 V4 M9 14 V16.5 M1.5 9 H4 M14 9 H16.5"/></svg>,
   executer: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="7"/><path d="M7 6.5 L12 9 L7 11.5 Z" fill="currentColor" stroke="none"/></svg>,
   runs: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2 15 L6 10 L9 12 L15 4"/><circle cx="15" cy="4" r="1.4"/></svg>,
   consultants: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3 16c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>,
@@ -29,6 +30,7 @@ function Sidebar({ active, onNav, focusMode, focusCount, runCount, consultantCou
   const items = [
     { group: 'Pilotage', entries: [
       { id:'Overview',    label:'Vue d\u2019ensemble', icon: shellIcons.overview, badge: null },
+      { id:'ActionMoex',  label:'ACTION MOEX',          icon: shellIcons.actionMoex, badge: null },
       { id:'Executer',    label:'Ex\u00e9cuter',             icon: shellIcons.executer, badge: null },
       { id:'Runs',        label:'Runs',                 icon: shellIcons.runs,     badge: runCount || null },
     ]},
@@ -683,6 +685,7 @@ function App() {
             </div>
           )}
           {active === 'Overview'       && <OverviewPage focusMode={focusMode} onNavigate={navigateTo} onOpenConsultant={(c) => navigateTo('ConsultantFiche', c)} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
+          {active === 'ActionMoex'     && <ActionMoexPage focusMode={focusMode}/>}
           {active === 'Consultants'    && <ConsultantsPage onOpen={(c) => navigateTo('ConsultantFiche', c)} focusMode={focusMode}/>}
           {active === 'ConsultantFiche'&& <ConsultantFichePage consultant={selectedConsultant} onBack={() => navigateTo('Consultants')} focusMode={focusMode}/>}
           {active === 'Contractors'    && <ContractorsPage focusMode={focusMode} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
@@ -751,7 +754,8 @@ function App() {
 
 function pageTitle(id) {
   const map = {
-    Overview: 'Vue d\u2019ensemble', Executer: 'Ex\u00e9cuter', Runs: 'Runs',
+    Overview: 'Vue d\u2019ensemble', ActionMoex: 'Plan d\u2019action MOEX',
+    Executer: 'Ex\u00e9cuter', Runs: 'Runs',
     Consultants: 'Consultants', ConsultantFiche: 'Fiche Consultant',
     Contractors: 'Entreprises', Discrepancies: '\u00C9carts',
     Reports: 'Rapports', Settings: 'Param\u00e8tres',

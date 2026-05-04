@@ -94,6 +94,19 @@ def interpret_date_field(raw) -> dict:
     if isinstance(raw, (_dt.datetime, _dt.date)):
         return {"date": raw, "date_status_type": "ANSWERED", "date_limite": None}
 
+    # int or float: openpyxl returns Excel date cells as nanosecond int
+    # timestamps when the column dtype is object. pd.Timestamp subclasses
+    # datetime and is already caught above; raw Python/numpy ints are not.
+    import math as _math
+    if isinstance(raw, (int, float)) and not (isinstance(raw, float) and _math.isnan(raw)):
+        try:
+            import pandas as _pd
+            ts = _pd.to_datetime(raw, unit="ns", errors="coerce")
+            if ts is not _pd.NaT:
+                return {"date": ts.to_pydatetime(), "date_status_type": "ANSWERED", "date_limite": None}
+        except Exception:
+            pass
+
     # Fallback
     return {"date": None, "date_status_type": "NOT_CALLED", "date_limite": None}
 

@@ -1,12 +1,12 @@
-# 11 — Tooling Hazards (Cowork / Cross-Mount Sandbox)
+﻿# 11 â€” Tooling Hazards (Cowork / Cross-Mount Sandbox)
 
 This file documents tooling pitfalls observed during Cowork sessions on this repo. Read this before any investigation that depends on file state, repo structure, or git status.
 
 ---
 
-## H-1 — Sandbox bash sees a stale/truncated view of Windows-mounted source files
+## H-1 â€” Sandbox bash sees a stale/truncated view of Windows-mounted source files
 
-**What it looks like.** `wc -l app.py` returns 864 when the file is actually ~1200 lines. `grep -n "def get_chain_onion_intel" app.py` returns no matches when the function exists at line 1070. `cat`, `head`, `tail`, `head -n N`, file size in `ls -la` — all stale. `git status`, `git diff` may be misleading too.
+**What it looks like.** `wc -l app.py` returns 864 when the file is actually ~1200 lines. `grep -n "def get_chain_onion_intel" app.py` returns no matches when the function exists at line 1070. `cat`, `head`, `tail`, `head -n N`, file size in `ls -la` â€” all stale. `git status`, `git diff` may be misleading too.
 
 **Root cause.** The repo lives on Windows (`C:\Users\GEMO 050224\Desktop\cursor\GF updater v3\`). The Cowork sandbox is Linux. The Windows folder is exposed to the sandbox through a host-side bind/share at `/sessions/<session>/mnt/GF updater v3/`. The cross-OS mount caches metadata and content for performance and has no inotify channel back to Windows. After certain editor write patterns (atomic-replace saves, large appends from a different session) the Linux mount can hold a stale snapshot until it is forced to re-stat. Bash inherits that snapshot and produces wrong answers.
 
@@ -14,12 +14,12 @@ This file documents tooling pitfalls observed during Cowork sessions on this rep
 
 | Tool | Path | Cache behavior | Authority for reading file state |
 |---|---|---|---|
-| `Read`, `Edit`, `Write` (file tools) | Cowork host bridge → live Windows disk | None observed | ✅ Authoritative |
-| `mcp__workspace__bash` (`wc`, `grep`, `cat`, etc.) | Linux mount projection of the Windows share | Cached, can be stale | ❌ Not reliable for content/size of mounted source files |
+| `Read`, `Edit`, `Write` (file tools) | Cowork host bridge â†’ live Windows disk | None observed | âœ… Authoritative |
+| `mcp__workspace__bash` (`wc`, `grep`, `cat`, etc.) | Linux mount projection of the Windows share | Cached, can be stale | âŒ Not reliable for content/size of mounted source files |
 
 The system prompt itself flags this: *"Paths in bash differ from what file tools (Read/Write/Edit) see."*
 
-**Operational rules — non-negotiable.**
+**Operational rules â€” non-negotiable.**
 
 1. **For "what is in the file?" questions, use the `Read` tool. Never use bash to verify file content, file size, function existence, line counts, or "did this method get added?" Use Read.**
 2. Use bash for **execution** (running `python main.py`, `pytest`, etc.) and for actions where Linux is not reading Windows source (e.g. operating on artifacts already produced under `/sessions/<session>/mnt/outputs/`). Bash is fine when the script itself runs and produces fresh output.
@@ -29,15 +29,15 @@ The system prompt itself flags this: *"Paths in bash differ from what file tools
 
 **What this looks like in practice.**
 
-- ❌ Wrong: `grep -n "def foo" app.py` returns 0 matches → conclude `foo` is missing → propose a recovery phase.
-- ✅ Right: `Read app.py` at offset where `foo` is expected → confirm presence → proceed.
+- âŒ Wrong: `grep -n "def foo" app.py` returns 0 matches â†’ conclude `foo` is missing â†’ propose a recovery phase.
+- âœ… Right: `Read app.py` at offset where `foo` is expected â†’ confirm presence â†’ proceed.
 
-- ❌ Wrong: `wc -l app.py` says 864 → assume the file ends there → assume nothing exists past line 864.
-- ✅ Right: `Read app.py offset=1015 limit=30` → read the actual content → know what's really there.
+- âŒ Wrong: `wc -l app.py` says 864 â†’ assume the file ends there â†’ assume nothing exists past line 864.
+- âœ… Right: `Read app.py offset=1015 limit=30` â†’ read the actual content â†’ know what's really there.
 
 **Recovery if you've already drawn a wrong conclusion from bash.** Retract immediately and re-verify with the Read tool against the relevant byte range. Do not commit changes, do not start "recovery" phases, until the Read tool confirms.
 
-### H-1.1 — Linux-side writes that READ stale mount content can OVERWRITE Windows
+### H-1.1 â€” Linux-side writes that READ stale mount content can OVERWRITE Windows
 
 **What it looks like.** A bash command that both reads and writes the same file (e.g. `sed -i`, `cat file > file`, in-place rewrites via Python `open("path", "w")`) propagates the stale Linux-mount snapshot back to the Windows file. The canonical Windows file is then truncated/wrong.
 
@@ -52,25 +52,25 @@ The system prompt itself flags this: *"Paths in bash differ from what file tools
 
 ---
 
-## H-2 — `git status` / branch inspection from sandbox bash
+## H-2 â€” `git status` / branch inspection from sandbox bash
 
 `git status` from inside the sandbox sees the same Linux-mount projection. Reported uncommitted changes, file modifications, and merge state may not reflect the actual Windows working tree. If a git observation is load-bearing for a decision, confirm it from the Windows side or by Read-tool inspection of the relevant files (e.g. read `.git/HEAD`, read the actual file content rather than `git diff`).
 
 ---
 
-## H-3 — `output/` / `runs/` / `data/` files that the pipeline produced inside this session
+## H-3 â€” `output/` / `runs/` / `data/` files that the pipeline produced inside this session
 
 When the pipeline writes outputs from inside the sandbox during this session, those files are produced under the same mount and may be visible to bash without staleness (the Linux side is the writer, so its cache is fresh). The hazard above mostly applies to Windows-edited source files. Outputs the user produced from a previous session by running `python app.py` on Windows have the same staleness risk as source files.
 
 ---
 
-## H-4 — `Glob` tool with `path=` parameter
+## H-4 â€” `Glob` tool with `path=` parameter
 
 When using the `Glob` tool, providing the `path` parameter limits the search root. If the pattern does not match relative to that root, no files are returned. To list everything under a known directory, prefer the absolute path with a simple pattern (e.g. `pattern: "*.md"`, `path: "C:\Users\...\context"`) rather than recursive globs that depend on path interpretation.
 
 ---
 
-## H-5 — File deletion via bash needs explicit permission
+## H-5 â€” File deletion via bash needs explicit permission
 
 `rm` from sandbox bash returns "Operation not permitted" by default for files in the user's working folder. Use the `mcp__cowork__allow_cowork_file_delete` tool to enable deletion for a path; the user is prompted to approve. After approval, `rm` succeeds. This is by design (data safety), not a sandbox failure.
 
@@ -80,15 +80,15 @@ When using the `Glob` tool, providing the `path` parameter limits the search roo
 
 Every phase MD in `docs/implementation/` carries this short rule block:
 
-> **Tooling note (read before any investigation):** Use the `Read` tool — never bash `wc`/`grep`/`cat`/`head`/`tail` — to verify file content, size, or function presence in Windows-mounted source files. The Linux sandbox mount caches a stale view that has, in past sessions, falsely reported missing methods and truncated files. If a bash inspection contradicts the Read tool, the Read tool wins. Do not raise "repo is broken" alarms from bash-only evidence. See `context/11_TOOLING_HAZARDS.md`.
+> **Tooling note (read before any investigation):** Use the `Read` tool â€” never bash `wc`/`grep`/`cat`/`head`/`tail` â€” to verify file content, size, or function presence in Windows-mounted source files. The Linux sandbox mount caches a stale view that has, in past sessions, falsely reported missing methods and truncated files. If a bash inspection contradicts the Read tool, the Read tool wins. Do not raise "repo is broken" alarms from bash-only evidence. See `context/11_TOOLING_HAZARDS.md`.
 
 ---
 
-## H-2 — FLAT_GED pickle cache freshness uses mtime only (schema drift invisible)
+## H-2 â€” FLAT_GED pickle cache freshness uses mtime only (schema drift invisible)
 
 **What it looks like.** `ctx.workflow_engine.responses_df` returns 0 rows for `approver_raw == "0-SAS"` even though `stage_read_flat.py:538-569` clearly emits SAS rows. UI metrics that depend on SAS-track responses (e.g. SAS REF rate) silently report 0 for every contractor. No error, no warning.
 
-**Root cause.** `data_loader._load_flat_normalized_cache` skips a fresh re-parse of `FLAT_GED.xlsx` whenever the three pickle files (`FLAT_GED_cache_docs.pkl`, `FLAT_GED_cache_resp.pkl`, `FLAT_GED_cache_meta.json`) are newer than the xlsx mtime. The freshness check is purely temporal — it has no notion of code-version. If `stage_read_flat.py` (or any upstream code that influences the cache contents) changes its emitted schema while the xlsx file itself does not change, the OLD cache is served forever. SAS rows were stripped silently for an unknown duration on this project for exactly that reason; discovered Phase 7 12a-fix2 (2026-04-29).
+**Root cause.** `data_loader._load_flat_normalized_cache` skips a fresh re-parse of `FLAT_GED.xlsx` whenever the three pickle files (`FLAT_GED_cache_docs.pkl`, `FLAT_GED_cache_resp.pkl`, `FLAT_GED_cache_meta.json`) are newer than the xlsx mtime. The freshness check is purely temporal â€” it has no notion of code-version. If `stage_read_flat.py` (or any upstream code that influences the cache contents) changes its emitted schema while the xlsx file itself does not change, the OLD cache is served forever. SAS rows were stripped silently for an unknown duration on this project for exactly that reason; discovered Phase 7 12a-fix2 (2026-04-29).
 
 **Operational rules.**
 
@@ -102,13 +102,13 @@ Every phase MD in `docs/implementation/` carries this short rule block:
 
 2. **Landed 2026-04-29 (Phase 0 D-001):** `CACHE_SCHEMA_VERSION = "v1"` constant in `data_loader.py` is written into `cache_meta.json` by `_save_flat_normalized_cache` and checked by `_flat_cache_is_fresh`. The freshness check now rejects the cache (and forces an xlsx rebuild) whenever the version key is absent or differs. Bump the constant whenever `stage_read_flat.py` emitted columns change, `normalize_responses` / `normalize_docs` add or rename columns, `flat_doc_meta` structure changes, or pandas-side pickle compatibility breaks. See `data_loader.py:73-149`.
 
-   **Production confirmation observed during Phase 0 canary (2026-04-29):** the FIRST run after pandas was upgraded showed `[FLAT_CACHE] Cache load failed (non-fatal): (<StringDtype(storage='python', na_value=nan)>, …)` despite the mtime check declaring the cache fresh. The cache pickles had been written by an older pandas; current pandas could not unpickle them. With D-001 in place, this exact failure mode is now caught preemptively: the cache is rejected before any unpickle attempt, and the rebuild path runs cleanly. See `docs/audit/CANARY_BEN.md` §13 / D-104.
+   **Production confirmation observed during Phase 0 canary (2026-04-29):** the FIRST run after pandas was upgraded showed `[FLAT_CACHE] Cache load failed (non-fatal): (<StringDtype(storage='python', na_value=nan)>, â€¦)` despite the mtime check declaring the cache fresh. The cache pickles had been written by an older pandas; current pandas could not unpickle them. With D-001 in place, this exact failure mode is now caught preemptively: the cache is rejected before any unpickle attempt, and the rebuild path runs cleanly. See `docs/audit/CANARY_BEN.md` Â§13 / D-104.
 
 3. When debugging "this number looks wrong" symptoms downstream of `responses_df` or `docs_df`, **delete the cache as the first diagnostic step**. If the number changes after rebuild, the cache was stale.
 
 ---
 
-## H-3 — `WorkflowEngine.responses_df` ≠ `RunContext.responses_df` (silent dual-attribute hazard)
+## H-3 â€” `WorkflowEngine.responses_df` â‰  `RunContext.responses_df` (silent dual-attribute hazard)
 
 **What it looks like.** Two attributes that both look like the canonical "responses dataframe" return different row sets. Code that reads `ctx.workflow_engine.responses_df` is missing rows that exist in `ctx.responses_df`. SAS rows in particular (`approver_raw == "0-SAS"`) are absent from the workflow_engine view.
 
@@ -128,7 +128,7 @@ Both H-2 and H-3 were discovered during Phase 7 (contractor quality fiche) when 
 
 ---
 
-## H-4 — `pytest` invocations of tests that import the reporting chain hang in the sandbox
+## H-4 â€” `pytest` invocations of tests that import the reporting chain hang in the sandbox
 
 **What it looks like.** `python -m pytest tests/test_resolve_visa_global.py -q` (or any pytest target whose test module imports `src/reporting/aggregator.py`, `src/reporting/data_loader.py`, or anything that transitively pulls `read_raw` / `normalize` / `workflow_engine`) produces zero stdout for 10+ minutes and never returns. Discovered Phase 8 step 3 vdate addendum (2026-04-30): three consecutive pytest runs of a 13-test pure-mock unit file each hung; `python -m py_compile` on the same file returned in <1 s, and direct invocation (`python -c "from reporting.aggregator import resolve_visa_global; ..."`) completed cleanly.
 
@@ -153,32 +153,32 @@ Both H-2 and H-3 were discovered during Phase 7 (contractor quality fiche) when 
    print("avg_days_to_visa:", k.get("avg_days_to_visa"))
    PY
    ```
-   This pattern confirmed the Phase 8 §21.8 fix (avg_days_to_visa = 79.1) without pytest.
+   This pattern confirmed the Phase 8 Â§21.8 fix (avg_days_to_visa = 79.1) without pytest.
 
-3. **Authoritative test verification still requires a Windows shell run.** Tests that were structurally written and reviewed in this session (e.g. the 13 pytest cases for `resolve_visa_global`) need to be confirmed via `pytest` from a real Windows terminal before any release-quality sign-off. Mark sandbox pytest results as "inconclusive — see H-4" in execution reports rather than as PASS or FAIL.
+3. **Authoritative test verification still requires a Windows shell run.** Tests that were structurally written and reviewed in this session (e.g. the 13 pytest cases for `resolve_visa_global`) need to be confirmed via `pytest` from a real Windows terminal before any release-quality sign-off. Mark sandbox pytest results as "inconclusive â€” see H-4" in execution reports rather than as PASS or FAIL.
 
 4. **App smoke remains a reliable sandbox check.** `timeout 15 python -c "import app"` and `timeout 15 python app.py --browser` both run cleanly because they hit a single import root and exit fast. These should stay in sandbox validation.
 
-5. **Do NOT delete `.pytest_cache/` or `__pycache__/` under repo root from sandbox bash to "fix" the hang** — that may force pytest to re-collect from cold and is not the actual remedy. The remedy is to skip pytest in sandbox for tests in this import family.
+5. **Do NOT delete `.pytest_cache/` or `__pycache__/` under repo root from sandbox bash to "fix" the hang** â€” that may force pytest to re-collect from cold and is not the actual remedy. The remedy is to skip pytest in sandbox for tests in this import family.
 
 **What this looks like in practice.**
 
-- ❌ Wrong: launch `python -m pytest tests/test_resolve_visa_global.py -q`, observe no output after 10 min, conclude the tests fail or the helper is broken, propose a recovery patch.
-- ✅ Right: same observation → record as "pytest inconclusive in sandbox (H-4)" → confirm fix via direct `python -c "..."` invocation against the impacted KPI → flag for Windows-side pytest verification before sign-off.
+- âŒ Wrong: launch `python -m pytest tests/test_resolve_visa_global.py -q`, observe no output after 10 min, conclude the tests fail or the helper is broken, propose a recovery patch.
+- âœ… Right: same observation â†’ record as "pytest inconclusive in sandbox (H-4)" â†’ confirm fix via direct `python -c "..."` invocation against the impacted KPI â†’ flag for Windows-side pytest verification before sign-off.
 
 ---
 
-## H-5 — Bulk Windows-mounted xlsx I/O times out in the sandbox cross-mount
+## H-5 â€” Bulk Windows-mounted xlsx I/O times out in the sandbox cross-mount
 
-**What it looks like.** A `python -c` invocation that calls `load_run_context(0)` (or any code path that triggers `stage_read_flat()` re-parsing `output/intermediate/FLAT_GED.xlsx` — ~32K rows × 2 sheets via openpyxl) emits no output for 5+ minutes and is killed. On a native Windows shell the same call returns in ~30 s. Discovered Phase 8 step 4 (2026-04-30) when the `CACHE_SCHEMA_VERSION` "v1" → "v2" bump correctly forced a rebuild that the sandbox could not finish.
+**What it looks like.** A `python -c` invocation that calls `load_run_context(0)` (or any code path that triggers `stage_read_flat()` re-parsing `output/intermediate/FLAT_GED.xlsx` â€” ~32K rows Ã— 2 sheets via openpyxl) emits no output for 5+ minutes and is killed. On a native Windows shell the same call returns in ~30 s. Discovered Phase 8 step 4 (2026-04-30) when the `CACHE_SCHEMA_VERSION` "v1" â†’ "v2" bump correctly forced a rebuild that the sandbox could not finish.
 
 **Probable cause.** The Cowork sandbox exposes the Windows folder via the host-side bind/share that already misbehaves under H-1 and H-4. Bulk file I/O against that mount runs at a fraction of native Windows speed because every `read()` round-trips through the cross-OS bridge layer with caching that is helpful for small reads (Read tool) and harmful for large sequential reads (openpyxl streaming an xlsx). The same penalty applies to any pipeline stage that reads or writes large files under the mount during runtime.
 
 **Operational rules.**
 
-1. **For any step that triggers a cache rebuild, a pipeline rerun, or full xlsx re-parse against `FLAT_GED.xlsx` / `Grandfichier_v3.xlsx` / `GED_export.xlsx`:** do not gate on sandbox completion. Implement the patch, py_compile, run direct `python -c` invocations that touch only modified surfaces, and defer the heavy I/O verification to a Windows-shell run. Mark the verification status in the execution report as "code-landed, runtime verification pending Windows shell — see H-5".
+1. **For any step that triggers a cache rebuild, a pipeline rerun, or full xlsx re-parse against `FLAT_GED.xlsx` / `Grandfichier_v3.xlsx` / `GED_export.xlsx`:** do not gate on sandbox completion. Implement the patch, py_compile, run direct `python -c` invocations that touch only modified surfaces, and defer the heavy I/O verification to a Windows-shell run. Mark the verification status in the execution report as "code-landed, runtime verification pending Windows shell â€” see H-5".
 
-2. **Cache rebuild specifically:** changing `CACHE_SCHEMA_VERSION` in `data_loader.py` is the correct trigger; the existing freshness check rejects mismatched caches and forces the rebuild. Do NOT also `rm -f output/intermediate/FLAT_GED_cache_*.{pkl,json}` from sandbox bash — the rebuild path is already engaged, deletion adds nothing and risks tripping H-1.1.
+2. **Cache rebuild specifically:** changing `CACHE_SCHEMA_VERSION` in `data_loader.py` is the correct trigger; the existing freshness check rejects mismatched caches and forces the rebuild. Do NOT also `rm -f output/intermediate/FLAT_GED_cache_*.{pkl,json}` from sandbox bash â€” the rebuild path is already engaged, deletion adds nothing and risks tripping H-1.1.
 
 3. **The one-line Windows-shell verification** for any step that landed code expecting a cache rebuild:
    ```
@@ -193,10 +193,10 @@ Both H-2 and H-3 were discovered during Phase 7 (contractor quality fiche) when 
 
 **What this looks like in practice.**
 
-- ❌ Wrong: bump CACHE_SCHEMA_VERSION → invoke `load_run_context(0)` in sandbox → wait 5 min → kill the command → conclude the patch is broken → revert.
-- ✅ Right: bump CACHE_SCHEMA_VERSION → py_compile clean → directly inspect the new payload shape via Read tool → mark step as "code-landed, runtime verification pending Windows shell" → hand the project owner the single Windows-shell command → close on their next paste.
+- âŒ Wrong: bump CACHE_SCHEMA_VERSION â†’ invoke `load_run_context(0)` in sandbox â†’ wait 5 min â†’ kill the command â†’ conclude the patch is broken â†’ revert.
+- âœ… Right: bump CACHE_SCHEMA_VERSION â†’ py_compile clean â†’ directly inspect the new payload shape via Read tool â†’ mark step as "code-landed, runtime verification pending Windows shell" â†’ hand the project owner the single Windows-shell command â†’ close on their next paste.
 
-H-1, H-4, and H-5 are facets of the same root cause — the cross-mount is a poor substrate for runtime work. The hazards differ by symptom (stale views / pytest-collection deadlock / bulk-read timeout) and remedy (Read tool / direct `python -c` / Windows shell), but they share an operating principle: **prefer Windows-shell runs for anything load-bearing.**
+H-1, H-4, and H-5 are facets of the same root cause â€” the cross-mount is a poor substrate for runtime work. The hazards differ by symptom (stale views / pytest-collection deadlock / bulk-read timeout) and remedy (Read tool / direct `python -c` / Windows shell), but they share an operating principle: **prefer Windows-shell runs for anything load-bearing.**
 
 ---
 
@@ -208,4 +208,6 @@ H-1, H-4, and H-5 are facets of the same root cause — the cross-mount is a poo
 | 2026-04-29 | H-2 (cache mtime-only freshness check) and H-3 (WorkflowEngine.responses_df dual-attribute hazard) added after Phase 7 12a-fix2 surfaced both compounded as the SNI SAS REF = 0 % bug. |
 | 2026-04-29 | H-1.1 added after Phase 0 Step 0.6: `sed -i.bak` round-trip overwrote `contractor_quality.py` on Windows with the stale Linux-mount truncated view. Recovery via Edit tool. H-2 production-confirmation note added (StringDtype unpickle drift) and D-001 fix landed. |
 | 2026-04-30 | H-4 added during Phase 8 step 3 vdate addendum: three pytest invocations of a 13-test pure-mock helper file hung indefinitely in the sandbox. Direct `python -c` invocation confirmed the fix (`avg_days_to_visa` restored from `None` to `79.1`). Pytest-side pass needs Windows-shell verification. |
-| 2026-04-30 | H-5 added during Phase 8 step 4: `CACHE_SCHEMA_VERSION` "v1" → "v2" bump correctly triggers a rebuild via the existing freshness check, but the rebuild's xlsx re-parse against the cross-mounted `FLAT_GED.xlsx` was killed at 5 min in sandbox (~30 s on Windows). Step 4 marked code-landed, runtime verification deferred to Windows shell. |
+| 2026-04-30 | H-5 added during Phase 8 step 4: `CACHE_SCHEMA_VERSION` "v1" â†’ "v2" bump correctly triggers a rebuild via the existing freshness check, but the rebuild's xlsx re-parse against the cross-mounted `FLAT_GED.xlsx` was killed at 5 min in sandbox (~30 s on Windows). Step 4 marked code-landed, runtime verification deferred to Windows shell. |
+| 2026-05-02 | H-1.1 re-occurred during Phase 6A Step 5A on `src/reporting/counter_attack_builder.py`: an additive Edit (TERMINAL_STATES filter) succeeded through the authoritative path, but bash `wc -l` / `tail` / `python -m py_compile` reported the file truncated to ~691 lines and emitted `SyntaxError: unterminated string literal`, while the Read tool showed the file intact. A "fix" via `head -690 ... > /tmp/foo && cp /tmp/foo file` plus a Python `read_text + write_text` round-trip â€” both stale-mount roundtrips â€” overwrote the canonical Windows file and lost the `_build_evidence_summary` helper. Recovery: re-Edited via Edit tool. Lesson reinforced: during Phase 6A and any future cross-mount work, Read
+| 2026-05-04 | H-1.1 re-occurred during Phase 6X.F2-bis closure attempt on `src/reporting/counter_attack_builder.py`. A consolidated patch script used `Path.read_text(newline=...)` (kwarg unsupported), I sed-substituted the read/write calls, and the substituted form was `open(path, "w", newline="\\n")` — `open(..., "w")` truncates the file at open time *before* the `newline=` value is validated, so the subsequent `ValueError` left the file at 0 bytes. The file was untracked in git (added by pre-existing uncommitted Phase 6 work), so `git checkout HEAD --` could not recover it. A `/tmp/counter_attack_builder_pre_s3.py` backup existed but was owned by `nobody:nogroup` and unreadable to the sandbox uid. Final recovery + R1/R2/R3 reconstruction completed by Codex outside Cowork. Lesson reinforced: for untracked operational files, **make an explicit on-disk `.pre-<step>` copy before any patch script runs**, regardless of how anchor-checked the script claims to be. Validation of `open(..., "w", newline=...)` failure modes assuming "newline kwarg validation runs first" is wrong — the file is truncated. |

@@ -1252,7 +1252,16 @@ def _resolve_data_date(ctx: RunContext) -> date:
     if d is None:
         # Fallback to run_date; warn.
         ctx.warnings.append("data_date missing on ctx; falling back to run_date")
-        d = datetime.fromisoformat(ctx.run_date).date() if ctx.run_date else date.today()
+        if ctx.run_date:
+            try:
+                d = datetime.fromisoformat(ctx.run_date).date()
+            except (TypeError, ValueError):
+                d = None
+        if d is None:
+            raise ValueError(
+                "data_date is required for consultant lateness; "
+                "ctx.data_date and ctx.run_date are both unavailable or unparseable"
+            )
     if isinstance(d, datetime):
         d = d.date()
     return d

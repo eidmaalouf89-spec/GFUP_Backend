@@ -255,6 +255,58 @@ key (lates first, then earliest deadline).
 | Document Command Center — search | `search_documents(query, focus, stale_days, limit)` | `document_command_center.search_documents` |
 | Document Command Center — panel | `get_document_command_center(numero, indice, focus, stale_days)` | `document_command_center.build_document_command_center` |
 | Document Command Center — chain timeline (Chronologie section) | `get_chain_timeline(numero)` | `chain_timeline_attribution.load_chain_timeline_artifact` (reads `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json`) |
+| Counter-Attack — home (Phase 6B) | `get_counter_attack_home()` | `reporting.counter_attack_query.get_counter_attack_home` (reads `output/intermediate/COUNTER_ATTACK_ITEMS.csv`; identity columns locked as `string`; missing-artifact returns `available=false` empty state) |
+| Counter-Attack — bucket queue (Phase 6B) | `get_counter_attack_queue(bucket, limit=500)` | `reporting.counter_attack_query.get_counter_attack_queue` (same artifact; bucket display order: FERMER_MAINTENANT, SECONDAIRE_EXPIRE, DECISION_MOEX, ENTREPRISE_A_RELANCER, CONSULTANT_A_ATTAQUER, SUJET_REUNION, MOEX_SHAME_INTERNAL) |
+| Counter-Attack — item detail (Phase 6B) | `get_counter_attack_item(item_id)` | `reporting.counter_attack_query.get_counter_attack_item` (same artifact; `timeline=[]` by design — cockpit reaches existing chain timeline through DCC via `open_dcc_ref`) |
+
+> **Counter-Attack note (Phase 6B):** these three endpoints are
+> on-demand. They are NOT part of the four-call `Promise.allSettled` in
+> `data_bridge.js:_loadCoreData` and do NOT populate any `window.*`
+> global. The future Counter-Attack page (Phase 6C) owns its own state
+> and calls `jansaBridge.loadCounterAttackHome / loadCounterAttackQueue /
+> loadCounterAttackItem` only when the user navigates to the page. The
+> bridge contract is the only allowed integration point — JSX must NOT
+> read the CSV directly. See
+> `docs/implementation/PHASE_6B_READ_API.md` for the full payload
+> contracts and known limitations.
+>
+> **Phase 6X closure (2026-05-04):** the backend artifact now uses DCC
+> split deadline truth (`primary_consultant_days_remaining`,
+> `secondary_consultant_days_remaining`, `consultant_days_remaining`) and
+> Chain/Onion wait-day fields to assign buckets and `days_late`. The
+> Phase 6B endpoint shapes did not change; UI code still consumes only the
+> read API payloads.
+>
+> **Phase 6C closure (2026-05-04):** the previously-forward-referenced
+> Counter-Attack page is now built and live, user-facing label
+> **ACTION MOEX**. Internal page id `ActionMoex`, component
+> `window.ActionMoexPage`, file `ui/jansa/counter_attack.jsx` (loaded
+> between `document_panel.jsx` and `shell.jsx` in `ui/jansa-connected.html`).
+> The page consumes only the three Phase 6B bridge methods on demand
+> (`loadCounterAttackHome` on mount, `loadCounterAttackQueue(bucket, 500)`
+> on bucket click with per-bucket cache, `loadCounterAttackItem(item_id)`
+> on row click), with `queueGenRef` and `itemGenRef` stale-promise guards
+> for rapid clicks. The cockpit performs **no business logic**: bucket
+> rules, ownership, deadlines, risk, MOEX exposure, attackability, and
+> recommended actions are all decided by the backend (Phase 6A / Phase 6X).
+> Bucket presentation order is overridden in JSX (`AM_BUCKET_PRESENTATION`
+> array, counts looked up by enum, not by index — backend display order
+> remains free to evolve). The "Ouvrir le détail" button uses the existing
+> `window.openDocumentCommandCenter(numero, indice)` global from the DCC
+> wiring; no new DCC-like surface is added. "Voir preuves / Masquer
+> preuves" toggles locally without an extra backend call. See
+> `docs/implementation/PHASE_6C_COUNTER_ATTACK_UI.md` for the full
+> implementation record (files, edge-state matrix, manual smokes).
+>
+> **Phase 6C correction Set 1 — 2026-05-04:**
+> (S3) Latest-indice dedup landed at the 6A builder; the artifact now has
+> exactly one row per chain (1525 distinct family_keys). (S1) The 6B
+> `get_counter_attack_queue` adapter sorts rows ascending by `days_late`
+> (numeric coercion, NaN last) with stable tie-breakers `days_open`,
+> `numero`, `indice`. Pure presentation order; `count` is unchanged.
+> (S2) Canonical-name row title (`AXIMA — …`, `BENTIN — …`) is produced
+> at the 6A builder under Phase 6X — the 6B adapter passes
+> `subject_label` through verbatim, no JSX-side reformatting.
 
 ### Document Command Center wiring (deployed 2026-04-28)
 
@@ -337,38 +389,4 @@ unwired. `priority_queue` exists in OVERVIEW data but is not rendered (no site t
 - `OverviewPage` now accepts an `onOpenConsultant` prop, threaded down to
   `KpiRow.BestPerformerCard` ("Consultant de la semaine") and
   `FocusByConsultant` per-row buttons. Both call sites replaced
-  `onNavigate('Consultants')` with `onOpenConsultant(consultant)`. The shell
-  closure `(c) => navigateTo('ConsultantFiche', c)` is the same one used by
-  `<ConsultantsPage onOpen={...}/>` — single fiche-open path, multiple entry
-  points. `data.best_consultant` carries `name` (sufficient for
-  `loadFiche(canonical_name || name)`); each `c` in `focus.by_consultant`
-  carries `name` likewise. "Entreprise de la semaine" KPI card unchanged
-  (still routes to Contractors list — Phase 7 territory).
-- `get_chain_onion_intel` (`app.py` ~line 1070) now applies
-  `reporting.narrative_translation.translate_top_issue` per issue. Each
-  `top_issues[i]` carries three additive keys: `executive_summary_fr`,
-  `primary_driver_fr`, `recommended_focus_fr`. English fields are preserved.
-  `ChainOnionPanel` Synthèse cell renders `executive_summary_fr ||
-  executive_summary || ''` (fallback chain). `narrative_engine.py` was not
-  touched.
-
----
-
-## E. Side notes on the "Focus" toggle
-
-Focus is a boolean + stale-threshold slider in the topbar. The toggle:
-
-1. Sets local React state (`focusMode`, `staleDays`).
-2. Calls `jansaBridge.refreshForFocus(focusMode, staleDays)`.
-3. Bridge re-issues `get_overview_for_ui` / `get_consultants_for_ui` /
-   `get_contractors_for_ui` with the new flags.
-4. Backend pipes the flags into `FocusConfig(enabled, stale_threshold_days)`
-   on every aggregator/builder call.
-5. `app.Api._build_live_operational_numeros` is invoked to narrow the focus
-   set to the chain_onion LIVE_OPERATIONAL bucket; `_apply_live_narrowing`
-   mutates `focus_result` accordingly.
-
-The Focus pipeline therefore depends on **both** the main pipeline outputs
-AND `output/chain_onion/*`. If chain_onion has not been run since the last
-pipeline run, Focus narrowing silently falls back to the unfiltered
-ownership set (no crash, but `legacy_backlog_count` will be 0).
+  `onNavigate('Con

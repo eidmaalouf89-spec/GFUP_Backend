@@ -1,0 +1,438 @@
+Phase 6 — Counter-Attack Intelligence
+Objective
+
+Create an operational cockpit that tells MOEX:
+
+What to close.
+What to decide.
+Who to relaunch.
+Who to attack.
+Which subject is becoming dangerous.
+What evidence supports it.
+
+The system must be usable by non-technical people. The user should not need to understand chain logic, onion scoring, consultant tiers, or workflow complexity.
+
+The current repo already has the key ownership rule: primary pending, secondary pending within 10 days, secondary expired returning to MOEX, all replied returning to MOEX, REF returning to contractor, terminal visa closing the item. The Document Command Center already exposes “Secondaire expiré” as a secondary tag. Phase 6 should surface these rules as action buckets.
+
+Phase 6A — Action Kernel / Evidence Artifact
+Objective
+
+Produce one deterministic backend artifact that converts existing chain/onion/focus/DCC logic into simple operational action items.
+
+This replaces the weak idea of only producing INTELLIGENCE_TAGS.csv.
+
+Recommended artifact:
+
+output/intermediate/COUNTER_ATTACK_ITEMS.csv
+
+Optional supporting artifacts:
+
+output/intermediate/SUBJECT_RISK_DOSSIERS.csv
+output/intermediate/ACTOR_ATTACK_DOSSIERS.csv
+User Value
+
+The software pre-digests complexity into stupid-simple decisions:
+
+Fermer maintenant
+Décider MOEX
+Secondaire expiré
+Entreprise à relancer
+Consultant à attaquer
+Sujet à mettre en réunion
+Touchpoints
+
+Likely affected:
+
+src/reporting/document_command_center.py      read only
+src/reporting/focus_ownership.py             read only
+src/reporting/chain_timeline_attribution.py  read/use existing artifact
+output/chain_onion/*                         read only
+src/reporting/counter_attack_builder.py      new
+src/pipeline/stages/stage_finalize_run.py    additive write/register artifact
+context docs                                 update
+Recommended Scope MVP
+
+Each row in COUNTER_ATTACK_ITEMS.csv should contain:
+
+item_id
+numero
+indice
+family_key
+subject_label
+emetteur_code
+emetteur_name
+primary_actor
+actor_to_call
+action_bucket
+action_label
+plain_reason
+recommended_action
+risk_level
+evidence_summary
+days_open
+days_late
+current_state
+normalized_score_100
+is_internal_moex_exposure
+is_external_attackable
+
+Minimum action buckets:
+
+FERMER_MAINTENANT
+DECISION_MOEX
+SECONDAIRE_EXPIRE
+ENTREPRISE_A_RELANCER
+CONSULTANT_A_ATTAQUER
+SUJET_REUNION
+MOEX_SHAME_INTERNAL
+
+Example row:
+
+Bucket: SECONDAIRE_EXPIRE
+Label: Secondaire expiré — décision MOEX requise
+Reason: Le BET primaire a répondu, le secondaire n’a pas répondu après 10 jours.
+Action: MOEX doit reprendre la main et émettre/arbitrer le visa.
+Future V2
+
+Add stronger subject clustering:
+
+CFO-CFA-SSI
+CVC
+Structure / PH / planchers
+Façade
+VRD
+GTB
+Ascenseurs
+SAS compliance
+SOCOTEC compliance
+Risks
+
+This touches the pipeline/output layer, so it is HIGH risk.
+
+Do not rewrite existing ownership logic. Reuse what exists. The existing repo already states the pipeline/source-of-truth hierarchy and warns that UI is presentation only.
+
+Validation
+Artifact exists
+Row count plausible
+No pipeline regression
+Same inputs → same artifact
+Buckets are non-empty
+Secondaire expiré rows match existing ownership/countdown logic
+All other outputs unchanged
+Phase 6B — Counter-Attack Read API
+Objective
+
+Expose backend endpoints that serve ready-made screens, not raw filter data.
+
+User Value
+
+The UI does not calculate. The backend says:
+
+Here are today’s buckets.
+Here is the queue.
+Here is the evidence.
+Here is the action.
+Touchpoints
+src/reporting/counter_attack_query.py   new
+app.py                                  add read-only endpoints
+ui/jansa/data_bridge.js                 add bridge methods
+Recommended Scope MVP
+
+Endpoints:
+
+get_counter_attack_home()
+get_counter_attack_queue(bucket, limit=500)
+get_counter_attack_item(item_id)
+
+Optional:
+
+get_counter_attack_subjects()
+get_counter_attack_actors()
+Expected Payloads
+get_counter_attack_home()
+
+Returns:
+
+{
+  "summary": {
+    "total_today": 47,
+    "recommended_first_bucket": "FERMER_MAINTENANT"
+  },
+  "buckets": [
+    {
+      "bucket": "FERMER_MAINTENANT",
+      "label": "À fermer maintenant",
+      "count": 12,
+      "priority": 1,
+      "description": "Tous les avis sont disponibles, MOEX doit émettre le visa."
+    }
+  ]
+}
+get_counter_attack_queue(bucket)
+
+Returns simple rows:
+
+{
+  "bucket": "SECONDAIRE_EXPIRE",
+  "rows": [
+    {
+      "item_id": "...",
+      "subject_label": "CVC / Armoires climatisation",
+      "actor": "Axima",
+      "reason": "Secondaire expiré depuis 18 jours.",
+      "recommended_action": "MOEX doit reprendre la main.",
+      "risk_level": "High"
+    }
+  ]
+}
+get_counter_attack_item(item_id)
+
+Returns evidence:
+
+{
+  "header": {},
+  "why_here": [],
+  "timeline": [],
+  "recommended_action": "",
+  "evidence": [],
+  "open_dcc_ref": {
+    "numero": "049512",
+    "indice": "B"
+  }
+}
+Future V2
+
+Add advanced filters, but not as the default journey.
+
+actor
+subject
+risk
+bucket
+internal/external
+Risks
+
+Medium risk. Read-only endpoints over an artifact.
+
+No new DB. No pipeline changes. No UI calculations.
+
+Validation
+Home returns bucket counts
+Queue returns rows for each bucket
+Item detail returns evidence
+Missing artifact returns friendly empty state
+No other API regressions
+Phase 6C — Counter-Attack Cockpit UI
+Objective
+
+Create a new sidebar page:
+
+Contre-attaque
+
+or:
+
+Intelligence
+
+But the page header should be operational:
+
+Cuisine d’attaque
+User Value
+
+A non-technical MOEX user opens the page and immediately knows what to do.
+
+Touchpoints
+ui/jansa/counter_attack.jsx     new
+ui/jansa/shell.jsx              add sidebar entry
+ui/jansa-connected.html         add script tag
+Recommended Scope MVP
+
+Home screen:
+
+Aujourd’hui, vous devez traiter 47 sujets.
+Commencez par les 12 faciles.
+
+Big action cards:
+
+1. À fermer maintenant
+2. Secondaires expirés
+3. Décisions MOEX
+4. Entreprises à relancer
+5. Consultants à attaquer
+6. Sujets réunion critique
+7. Honte MOEX interne
+
+User flow:
+
+Home
+→ Bucket
+→ Queue
+→ Item detail
+→ Open DCC / Export / Mark treated
+Queue Row Format
+
+Bad:
+
+245028 | normalized_score=82 | WAITING_CORRECTED_INDICE
+
+Good:
+
+SNI — Câblage éclairage R1
+Entreprise doit resoumettre
+Bloqué depuis 35 jours après REF MOEX
+Action: relancer SNI
+[Ouvrir] [Preuves] [Traité]
+Item Detail Format
+
+Every item should answer only 3 questions first:
+
+What is it?
+Why is it here?
+What should I do?
+
+Then hide details under:
+
+Voir preuves
+Voir chronologie
+Ouvrir DCC
+Future V2
+
+Expert mode:
+
+filters
+actor comparison
+subject risk map
+advanced evidence table
+Risks
+
+Medium risk. New UI page only.
+
+Do not touch backend in this phase if 6B is done.
+
+Validation
+Page opens
+Buckets show counts
+Bucket click opens queue
+Row click opens DCC
+Evidence panel understandable
+No console errors
+No regression to existing tabs
+Phase 6D — Export / Treated / Monthly AI Pack
+Objective
+
+Add operator workflow tools:
+
+Export bucket
+Export selection
+Mark treated
+Reset treated
+Generate monthly AI evidence pack
+User Value
+
+The user can work through the backlog across the day/week without losing track, and can produce an external report pack.
+
+Touchpoints
+ui/jansa/counter_attack.jsx
+ui/jansa/data_bridge.js
+app.py
+src/reporting/counter_attack_export.py     new
+output/exports/
+Recommended Scope MVP
+
+Actions:
+
+Export this bucket
+Export selected rows
+Mark selected treated
+Auto-mark exported rows treated
+Reset treated for current run
+
+Local treated state:
+
+localStorage only
+run-number scoped
+no DB write
+no pipeline mutation
+
+Key pattern:
+
+counter_attack_treated_<run_number>__<item_id>
+
+Exports:
+
+output/exports/CounterAttack_<bucket>_<timestamp>.xlsx
+
+Monthly pack:
+
+output/exports/CounterAttack_AI_Pack_<timestamp>.zip
+
+Zip contains:
+
+COUNTER_ATTACK_ITEMS.csv
+SUBJECT_RISK_DOSSIERS.csv
+ACTOR_ATTACK_DOSSIERS.csv
+CHAIN_EVENTS.csv
+ONION_LAYERS.csv
+ONION_SCORES.csv
+CHAIN_REGISTER.csv
+top_issues.json
+dashboard_summary.json
+README_FOR_AI.md
+
+The README_FOR_AI.md should tell the external AI:
+
+You are analyzing a MOEX counter-attack pack.
+Your goal is to produce:
+1. MOEX recovery report
+2. Actor attack dossiers
+3. Subject risk dossiers
+4. Meeting agenda
+5. Draft letter angles
+Future V2
+
+Generate draft letters directly:
+
+Relance entreprise
+Relance consultant
+Mise en demeure soft
+Point réunion
+Note interne MOEX
+Risks
+
+Medium risk.
+
+No backend mutation. No DB write. No modification of deterministic artifacts.
+
+Validation
+Export creates XLSX
+Exported rows match queue
+Treated rows grey out
+Reload keeps treated state
+New run resets treated state
+AI pack zip contains expected files
+No DB modified
+No pipeline artifact modified
+Recommended Final Phase 6 Structure
+6A — Build Counter-Attack Action Artifact
+6B — Add Counter-Attack Read Endpoints
+6C — Build Simple Cockpit UI
+6D — Add Export, Treated State, Monthly AI Pack
+
+This is better than the current documented structure because the current docs are still centered on an “Intelligence filter/list” page. The repo confirms Phase 6 was planned as an unimplemented Intelligence layer with 6A/6B/6C/6D sub-plans, but those plans are passive compared to the counter-attack concept.
+
+Core Design Rule
+
+Phase 6 must not ask the user to analyze.
+
+It must say:
+
+Do this first.
+Here is why.
+Here is the evidence.
+Here is the action.
+
+Default mode:
+
+Simple / idiot-proof / action buckets
+
+Optional later mode:
+
+Expert / filters / forensic analysis

@@ -296,45 +296,6 @@ def _compute_days_since_moex_ref(ctx, latest_responses: list[dict]) -> Optional[
     return None
 
 
-def _compute_open_consultant_deadlines(ctx, latest_responses: list[dict]) -> dict:
-    """Return open consultant deadline truth split by PRIMARY/SECONDARY tier.
-
-    Uses only `_get_latest_responses_for_doc` output: `is_open`, `deadline`,
-    `reviewer`, and `tier`. MOEX/UNKNOWN/answered responses are ignored.
-    """
-    data_date = ctx.data_date
-    dd = data_date.date() if hasattr(data_date, "date") else data_date
-
-    deadlines_by_tier = {"PRIMARY": [], "SECONDARY": []}
-    for response in latest_responses:
-        if (
-            response.get("is_open")
-            and response.get("reviewer") != MOEX_CANONICAL
-            and response.get("deadline") is not None
-            and response.get("tier") in deadlines_by_tier
-        ):
-            deadlines_by_tier[response["tier"]].append(response["deadline"])
-
-    primary_deadline = min(deadlines_by_tier["PRIMARY"]) if deadlines_by_tier["PRIMARY"] else None
-    secondary_deadline = min(deadlines_by_tier["SECONDARY"]) if deadlines_by_tier["SECONDARY"] else None
-    all_deadlines = deadlines_by_tier["PRIMARY"] + deadlines_by_tier["SECONDARY"]
-    min_deadline = min(all_deadlines) if all_deadlines else None
-
-    def _remaining(deadline):
-        if deadline is None or dd is None:
-            return None
-        return (deadline - dd).days
-
-    return {
-        "min_open_consultant_deadline": min_deadline,
-        "consultant_days_remaining": _remaining(min_deadline),
-        "primary_open_consultant_deadline": primary_deadline,
-        "primary_consultant_days_remaining": _remaining(primary_deadline),
-        "secondary_open_consultant_deadline": secondary_deadline,
-        "secondary_consultant_days_remaining": _remaining(secondary_deadline),
-    }
-
-
 def _compute_primary_tag(
     focus_owner_tier: str,
     latest_responses: list[dict],
@@ -647,7 +608,24 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         # Visa global
         visa_global = doc_row.get("_visa_global")
 
-        deadline_truth = _compute_open_consultant_deadlines(ctx, latest_responses)
+        # Min open consultant deadline (consultants = non-MOEX reviewers).
+        # Reuses is_open/deadline truth from _get_latest_responses_for_doc.
+        open_consultant_deadlines = [
+            r["deadline"] for r in latest_responses
+            if r.get("is_open")
+            and r["reviewer"] != MOEX_CANONICAL
+            and r.get("deadline") is not None
+        ]
+        if open_consultant_deadlines:
+            min_open_consultant_deadline = min(open_consultant_deadlines)
+            if ctx.data_date is not None:
+                dd = ctx.data_date.date() if hasattr(ctx.data_date, "date") else ctx.data_date
+                consultant_days_remaining = (min_open_consultant_deadline - dd).days
+            else:
+                consultant_days_remaining = None
+        else:
+            min_open_consultant_deadline = None
+            consultant_days_remaining = None
 
         rows.append({
             "doc_id": doc_id,
@@ -663,12 +641,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
             "blocking_bet_count": blocking_bet_count,
             "countdown_expired": countdown_expired,
             "visa_global": visa_global,
-            "min_open_consultant_deadline": deadline_truth["min_open_consultant_deadline"],
-            "consultant_days_remaining": deadline_truth["consultant_days_remaining"],
-            "primary_open_consultant_deadline": deadline_truth["primary_open_consultant_deadline"],
-            "primary_consultant_days_remaining": deadline_truth["primary_consultant_days_remaining"],
-            "secondary_open_consultant_deadline": deadline_truth["secondary_open_consultant_deadline"],
-            "secondary_consultant_days_remaining": deadline_truth["secondary_consultant_days_remaining"],
+            "min_open_consultant_deadline": min_open_consultant_deadline,
+            "consultant_days_remaining": consultant_days_remaining,
         })
 
     return pd.DataFrame(rows)
@@ -734,7 +708,24 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         # Visa global
         visa_global = doc_row.get("_visa_global")
 
-        deadline_truth = _compute_open_consultant_deadlines(ctx, latest_responses)
+        # Min open consultant deadline (consultants = non-MOEX reviewers).
+        # Reuses is_open/deadline truth from _get_latest_responses_for_doc.
+        open_consultant_deadlines = [
+            r["deadline"] for r in latest_responses
+            if r.get("is_open")
+            and r["reviewer"] != MOEX_CANONICAL
+            and r.get("deadline") is not None
+        ]
+        if open_consultant_deadlines:
+            min_open_consultant_deadline = min(open_consultant_deadlines)
+            if ctx.data_date is not None:
+                dd = ctx.data_date.date() if hasattr(ctx.data_date, "date") else ctx.data_date
+                consultant_days_remaining = (min_open_consultant_deadline - dd).days
+            else:
+                consultant_days_remaining = None
+        else:
+            min_open_consultant_deadline = None
+            consultant_days_remaining = None
 
         rows.append({
             "doc_id": doc_id,
@@ -750,12 +741,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
             "blocking_bet_count": blocking_bet_count,
             "countdown_expired": countdown_expired,
             "visa_global": visa_global,
-            "min_open_consultant_deadline": deadline_truth["min_open_consultant_deadline"],
-            "consultant_days_remaining": deadline_truth["consultant_days_remaining"],
-            "primary_open_consultant_deadline": deadline_truth["primary_open_consultant_deadline"],
-            "primary_consultant_days_remaining": deadline_truth["primary_consultant_days_remaining"],
-            "secondary_open_consultant_deadline": deadline_truth["secondary_open_consultant_deadline"],
-            "secondary_consultant_days_remaining": deadline_truth["secondary_consultant_days_remaining"],
+            "min_open_consultant_deadline": min_open_consultant_deadline,
+            "consultant_days_remaining": consultant_days_remaining,
         })
 
     return pd.DataFrame(rows)
