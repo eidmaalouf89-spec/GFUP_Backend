@@ -326,6 +326,39 @@
       }
     },
 
+    /**
+     * Phase 6D — Generate the JANSA AI Audit Pack ZIP.
+     * On-demand: triggered by the ReportsPage card (Step 6).
+     * Always resolves to the §10.8 payload shape; never rejects, never throws.
+     * @returns {Promise<object>}  { success, path, filename, included_files, missing_optional_files, error }
+     */
+    generateAiAuditPack: async function () {
+      if (!bridge.api || typeof bridge.api.generate_counter_attack_ai_audit_pack !== "function") {
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          included_files: [],
+          missing_optional_files: [],
+          error: "Bridge not ready: window.jansaBridge.api unavailable",
+        };
+      }
+      try {
+        var r = await bridge.api.generate_counter_attack_ai_audit_pack();
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] AI audit pack exception:", e);
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          included_files: [],
+          missing_optional_files: [],
+          error: "Bridge.generateAiAuditPack: " + e.name + ": " + e.message,
+        };
+      }
+    },
+
     // ── Internal ──────────────────────────────────────────────────
 
     _loadCoreData: async function (focus, staleDays) {

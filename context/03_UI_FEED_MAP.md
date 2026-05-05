@@ -151,6 +151,23 @@ Data sources:
 One real action: "Tableau de Suivi VISA" → `api.export_team_version()`.
 Other reports section is a placeholder ("à venir").
 
+**Phase 6D (2026-05-05):** `Générer Pack Audit IA` button added at post-edit
+lines 877–910 (`ui/jansa/shell.jsx`). Replaces the disabled "Autres rapports"
+placeholder (pre-edit lines 853–864). Full call chain:
+
+1. UI: `Générer Pack Audit IA` button → `handleAiPack` handler (lines 807–827);
+   state pairs `(aiPacking, aiPackResult)` at lines 782–783.
+2. Bridge: `window.jansaBridge.generateAiAuditPack()` (`ui/jansa/data_bridge.js`
+   lines 329–360); ES5-style; typeof-guard on the API method; wraps failure in
+   the §10.8 envelope on every code path.
+3. Api: `Api.generate_counter_attack_ai_audit_pack()` (`app.py` lines 1255–1287);
+   module-level import at line 39; loads `RunContext` via `load_run_context(BASE_DIR)`.
+4. Backend: `build_ai_audit_pack(ctx, output_dir)`
+   (`src/reporting/counter_attack_ai_pack.py`).
+5. Output: `output/exports/JANSA_AI_AUDIT_PACK_<YYYYMMDD>_<HHMMSS>.zip`.
+6. Explorer-open guard (Correction #3): `result.success === true && result.path`
+   enforced at line 818 in `shell.jsx`.
+
 ### Stub pages (rendered by `shell.jsx`)
 
 - `Discrepancies` → `<StubPage title="Écarts" …>`.
@@ -250,6 +267,7 @@ key (lates first, then earliest deadline).
 | Runs | `get_all_runs`, `export_run_bundle` | `run_explorer` |
 | Executer | `validate_inputs`, `run_pipeline_async`, `get_pipeline_status` | `run_orchestrator` |
 | Reports / Tableau VISA | `export_team_version` | `data_loader` + shutil copy |
+| Reports / Pack Audit IA (Phase 6D) | `generate_counter_attack_ai_audit_pack` | `reporting.counter_attack_ai_pack.build_ai_audit_pack` |
 | Discrepancies (stub) | none today | (future: `DISCREPANCY_REPORT.xlsx` consumer) |
 | Settings (stub) | none today | — |
 | Document Command Center — search | `search_documents(query, focus, stale_days, limit)` | `document_command_center.search_documents` |

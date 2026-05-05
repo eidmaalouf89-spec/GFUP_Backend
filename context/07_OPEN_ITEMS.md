@@ -511,9 +511,11 @@ only phase still requiring substantial development is **Phase 6** (the
 (`PHASE_6A_INTELLIGENCE_ARTIFACT.md`, `PHASE_6B_INTELLIGENCE_ENDPOINTS.md`,
 `PHASE_6C_INTELLIGENCE_UI_PAGE.md`, `PHASE_6D_INTELLIGENCE_EXPORT_AND_TREATED.md`)
 are **superseded** — see `docs/implementation/PHASE_6_COUNTER_ATTACK_MASTER.md`
-for the authoritative plan. As of 2026-05-04: **6A and 6B are landed**, **6X
-is closed** (data-truth correction; see the dedicated section above), and
-**6C / 6D are resumable** against the corrected `COUNTER_ATTACK_ITEMS.csv`.
+for the authoritative plan. As of 2026-05-05: **6A and 6B are landed**, **6X
+is closed** (data-truth correction; see the dedicated section above), **6C is
+closed** (Counter-Attack cockpit; `docs/implementation/PHASE_6C_COUNTER_ATTACK_UI.md`),
+and **6D is closed** (AI audit pack; `docs/implementation/PHASE_6D_TEAM_AI_AUDIT_PACK.md`
+§11 — `VALIDATED`). The full Phase 6 intelligence layer is complete.
 Phases 0–5, 7, 8 (and family) are shipped or read-only reference.
 
 ---

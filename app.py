@@ -36,6 +36,8 @@ RUNS_DIR = BASE_DIR / "runs"
 # ── Add src/ to path so existing modules can find each other ──
 sys.path.insert(0, str(BASE_DIR / "src"))
 
+from reporting.counter_attack_ai_pack import build_ai_audit_pack
+
 # ── UI resolution ────────────────────────────────────────────
 def _resolve_ui():
     """Return the single production UI entrypoint for PyWebView."""
@@ -1249,6 +1251,40 @@ class Api:
                 "message": "Le module Contre-attaque n'est pas encore disponible.",
                 "error": str(exc),
             })
+
+    # ── Phase 6D — JANSA AI Audit Pack ──────────────────────────
+    def generate_counter_attack_ai_audit_pack(self) -> dict:
+        """Phase 6D — Generate the JANSA AI Audit Pack ZIP for the current run.
+
+        Returns the §10.8 success/failure payload from
+        src/reporting/counter_attack_ai_pack.build_ai_audit_pack. Never raises
+        to the bridge.
+        """
+        try:
+            from reporting.data_loader import load_run_context
+            ctx = load_run_context(BASE_DIR)
+            if ctx is None:
+                return {
+                    "success": False,
+                    "path": None,
+                    "filename": None,
+                    "included_files": [],
+                    "missing_optional_files": [],
+                    "error": "No run context available. Load or run a project first.",
+                }
+
+            output_dir = OUTPUT_DIR / "exports"
+            result = build_ai_audit_pack(ctx, output_dir)
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "path": None,
+                "filename": None,
+                "included_files": [],
+                "missing_optional_files": [],
+                "error": f"Api.generate_counter_attack_ai_audit_pack: {type(e).__name__}: {e}",
+            }
 
 # ── Main ─────────────────────────────────────────────────────
 def main():

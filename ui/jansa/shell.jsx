@@ -779,6 +779,8 @@ function StubPage({ title, note }) {
 function ReportsPage() {
   const [exporting, setExporting] = React.useState(false);
   const [exportResult, setExportResult] = React.useState(null);
+  const [aiPacking, setAiPacking] = React.useState(false);
+  const [aiPackResult, setAiPackResult] = React.useState(null);
 
   const handleExport = async () => {
     if (!window.jansaBridge || !window.jansaBridge.api) return;
@@ -799,6 +801,28 @@ function ReportsPage() {
     } finally {
       setExporting(false);
       setTimeout(() => setExportResult(null), 4000);
+    }
+  };
+
+  const handleAiPack = async () => {
+    if (!window.jansaBridge) return;
+    setAiPacking(true);
+    setAiPackResult(null);
+    try {
+      var result = await window.jansaBridge.generateAiAuditPack();
+      if (result && result.success === true) {
+        setAiPackResult({ ok: true });
+      } else {
+        setAiPackResult({ ok: false });
+      }
+      if (result && result.success === true && result.path) {
+        window.jansaBridge.api.open_file_in_explorer(result.path);
+      }
+    } catch (e) {
+      setAiPackResult({ ok: false });
+    } finally {
+      setAiPacking(false);
+      setTimeout(() => setAiPackResult(null), 4000);
     }
   };
 
@@ -850,17 +874,39 @@ function ReportsPage() {
         </button>
       </div>
 
-      {/* Other reports placeholder */}
+      {/* G\u00e9n\u00e9rer Pack Audit IA */}
       <div style={{
         background: 'var(--bg-elev)', border: '1px solid var(--line)',
-        borderRadius: 16, padding: 24, opacity: 0.5,
+        borderRadius: 16, padding: 24, marginBottom: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
       }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-2)', marginBottom: 4 }}>
-          Autres rapports
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+            G\u00e9n\u00e9rer Pack Audit IA
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
+            Pr\u00e9pare un dossier ZIP avec les donn\u00e9es JANSA + prompts IA pour analyse externe.
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-          Fiches consultants, bilans entreprises \u2014 \u00e0 venir.
-        </div>
+        <button
+          onClick={handleAiPack}
+          disabled={aiPacking}
+          style={{
+            flexShrink: 0,
+            padding: '9px 18px', borderRadius: 9,
+            background: 'var(--accent-soft)',
+            border: '1px solid rgba(10,132,255,0.35)',
+            color: 'var(--accent)',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+            cursor: aiPacking ? 'wait' : 'pointer',
+            opacity: aiPacking ? 0.6 : 1,
+            transition: 'opacity 0.15s',
+          }}
+        >
+          {aiPacking ? 'Export en cours\u2026'
+            : aiPackResult ? (aiPackResult.ok ? '\u2713 Export\u00e9' : '\u2717 Erreur')
+            : 'G\u00e9n\u00e9rer Pack Audit IA'}
+        </button>
       </div>
     </div>
   );

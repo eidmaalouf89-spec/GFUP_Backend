@@ -230,11 +230,27 @@ target them safely. **Do not delete without an explicit task.**
 
 ---
 
-## "Tableau de suivi de visa 10_04_2026.xlsx"
+## “Tableau de suivi de visa 10_04_2026.xlsx”
 
 Found in `output/`. Produced by a previous `export_team_version()` invocation
 on 2026-04-10. `app.Api.export_team_version` overwrites by deleting the
 existing dest before renaming the temp file in place, so a future export
 will replace it (or leave it if a different date stamp is generated). Not
 a leak â€” this is the user-facing dated team export.
+
+---
+
+## On-demand exports (`output/exports/`)
+
+Produced on demand from the JANSA app UI. NOT registered in `run_memory.db`
+and NOT part of any pipeline stage. Each export is independent — filename
+carries a generation timestamp, not a run number. The directory is created
+on first call with `mkdir(parents=True, exist_ok=True)`. The existing
+`run_N_bundle.zip` exports (from `Api.export_run_bundle`) and the AI audit
+pack both land in `output/exports/` but are distinct in naming, content,
+and trigger path.
+
+| Artifact | Location | Trigger | Generator | Purpose / Notes |
+|---|---|---|---|---|
+| `JANSA_AI_AUDIT_PACK_<YYYYMMDD>_<HHMMSS>.zip` | `output/exports/` | `Générer Pack Audit IA` button in `ReportsPage` (`ui/jansa/shell.jsx` post-edit lines 877–910) | `src/reporting/counter_attack_ai_pack.build_ai_audit_pack(ctx, output_dir)` | External-AI evidence pack. Contains 14 required entries: 8 verbatim-copied source CSVs (`DATA/01_COUNTER_ATTACK_ITEMS.csv` through `DATA/08_CHAIN_TIMELINE_ATTRIBUTION.csv`), 1 in-memory-built `DATA/09_FLAT_GED_EXTRACT.csv` (LEFT JOIN of `ctx.docs_df` × `ctx.responses_df`, 20 columns, sorted ascending by `(numero, indice, doc_id, approver_canonical)` with mergesort), 1 `README_FOR_AI.md` (French-first, short English note at end), and 5 `PROMPTS/*.md` files (French-first, covering the six accepted attack angles). Up to 4 optional entries included when present on disk: `DATA/SUBJECT_RISK_DOSSIERS.csv`, `DATA/ACTOR_ATTACK_DOSSIERS.csv`, `DATA/dashboard_summary.json`, `DATA/top_issues.json`. Missing required source → clean error payload (`success: false`), no crash. Missing optional source → recorded in `missing_optional_files`, pack still ships. NOT registered in `run_memory.db`. See `docs/implementation/PHASE_6D_TEAM_AI_AUDIT_PACK.md` §10. |
 
