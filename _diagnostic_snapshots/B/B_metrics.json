@@ -1,0 +1,236 @@
+{
+  "run_memory": {
+    "error": "database disk image is malformed"
+  },
+  "report_memory": {
+    "error": "database disk image is malformed"
+  },
+  "output_artifacts": {
+    "GF_V0_CLEAN.xlsx": {
+      "exists": true,
+      "bytes": 906913,
+      "mtime": 1778068362.1797945
+    },
+    "GF_TEAM_VERSION.xlsx": {
+      "exists": true,
+      "bytes": 2574200,
+      "mtime": 1778068736.9653084
+    },
+    "DISCREPANCY_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 180083,
+      "mtime": 1778068378.910085
+    },
+    "DISCREPANCY_REVIEW_REQUIRED.xlsx": {
+      "exists": true,
+      "bytes": 7865,
+      "mtime": 1778068378.9387
+    },
+    "ANOMALY_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 6604,
+      "mtime": 1778068362.2175612
+    },
+    "AUTO_RESOLUTION_LOG.xlsx": {
+      "exists": true,
+      "bytes": 48992,
+      "mtime": 1778068362.3800054
+    },
+    "IGNORED_ITEMS_LOG.xlsx": {
+      "exists": true,
+      "bytes": 15830,
+      "mtime": 1778068379.0475607
+    },
+    "RECONCILIATION_LOG.xlsx": {
+      "exists": true,
+      "bytes": 18753,
+      "mtime": 1778068378.0118554
+    },
+    "MISSING_IN_GED_DIAGNOSIS.xlsx": {
+      "exists": true,
+      "bytes": 89954,
+      "mtime": 1778068379.5049837
+    },
+    "MISSING_IN_GED_TRUE_ONLY.xlsx": {
+      "exists": true,
+      "bytes": 5843,
+      "mtime": 1778068379.5145133
+    },
+    "MISSING_IN_GF_DIAGNOSIS.xlsx": {
+      "exists": true,
+      "bytes": 7090,
+      "mtime": 1778068379.5460708
+    },
+    "MISSING_IN_GF_TRUE_ONLY.xlsx": {
+      "exists": true,
+      "bytes": 5829,
+      "mtime": 1778068379.5539079
+    },
+    "INSERT_LOG.xlsx": {
+      "exists": true,
+      "bytes": 6088,
+      "mtime": 1778068379.6794298
+    },
+    "NEW_SUBMITTAL_ANALYSIS.xlsx": {
+      "exists": true,
+      "bytes": 440162,
+      "mtime": 1778068383.5596967
+    },
+    "SUSPICIOUS_ROWS_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 5293,
+      "mtime": 1778068736.9782827
+    },
+    "consultant_match_report.xlsx": {
+      "exists": true,
+      "bytes": 269490,
+      "mtime": 1778069379.977304
+    },
+    "consultant_reports.xlsx": {
+      "exists": true,
+      "bytes": 153809,
+      "mtime": 1778069371.7900746
+    }
+  },
+  "intermediate": {
+    "FLAT_GED.xlsx": {
+      "exists": true,
+      "bytes": 8897773,
+      "mtime": 1778068313.3436074
+    },
+    "DEBUG_TRACE.csv": {
+      "exists": true,
+      "bytes": 75627674,
+      "mtime": 1778068314.514165
+    },
+    "flat_ged_run_report.json": {
+      "exists": true,
+      "bytes": 580,
+      "mtime": 1778068314.516167
+    },
+    "COUNTER_ATTACK_ITEMS.csv": {
+      "exists": true,
+      "bytes": 2904582,
+      "mtime": 1778068569.755699
+    },
+    "CHAIN_TIMELINE_ATTRIBUTION.json": {
+      "exists": true,
+      "bytes": 4650976,
+      "mtime": 1778068510.5901725
+    },
+    "CHAIN_TIMELINE_ATTRIBUTION.csv": {
+      "exists": true,
+      "bytes": 801502,
+      "mtime": 1778068510.626969
+    },
+    "FLAT_GED_cache_meta.json": {
+      "exists": true,
+      "bytes": 792603,
+      "mtime": 1778068415.3182566
+    }
+  },
+  "chain_onion_files": {
+    "CHAIN_REGISTER.csv": {
+      "exists": true,
+      "bytes": 565076,
+      "mtime": 1778068473.3480573
+    },
+    "CHAIN_VERSIONS.csv": {
+      "exists": true,
+      "bytes": 518534,
+      "mtime": 1778068473.3830955
+    },
+    "CHAIN_EVENTS.csv": {
+      "exists": true,
+      "bytes": 5243853,
+      "mtime": 1778068473.5323634
+    },
+    "CHAIN_METRICS.csv": {
+      "exists": true,
+      "bytes": 603561,
+      "mtime": 1778068473.56637
+    },
+    "ONION_LAYERS.csv": {
+      "exists": true,
+      "bytes": 2081828,
+      "mtime": 1778068473.6024108
+    },
+    "ONION_SCORES.csv": {
+      "exists": true,
+      "bytes": 834420,
+      "mtime": 1778068473.6235633
+    },
+    "CHAIN_NARRATIVES.csv": {
+      "exists": true,
+      "bytes": 1220830,
+      "mtime": 1778068473.6412468
+    },
+    "CHAIN_ONION_SUMMARY.xlsx": {
+      "exists": true,
+      "bytes": 1732091,
+      "mtime": 1778068477.2129524
+    },
+    "dashboard_summary.json": {
+      "exists": true,
+      "bytes": 338,
+      "mtime": 1778068473.6432366
+    },
+    "top_issues.json": {
+      "exists": true,
+      "bytes": 14352,
+      "mtime": 1778068473.6672256
+    }
+  },
+  "chain_onion_counts": {
+    "CHAIN_REGISTER.csv": 2819,
+    "CHAIN_VERSIONS.csv": 4848,
+    "CHAIN_EVENTS.csv": 36947,
+    "CHAIN_METRICS.csv": 2819,
+    "ONION_LAYERS.csv": 7788,
+    "ONION_SCORES.csv": 2819,
+    "CHAIN_NARRATIVES.csv": 2819,
+    "CHAIN_ONION_SUMMARY.xlsx": {
+      "exists": true,
+      "bytes": 1732091,
+      "mtime": 1778068477.2129524
+    },
+    "dashboard_summary.json": {
+      "kind": "object",
+      "keys": [
+        "archived_chains",
+        "avg_pressure_live",
+        "dormant_ghost_ratio",
+        "engine_version",
+        "escalated_chain_count",
+        "generated_at",
+        "legacy_chains",
+        "live_chains",
+        "top_theme_by_impact",
+        "total_chains"
+      ]
+    },
+    "top_issues.json": {
+      "kind": "list",
+      "len": 20
+    }
+  },
+  "runs_dir": {
+    "present": true,
+    "run_dirs": [
+      "run_0000",
+      "run_0001"
+    ],
+    "count": 2
+  },
+  "counter_attack": {
+    "row_count": 1524,
+    "bucket_counts": {
+      "CONSULTANT_A_ATTAQUER": 210,
+      "DECISION_MOEX": 8,
+      "ENTREPRISE_A_RELANCER": 122,
+      "FERMER_MAINTENANT": 66,
+      "MOEX_SHAME_INTERNAL": 989,
+      "SECONDAIRE_EXPIRE": 129
+    }
+  }
+}

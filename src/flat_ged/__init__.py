@@ -1,5 +1,5 @@
 """
-src/flat_ged/__init__.py — Frozen snapshot of ged_flat_builder.
+src/flat_ged/__init__.py - Frozen snapshot of ged_flat_builder.
 
 DO NOT edit business rules in this package. See BUILD_SOURCE.md.
 All business logic lives in the upstream builder repo.
@@ -18,7 +18,7 @@ import json
 import types
 from pathlib import Path
 
-# Package directory — added to sys.path only during build, then cleaned up.
+# Package directory - added to sys.path only during build, then cleaned up.
 _pkg_dir = Path(__file__).parent
 
 # Module names that live in src/flat_ged/ and use bare imports.
@@ -50,8 +50,8 @@ def build_flat_ged(
     output_dir : Path
         Directory where output files are written (created if absent).
     mode : str
-        "batch" (default) — processes all documents, fast streaming path.
-        "single" — processes one document (requires numero + indice).
+        "batch" (default) - processes all documents, fast streaming path.
+        "single" - processes one document (requires numero + indice).
     numero : int | None
         [single mode] Document NUMERO.
     indice : str | None
@@ -62,8 +62,22 @@ def build_flat_ged(
     dict
         Contents of run_report.json written by the builder.
     """
-    # ── Snapshot sys.path and sys.modules before builder imports ──
+    # Snapshot sys.path and sys.modules before builder imports
     _need_path = str(_pkg_dir) not in sys.path
+
+    # Evict any pre-existing modules that would shadow flat_ged's bare
+    # imports. When the orchestrator is invoked from app.py, the prewarm
+    # thread loads src/writer.py (and possibly other src/ siblings of
+    # flat_ged) into sys.modules. Python's import system honours sys.modules
+    # ahead of sys.path, so a bare `import writer` inside the flat_ged
+    # builder would return the GF writer instead of src/flat_ged/writer.py.
+    # We pop those entries here, hold them, and restore in finally so
+    # callers see no net change to sys.modules.
+    _shadowed = {}
+    for mod_name in _FLAT_GED_BARE_MODULES:
+        if mod_name in sys.modules:
+            _shadowed[mod_name] = sys.modules.pop(mod_name)
+
     _modules_before = set(sys.modules.keys())
 
     if _need_path:
@@ -96,12 +110,17 @@ def build_flat_ged(
             return json.load(fh)
 
     finally:
-        # ── Clean up: remove flat_ged package dir from sys.path ──
+        # Clean up: remove flat_ged package dir from sys.path
         if _need_path and str(_pkg_dir) in sys.path:
             sys.path.remove(str(_pkg_dir))
 
-        # ── Clean up: remove bare-imported flat_ged modules from sys.modules
+        # Clean up: remove bare-imported flat_ged modules from sys.modules
         # so they don't shadow identically-named modules in src/ (e.g. writer).
         for mod_name in _FLAT_GED_BARE_MODULES:
             if mod_name in sys.modules and mod_name not in _modules_before:
                 del sys.modules[mod_name]
+
+        # Restore any pre-existing shadows we evicted at the start so the
+        # caller's sys.modules is unchanged net of this call.
+        for mod_name, mod in _shadowed.items():
+            sys.modules[mod_name] = mod

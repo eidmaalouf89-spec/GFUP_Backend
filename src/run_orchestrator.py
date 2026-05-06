@@ -218,13 +218,29 @@ def _patched_main_context(main_module, execution_context: dict):
     if use_reports:
         main_module.CONSULTANT_REPORTS_ROOT = Path(execution_context["inputs"]["reports_dir"])
     else:
+        # Phase 9A.5 (2026-05-06): only redirect outputs that genuinely depend
+        # on consultant reports. GF_TEAM_VERSION and SUSPICIOUS_ROWS_REPORT
+        # are produced from GED + GF only — no consultant data — so they must
+        # keep their canonical output/ paths regardless of run_mode. Previously
+        # they were redirected to _orchestrator_disabled/<mode>/ which (a)
+        # didn't exist on disk, breaking the build; (b) hid the team
+        # deliverable from the UI's export button. The CONSULTANT_*,
+        # OUTPUT_GF_STAGE1, OUTPUT_GF_STAGE2 redirects below remain — those
+        # outputs are consultant-specific and correctly suppressed when
+        # reports are unavailable.
         main_module.CONSULTANT_REPORTS_ROOT = Path(disabled_root / "reports")
         main_module.CONSULTANT_MATCH_REPORT = disabled_root / "consultant_match_report.xlsx"
         main_module.OUTPUT_CONSULTANT_REPORTS_WB = disabled_root / "consultant_reports.xlsx"
         main_module.OUTPUT_GF_STAGE1 = disabled_root / "GF_consultant_enriched_stage1.xlsx"
         main_module.OUTPUT_GF_STAGE2 = disabled_root / "GF_consultant_enriched_stage2.xlsx"
-        main_module.OUTPUT_GF_TEAM_VERSION = disabled_root / "GF_TEAM_VERSION.xlsx"
-        main_module.OUTPUT_SUSPICIOUS_ROWS = disabled_root / "SUSPICIOUS_ROWS_REPORT.xlsx"
+        # NOTE: do NOT redirect OUTPUT_GF_TEAM_VERSION or OUTPUT_SUSPICIOUS_ROWS.
+        # Defensive: ensure the disabled_root directory exists so any code
+        # that does write into the redirected consultant paths does not crash
+        # on a missing directory.
+        try:
+            disabled_root.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     main_module._RUN_CONTROL_CONTEXT = execution_context
     try:
@@ -378,6 +394,52 @@ def run_pipeline_controlled(
             }
     else:
         print("[orchestrator] RAW FALLBACK -- GFUP_FORCE_RAW=1, skipping Flat GED build.")
+
+    # -- Auto-invoke consultant integration when reports_dir is provided.
+    # Phase 9A hook (2026-05-06): consultant_integration.py was previously
+    # only callable as a separate script. The UI's "Reports" field on the
+    # Executer page passes reports_dir through to here but no code consumed
+    # it to actually run the matcher, so stage_report_memory always saw
+    # consultant_match_report.xlsx as missing and skipped ingestion. This
+    # block closes that gap: when reports_dir is provided, we invoke
+    # run_consultant_integration BEFORE the pipeline starts so that
+    # stage_report_memory finds the match report and ingests it into
+    # report_memory.db. Failures here are non-fatal — the pipeline
+    # continues, just without report ingestion.
+    if reports_dir:
+        try:
+            from src.consultant_integration import (
+                run_consultant_integration as _run_ci,
+                OUTPUT_CONSULTANT_WB as _CI_WB,
+                INPUT_CONSULTANT_ROOT as _CI_ROOT,
+            )
+            from pathlib import Path as _Path
+            # Sanity: the hardcoded INPUT_CONSULTANT_ROOT in consultant_integration
+            # should match the reports_dir the orchestrator received. Operationally
+            # both resolve to input/consultant_reports today; flag any mismatch.
+            if _Path(reports_dir).resolve() != _Path(_CI_ROOT).resolve():
+                warnings.append(
+                    f"reports_dir={reports_dir} differs from consultant_integration "
+                    f"INPUT_CONSULTANT_ROOT={_CI_ROOT}; integration will use the latter."
+                )
+            rebuild_needed = not _Path(_CI_WB).exists()
+            print(
+                f"[orchestrator] Reports provided -- running consultant_integration "
+                f"(rebuild_consultant_wb={rebuild_needed})."
+            )
+            _run_ci(
+                rebuild_consultant_wb=rebuild_needed,
+                skip_gf_update=True,  # direct GF write is deprecated (Step 8)
+            )
+            print("[orchestrator] consultant_integration complete.")
+        except Exception as _ci_exc:  # noqa: BLE001
+            warnings.append(
+                f"consultant_integration failed: {_ci_exc}; "
+                f"pipeline will run without report ingestion."
+            )
+            print(f"[orchestrator] WARNING: consultant_integration failed: {_ci_exc}")
+    else:
+        print("[orchestrator] reports_dir not provided -- skipping consultant_integration.")
 
     try:
         with _patched_main_context(main_module, execution_context):

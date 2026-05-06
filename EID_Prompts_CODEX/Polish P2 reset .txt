@@ -1,0 +1,75 @@
+# Codex Task — Revert Final_Polish_P2 Only, Preserve Final_Polish_P1## ObjectiveRestore the repo to the state immediately after **Final_Polish_P1** and before **Final_Polish_P2**.Important context:- **Final_Polish_P1** fixed visible weird character / Unicode escape issues in the UI.- P1 was **not pushed to GitHub**.- Therefore, do **not** reset the whole repo to GitHub.- **Final_Polish_P2** started modifying Team GF generation and must be reverted.- The target state is:```textorigin/main+ local P1 UI character fixes- P2 Team GF modifications
+What Must Be Preserved
+Do not revert these P1 files:
+ui/jansa/shell.jsxui/jansa/overview.jsx
+These contain the good Final_Polish_P1 fixes and must remain as they are locally.
+What Must Be Reverted
+Rollback only Team GF / P2-related modifications, likely:
+src/team_version_builder.pysrc/pipeline/stages/stage_build_team_version.pyapp.py only if it was modified by P2
+Do not manually edit generated Excel outputs.
+
+Mandatory Inspection First
+Before reverting anything, run:
+git status --shortgit diff -- ui/jansa/shell.jsx ui/jansa/overview.jsxgit diff -- src/team_version_builder.py src/pipeline/stages/stage_build_team_version.py app.py
+Report the modified files and confirm which files appear to be P1 vs P2.
+Expected:
+
+
+ui/jansa/shell.jsx and/or ui/jansa/overview.jsx may be modified because of P1.
+
+
+Team GF files may be modified because of P2.
+
+
+
+Save P2 Rollback Receipt
+Before reverting P2, save the Team GF diff:
+mkdir -p output/debuggit diff -- src/team_version_builder.py src/pipeline/stages/stage_build_team_version.py app.py > output/debug/P2_team_gf_rollback_diff.patch
+This receipt is important. Do not skip it.
+
+Revert P2 Files From GitHub
+Fetch latest origin:
+git fetch origin
+Restore only the Team GF files from origin/main:
+git restore --source=origin/main -- src/team_version_builder.pygit restore --source=origin/main -- src/pipeline/stages/stage_build_team_version.py
+Only restore app.py if inspection confirms it contains P2-related modifications:
+git restore --source=origin/main -- app.py
+Do not restore app.py blindly if it contains unrelated useful work. If uncertain, stop and report the diff.
+
+Forbidden Commands
+Do not run:
+git reset --hard origin/maingit clean -fd
+Do not restore or checkout:
+ui/jansa/shell.jsxui/jansa/overview.jsxui/jansa/*
+Do not manually edit:
+output/GF_TEAM_VERSION.xlsxoutput/Tableau de suivi de visa *.xlsxruns/data/
+Do not touch:
+src/flat_ged/src/report_memory.pysrc/run_memory.pysrc/effective_responses.pysrc/pipeline/stages/stage_report_memory.pysrc/pipeline/stages/stage_finalize_run.pydata/report_memory.dbdata/run_memory.dbruns/run_0000/
+
+Validation
+After rollback, run:
+python -m py_compile src/team_version_builder.pypython -m py_compile src/pipeline/stages/stage_build_team_version.pypython -m py_compile app.pygit status --short
+Expected final status:
+ui/jansa/shell.jsx        still modified if P1 changed itui/jansa/overview.jsx     still modified if P1 changed itsrc/team_version_builder.py                         no longer modifiedsrc/pipeline/stages/stage_build_team_version.py     no longer modifiedapp.py                                             no longer modified only if it was revertedoutput/debug/P2_team_gf_rollback_diff.patch        may appear as untracked
+If Team GF files still appear modified after restore, report exactly why.
+
+Required Return Package
+Return exactly:
+# Codex Return — Revert P2 Preserve P1## Initial Git StatusPaste `git status --short`.## Initial Diff SummarySummarize:- P1 files detected:- P2 files detected:- Whether app.py had P2 changes:## Rollback ReceiptConfirm saved:```textoutput/debug/P2_team_gf_rollback_diff.patch
+Files Reverted
+List exactly.
+Files Preserved
+Confirm these were not reverted:
+ui/jansa/shell.jsxui/jansa/overview.jsx
+Validation Commands Run
+List commands.
+Validation Results
+Paste results or summarize exact pass/fail.
+Final Git Status
+Paste final git status --short.
+Remaining Modified Files
+Explain each remaining modified file and why it remains.
+Recommendation
+State whether repo is now back to:
+Post-P1 / Pre-P2 state
+## Final ReminderThis is a rollback task only.Do not fix Team GF.Do not improve formatting.Do not refactor.Do not delete untracked files.Do not touch generated Excel files.Do not reset the whole repo.

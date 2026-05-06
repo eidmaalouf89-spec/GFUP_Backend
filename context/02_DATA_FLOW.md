@@ -42,6 +42,30 @@ Output:
                                                   │
                                                   ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
+│           CONSULTANT INTEGRATION (auto, when reports_dir provided)          │
+└────────────────────────────────────────────────────────────────────────────┘
+src/run_orchestrator.run_pipeline_controlled invokes
+src/consultant_integration.run_consultant_integration(rebuild_consultant_wb=auto, skip_gf_update=True)
+between Flat GED build and the 11-stage pipeline whenever reports_dir is
+provided to the orchestrator (UI Executer → Reports field, or main.py
+__main__ auto-detect of input/consultant_reports/). The matcher:
+  STEP A — load (or rebuild from PDFs) output/consultant_reports.xlsx
+  STEP B — load normalized GED universe
+  STEP C — build GED lookup index
+  STEP D — match consultant rows to GED documents
+  STEP E — write output/consultant_match_report.xlsx
+  STEP F — build enrichment records (HIGH/MEDIUM only; LOW excluded)
+Steps F-G direct GF write are deprecated (Step 8) — guarded off.
+The pipeline's stage_report_memory then reads consultant_match_report.xlsx
+and ingests HIGH/MEDIUM matches into report_memory.db. Failures here are
+non-fatal — pipeline continues without report ingestion (warning emitted).
+Phase 9A.5 (2026-05-06) — pre-9A this step had to be invoked manually as
+`python src/consultant_integration.py`; the UI's Reports field was a path
+constant pass-through with no consumer. The orchestrator hook makes the
+UI button do what users always assumed it did.
+                                                  │
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────┐
 │                       11-STAGE PIPELINE (src/pipeline/stages/)              │
 └────────────────────────────────────────────────────────────────────────────┘
 stage_init_run         → row in runs table (run_memory.db); creates runs/run_NNNN/

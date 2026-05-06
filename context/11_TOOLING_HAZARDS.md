@@ -200,6 +200,72 @@ H-1, H-4, and H-5 are facets of the same root cause â€” the cross-mount is 
 
 ---
 
+## H-6 — JSX text does not decode `\uXXXX` escapes; JS string literals do
+
+**What it looks like.** A JSX file like `ui/jansa/shell.jsx` contains JSX text such as:
+
+```jsx
+<div>Chargement des données…</div>
+```
+
+The browser renders the literal six characters `\`, `u`, `0`, `0`, `e`, `9` (and similarly for `…`) instead of `é` and `…`. Symptom on screen:
+
+```
+Chargement des données…
+```
+
+The same characters written inside a JS string literal — single, double, or backtick quotes used as a JS expression, **including JSX attribute values** — render correctly:
+
+```jsx
+<button title="Seuil de péremption">  // → tooltip says "Seuil de péremption"
+{exporting ? 'Export en cours…' : null} // → "Export en cours…"
+{ label: 'Paramètres' }                  // → "Paramètres"
+```
+
+**Root cause.** Babel's JSX transform handles two text positions differently:
+
+| Position | Decoding |
+|---|---|
+| JSX text content (between `>` and `<`) | The exact characters in the source are preserved verbatim. `\uXXXX` is six literal characters, not one. |
+| JS string literals (`'…'`, `"…"`, `` `…` ``) | Decoded by the JS parser at parse time. `é` becomes `é`. |
+| JSX attribute string values (`attr="…"`) | Babel converts the JSX attribute string into a JS string literal in the compiled output, so escapes ARE decoded. |
+
+**Operational rule.**
+
+1. When authoring new French copy in JSX text content, write the actual UTF-8 character (`é`, `à`, `ô`, `—`, `…`, NBSP ` ` as a real NBSP, `·`, etc.). Do not use `\uXXXX` escapes in JSX text positions.
+2. Inside JS string literals — including JSX attribute values, ternary results, object-literal values, `.replace()` arguments — either form is fine. Babel decodes them. Don't waste a diff "fixing" these unless the file is being edited for another reason.
+3. Files must be saved as UTF-8 without BOM.
+
+**Detection.** From the project root:
+
+```
+grep -rn '\\u00[0-9a-fA-F]\{2\}\|\\u20[0-9a-fA-F]\{2\}' ui/jansa/
+```
+
+For every hit, classify: is it inside a JS string literal (single/double/backtick-quoted as a JS expression) or JSX attribute string (works), or is it bare JSX text between `>` and `<` (broken)? Only the last category needs fixing.
+
+**Discovery (Final_Polish_P1, 2026-05-05).** User reported `Chargement des données…` and similar literal-escape strings on the loading screen and several stub pages. Audit identified 15 occurrences across `ui/jansa/shell.jsx` and `ui/jansa/overview.jsx`. Other JSX files (`runs.jsx`, `contractor_fiche_page.jsx`, `document_panel.jsx`, `fiche_base.jsx`, `counter_attack.jsx`, `overview.jsx:905`) already used real UTF-8 in equivalent positions and rendered correctly — that contrast was the proof. Plan + closure: `docs/implementation/FINAL_POLISH_P1.md`.
+
+---
+
+## H-7 — SQLite reads via sandbox FUSE cross-mount return spurious "database disk image is malformed"
+
+**What it looks like.** A SQLite DB written by Windows-side Python (e.g. `data/run_memory.db` or `data/report_memory.db` after a pipeline run) reads cleanly from the UI on Windows, but when the same file is opened from Cowork sandbox bash via `sqlite3.connect(...)` (default mode), every query raises `sqlite3.DatabaseError: database disk image is malformed`. The file's SQLite header (`SQLite format 3\0`) is intact and the page count looks reasonable. `PRAGMA integrity_check` from sandbox returns the same error. Even copying the DB to `/tmp` first and querying the copy reproduces the error. Yet the production UI's `data_loader._query_db` reads the file fine.
+
+**Root cause.** The Cowork sandbox bridges the Windows folder to Linux via FUSE. SQLite is sensitive to byte-level page integrity; the FUSE layer can present incomplete or inconsistent page reads of a recently-written DB even after the Windows process has fully closed it and written everything to disk. The production UI side-steps this by falling back to `mode=ro&immutable=1` URI (`src/reporting/data_loader._query_db` lines 213-250) — immutable mode bypasses journal/WAL coordination and treats the file as a static blob, which works regardless of the FUSE inconsistency.
+
+**Operational rules.**
+
+1. **Do not declare a SQLite DB "corrupt" from sandbox-side reads alone.** If `sqlite3.connect(db_path)` fails with "database disk image is malformed" from sandbox, ask the user to verify the same DB is unreadable from Windows-side `python app.py`. Production UI uses the immutable-mode fallback in `data_loader._query_db` — if the UI shows real run data, the DB is fine.
+
+2. **Snapshot/diagnostic tools that read SQLite from sandbox should mirror `data_loader._query_db`'s behaviour:** try plain connect first; on OperationalError fall back to `file:<abspath>?mode=ro&immutable=1` URI. `scripts/lifecycle_baseline_diagnostic.py:_open_sqlite_via_tmp_copy` already copies to `/tmp` first to avoid in-place WAL coordination issues, but should additionally fall back to immutable mode on the copy if plain connect fails.
+
+3. **WAL mode aggravates the FUSE issue.** Multi-process WAL access requires shared-memory coordination via `-wal` and `-shm` sidecar files. With multiple processes (UI worker thread + chain_onion subprocess + prewarm thread) opening the same DB on the cross-mount, the WAL state can present as corrupt to subsequent readers even when the Windows file is consistent. `src/run_memory.py` was switched from `journal_mode=WAL` to `journal_mode=DELETE` in Phase 9A.6 as defensive hardening. `report_memory.py` already uses default DELETE mode.
+
+**Discovery (Phase 9A, 2026-05-06).** During Cycles B and C of the lifecycle diagnostic, sandbox-side reads of `data/run_memory.db` and `data/report_memory.db` failed with "malformed disk image" after every UI-driven pipeline run. The user verified the UI worked correctly on Windows side — sidebar showed Run #N, KPIs populated, dashboard rendered real data — confirming the DBs were genuine. The "corruption" was sandbox-only.
+
+---
+
 ## Change log
 
 | Date | Note |
@@ -211,3 +277,6 @@ H-1, H-4, and H-5 are facets of the same root cause â€” the cross-mount is 
 | 2026-04-30 | H-5 added during Phase 8 step 4: `CACHE_SCHEMA_VERSION` "v1" â†’ "v2" bump correctly triggers a rebuild via the existing freshness check, but the rebuild's xlsx re-parse against the cross-mounted `FLAT_GED.xlsx` was killed at 5 min in sandbox (~30 s on Windows). Step 4 marked code-landed, runtime verification deferred to Windows shell. |
 | 2026-05-02 | H-1.1 re-occurred during Phase 6A Step 5A on `src/reporting/counter_attack_builder.py`: an additive Edit (TERMINAL_STATES filter) succeeded through the authoritative path, but bash `wc -l` / `tail` / `python -m py_compile` reported the file truncated to ~691 lines and emitted `SyntaxError: unterminated string literal`, while the Read tool showed the file intact. A "fix" via `head -690 ... > /tmp/foo && cp /tmp/foo file` plus a Python `read_text + write_text` round-trip â€” both stale-mount roundtrips â€” overwrote the canonical Windows file and lost the `_build_evidence_summary` helper. Recovery: re-Edited via Edit tool. Lesson reinforced: during Phase 6A and any future cross-mount work, Read
 | 2026-05-04 | H-1.1 re-occurred during Phase 6X.F2-bis closure attempt on `src/reporting/counter_attack_builder.py`. A consolidated patch script used `Path.read_text(newline=...)` (kwarg unsupported), I sed-substituted the read/write calls, and the substituted form was `open(path, "w", newline="\\n")` — `open(..., "w")` truncates the file at open time *before* the `newline=` value is validated, so the subsequent `ValueError` left the file at 0 bytes. The file was untracked in git (added by pre-existing uncommitted Phase 6 work), so `git checkout HEAD --` could not recover it. A `/tmp/counter_attack_builder_pre_s3.py` backup existed but was owned by `nobody:nogroup` and unreadable to the sandbox uid. Final recovery + R1/R2/R3 reconstruction completed by Codex outside Cowork. Lesson reinforced: for untracked operational files, **make an explicit on-disk `.pre-<step>` copy before any patch script runs**, regardless of how anchor-checked the script claims to be. Validation of `open(..., "w", newline=...)` failure modes assuming "newline kwarg validation runs first" is wrong — the file is truncated. |
+| 2026-05-05 | H-6 added during Final_Polish_P1: JSX text content does not decode `\uXXXX` escape sequences; `<div>Chargement des données…</div>` rendered the literal six-character escape on the loading screen. Fixed by replacing 15 broken JSX-text occurrences in `ui/jansa/shell.jsx` + `ui/jansa/overview.jsx` with real UTF-8 characters. JS string literals and JSX attribute values were already correct (Babel decodes both). Plan + closure: `docs/implementation/FINAL_POLISH_P1.md`. |
+| 2026-05-05 | H-1 re-occurred during Cowork-side P1-A review: `python3 -m py_compile app.py` from sandbox bash failed with `IndentationError: expected an indented block after 'except' statement on line 1279`, and `wc -l app.py` reported 1279 lines. Read tool against the same file showed the file intact through line 1300+ with the `except` body present and `def main()` defined; project owner's `python app.py` smoke confirmed runtime works. False truncation alarm retracted. Lesson reinforced (yet again): for "is this file complete?" questions, the Read tool is authoritative; sandbox bash file-state inspection is not. |
+| 2026-05-06 | H-7 added during Phase 9A Cycle B and C closures: sandbox-side `sqlite3.connect(...)` against `data/run_memory.db` and `data/report_memory.db` returned `database disk image is malformed` for every query, including `PRAGMA integrity_check`, even after copying the DB to `/tmp` first. Production UI's `data_loader._query_db` immutable-mode fallback (`file:...?mode=ro&immutable=1`) read the same DBs correctly on Windows. False corruption alarm; lesson: snapshot/diagnostic tools that read SQLite from sandbox must mirror the immutable-mode fallback or rely on Windows-side verification. WAL → DELETE journal mode also landed in `src/run_memory.py` as defensive hardening (Phase 9A.6). |

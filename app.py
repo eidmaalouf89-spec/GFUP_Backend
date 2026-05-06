@@ -394,10 +394,27 @@ class Api:
         Start pipeline in a background thread.
         Uses src.run_orchestrator.run_pipeline_controlled().
         Returns: {"started": True} or {"started": False, "errors": [...]}
+
+        Phase 9A.2 (2026-05-06): atomic check-and-set of running flag and a
+        post-pipeline chain refresh so the Lancer button stays disabled (via
+        running=True polling) until BOTH the pipeline AND the chain_onion +
+        chain_timeline regeneration have completed.
         """
+        # Atomic check-and-set: previously the running flag was checked,
+        # released, validated outside the lock, then re-acquired to set
+        # running=True. Two clicks could pass the check before either set the
+        # flag, allowing concurrent worker threads. Now check + set happen
+        # inside one locked block.
         with self._pipeline_lock:
             if self._pipeline_status["running"]:
                 return _sanitize_for_json({"started": False, "errors": ["Pipeline is already running"]})
+            self._pipeline_status = {
+                "running": True,
+                "message": "Validating inputs...",
+                "error": None,
+                "completed_run": None,
+                "warnings": [],
+            }
 
         # Use defaults from input/ if paths not provided
         if not ged_path:
@@ -405,7 +422,7 @@ class Api:
         if not gf_path:
             gf_path = self._detect_file("GF")
 
-        # Pre-validate via orchestrator
+        # Pre-validate via orchestrator (read-only, safe outside lock)
         from run_orchestrator import validate_run_inputs
         validation = validate_run_inputs(run_mode, {
             "ged_path": ged_path,
@@ -413,53 +430,115 @@ class Api:
             "reports_dir": reports_dir,
         })
         if not validation["valid"]:
+            # Validation failed — release running flag so user can retry
+            with self._pipeline_lock:
+                self._pipeline_status["running"] = False
+                self._pipeline_status["error"] = "; ".join(validation["errors"])
+                self._pipeline_status["message"] = "Validation failed"
             return _sanitize_for_json({"started": False, "errors": validation["errors"],
                     "warnings": validation.get("warnings", [])})
 
-        # Reset status and start worker thread
         with self._pipeline_lock:
-            self._pipeline_status = {
-                "running": True,
-                "message": "Starting pipeline...",
-                "error": None,
-                "completed_run": None,
-                "warnings": validation.get("warnings", []),
-            }
+            self._pipeline_status["message"] = "Starting pipeline..."
+            self._pipeline_status["warnings"] = validation.get("warnings", [])
 
         def worker():
+            result = None
             try:
-                from run_orchestrator import run_pipeline_controlled
-                self._update_status("Executing run_pipeline_controlled...")
-                result = run_pipeline_controlled(
-                    run_mode=run_mode,
-                    ged_path=ged_path,
-                    gf_path=gf_path,
-                    reports_dir=reports_dir,
-                )
-                with self._pipeline_lock:
-                    if result.get("success"):
-                        # Invalidate reporting cache so dashboard reloads fresh data
+                try:
+                    from run_orchestrator import run_pipeline_controlled
+                    self._update_status("Executing run_pipeline_controlled...")
+                    result = run_pipeline_controlled(
+                        run_mode=run_mode,
+                        ged_path=ged_path,
+                        gf_path=gf_path,
+                        reports_dir=reports_dir,
+                    )
+                    with self._pipeline_lock:
+                        if result.get("success"):
+                            # Invalidate reporting cache so dashboard reloads fresh data
+                            try:
+                                from reporting.data_loader import clear_cache
+                                clear_cache()
+                            except Exception:
+                                pass
+                            self._pipeline_status["completed_run"] = result.get("run_number")
+                            self._pipeline_status["warnings"] = result.get("warnings", [])
+                            self._pipeline_status["message"] = (
+                                f"Run {result.get('run_number')} completed — "
+                                f"{result.get('artifact_count', 0)} artifacts. "
+                                f"Refreshing chain data..."
+                            )
+                        else:
+                            self._pipeline_status["error"] = "; ".join(
+                                result.get("errors", ["Unknown error"])
+                            )
+                            self._pipeline_status["message"] = "Pipeline failed"
+                except Exception as exc:
+                    with self._pipeline_lock:
+                        self._pipeline_status["error"] = f"{type(exc).__name__}: {exc}"
+                        self._pipeline_status["message"] = "Pipeline failed with exception"
+
+                # Phase 9A.1 + 9A.3: post-pipeline chain refresh + counter_attack build (success only).
+                # Pipeline produced a fresh FLAT_GED, so chain_onion is now
+                # stale. Same code path the prewarm thread runs at app startup
+                # — subprocesses run_chain_onion.py if needed, then refreshes
+                # CHAIN_TIMELINE_ATTRIBUTION. Then build_counter_attack_items
+                # so output/intermediate/COUNTER_ATTACK_ITEMS.csv reflects the
+                # new run. All outside the pipeline lock so polling of
+                # get_pipeline_status keeps returning quickly during refresh.
+                # running=True stays set throughout (the outer finally below
+                # clears it), so the Lancer button stays disabled until
+                # pipeline + chain refresh + counter_attack are all done.
+                if result is not None and result.get("success"):
+                    ctx = None
+                    self._chain_data_ready.clear()
+                    try:
+                        from reporting.data_loader import load_run_context
+                        ctx = load_run_context(BASE_DIR)
+                        _ensure_chain_data_fresh(ctx, BASE_DIR)
+                        with self._pipeline_lock:
+                            self._pipeline_status["message"] = (
+                                f"Run {result.get('run_number')} completed — "
+                                f"chain data refreshed, building Counter-Attack..."
+                            )
+                    except Exception as exc:
+                        print(f"[app][CHAIN_DATA] post-pipeline refresh failed: {exc}")
+                        with self._pipeline_lock:
+                            self._pipeline_status.setdefault("warnings", []).append(
+                                f"Post-pipeline chain refresh failed: {exc}"
+                            )
+                    finally:
+                        self._chain_data_ready.set()
+
+                    # Phase 9A.3: counter_attack build. Direct import of
+                    # build_counter_attack_items (same code path as
+                    # scripts/build_counter_attack.py — uses the just-loaded
+                    # ctx, no subprocess overhead). Needs chain_onion outputs
+                    # to be present, which the chain refresh above ensures.
+                    if ctx is not None:
                         try:
-                            from reporting.data_loader import clear_cache
-                            clear_cache()
-                        except Exception:
-                            pass
-                        self._pipeline_status["completed_run"] = result.get("run_number")
-                        self._pipeline_status["message"] = (
-                            f"Run {result.get('run_number')} completed — "
-                            f"{result.get('artifact_count', 0)} artifacts"
-                        )
-                        self._pipeline_status["warnings"] = result.get("warnings", [])
-                    else:
-                        self._pipeline_status["error"] = "; ".join(
-                            result.get("errors", ["Unknown error"])
-                        )
-                        self._pipeline_status["message"] = "Pipeline failed"
-            except Exception as exc:
-                with self._pipeline_lock:
-                    self._pipeline_status["error"] = f"{type(exc).__name__}: {exc}"
-                    self._pipeline_status["message"] = "Pipeline failed with exception"
+                            from reporting.counter_attack_builder import build_counter_attack_items
+                            ca_dir = BASE_DIR / "output" / "intermediate"
+                            ca_path = build_counter_attack_items(ctx, ca_dir)
+                            print(f"[app][COUNTER_ATTACK] wrote {ca_path}")
+                            with self._pipeline_lock:
+                                self._pipeline_status["message"] = (
+                                    f"Run {result.get('run_number')} completed — "
+                                    f"{result.get('artifact_count', 0)} artifacts "
+                                    f"(chain + counter-attack refreshed)"
+                                )
+                        except Exception as exc:
+                            print(f"[app][COUNTER_ATTACK] post-pipeline build failed: {exc}")
+                            with self._pipeline_lock:
+                                self._pipeline_status.setdefault("warnings", []).append(
+                                    f"Post-pipeline counter_attack build failed: {exc}"
+                                )
             finally:
+                # Outer finally — guarantees running=False even if chain
+                # refresh raises an unhandled exception. Without this, a
+                # crash during chain refresh would leave running=True forever
+                # and the Lancer button greyed permanently.
                 with self._pipeline_lock:
                     self._pipeline_status["running"] = False
 
@@ -641,7 +720,15 @@ class Api:
     # ── Input validation (pre-flight check) ──────────────────
 
     def export_team_version(self):
-        """Export the GF TEAM_VERSION artifact with a readable name."""
+        """Export the GF TEAM_VERSION artifact with a readable name.
+
+        Phase 9A.4 (2026-05-06): if GF_TEAM_VERSION.xlsx is not registered or
+        the file is missing on disk (e.g. pipeline ran in a mode that skipped
+        stage_build_team_version), build it on demand from the latest
+        GF_V0_CLEAN.xlsx (registered as FINAL_GF) + input/Grandfichier_v3.xlsx.
+        Then proceed with the normal export-and-rename. Keeps the
+        Tableau de Suivi VISA button working regardless of run mode.
+        """
         import shutil
         import tempfile
         try:
@@ -651,12 +738,41 @@ class Api:
             if not team_path or not Path(team_path).exists():
                 from reporting.data_loader import _get_artifact_path
                 team_path = _get_artifact_path(str(DATA_DIR / "run_memory.db"), ctx.run_number, "GF_TEAM_VERSION")
+
+            # Build on-demand if still missing.
             if not team_path or not Path(team_path).exists():
-                return _sanitize_for_json({
-                    "success": False,
-                    "path": None,
-                    "error": f"GF_TEAM_VERSION artifact not found for Run {ctx.run_number}. Run the pipeline first.",
-                })
+                clean_path = ctx.artifact_paths.get("FINAL_GF")
+                if not clean_path or not Path(clean_path).exists():
+                    from reporting.data_loader import _get_artifact_path
+                    clean_path = _get_artifact_path(str(DATA_DIR / "run_memory.db"), ctx.run_number, "FINAL_GF")
+                if not clean_path or not Path(clean_path).exists():
+                    return _sanitize_for_json({
+                        "success": False,
+                        "path": None,
+                        "error": f"FINAL_GF (GF_V0_CLEAN.xlsx) not found for Run {ctx.run_number}. Run the pipeline first.",
+                    })
+                ogf_path = INPUT_DIR / "Grandfichier_v3.xlsx"
+                if not ogf_path.exists():
+                    return _sanitize_for_json({
+                        "success": False,
+                        "path": None,
+                        "error": f"input/Grandfichier_v3.xlsx not found — cannot build GF_TEAM_VERSION on demand.",
+                    })
+                try:
+                    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+                    team_path = OUTPUT_DIR / "GF_TEAM_VERSION.xlsx"
+                    print(f"[app] export_team_version: GF_TEAM_VERSION missing — building on demand from {clean_path}...")
+                    from team_version_builder import build_team_version
+                    build_team_version(str(ogf_path), str(clean_path), str(team_path))
+                    print(f"[app] export_team_version: built {team_path}")
+                except Exception as build_exc:
+                    import traceback
+                    traceback.print_exc()
+                    return _sanitize_for_json({
+                        "success": False,
+                        "path": None,
+                        "error": f"GF_TEAM_VERSION build failed: {build_exc}",
+                    })
             date_str = ctx.data_date.strftime("%d_%m_%Y") if ctx.data_date else __import__("datetime").date.today().strftime("%d_%m_%Y")
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             dest = OUTPUT_DIR / f"Tableau de suivi de visa {date_str}.xlsx"

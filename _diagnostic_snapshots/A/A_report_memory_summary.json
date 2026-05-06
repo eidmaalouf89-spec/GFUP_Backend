@@ -1,0 +1,14 @@
+{
+  "tables": [
+    "ingested_reports",
+    "persisted_report_responses",
+    "sqlite_sequence"
+  ],
+  "ingested_reports_row_count": 0,
+  "persisted_report_responses_row_count": 0,
+  "sqlite_sequence_row_count": 0,
+  "active_count": 0,
+  "confidence_distribution": {},
+  "status_distribution": {},
+  "ingested_status_distribution": {}
+}

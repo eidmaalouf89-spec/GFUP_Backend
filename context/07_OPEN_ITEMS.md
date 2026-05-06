@@ -5,6 +5,33 @@
 
 ---
 
+## Phase 9A — Baseline Lifecycle Diagnostic — CLOSED 2026-05-06
+
+UI-driven lifecycle test (Cycle A no-reports → Cycle B additive → Cycle C clean-with-reports). Verdict: **`PASS_OPERATIONAL_EQUIVALENCE`**. `COUNTER_ATTACK_ITEMS.csv` is byte-identical across all three cycles (`sha256[:16] = 03ca6f5a35be5d11`). Chain identity layer (REGISTER, VERSIONS, EVENTS, METRICS) also byte-identical. Only the scoring/narrative layer (ONION_LAYERS, ONION_SCORES, CHAIN_NARRATIVES) varies between cycles. **Reports do not affect Counter-Attack bucket assignment, ownership, or action priorities.**
+
+UI hardening landed during this phase (closes several pre-existing latent bugs in the UI flow):
+
+| Fix | File | What it addresses |
+|---|---|---|
+| **9A.0** Shadow eviction in flat_ged builder | `src/flat_ged/__init__.py` | UI's `cannot import name 'write_flat_ged' from 'writer'` crash — prewarm thread loaded `src/writer.py` before the user clicked Lancer, shadowing flat_ged's local writer. |
+| **9A.1** Post-pipeline chain refresh | `app.py` worker | Chain+Onion was previously only refreshed at app startup. Pipeline runs now trigger a fresh chain_onion subprocess + `CHAIN_TIMELINE_ATTRIBUTION.{json,csv}` regeneration before clearing `running=False`. |
+| **9A.2** Atomic concurrency guard | `app.py` `run_pipeline_async` | TOCTOU race between check + set on the running flag fixed; click+set now atomic in one locked block. |
+| **9A.3** Post-pipeline counter_attack build | `app.py` worker | UI now produces `output/intermediate/COUNTER_ATTACK_ITEMS.csv` automatically after pipeline runs (was previously only via `python scripts/build_counter_attack.py`). |
+| **9A.4** On-demand GF_TEAM_VERSION build | `app.py` `export_team_version` | Tableau de Suivi VISA export button now builds GF_TEAM_VERSION on demand if missing, instead of erroring. |
+| **9A.5** Orchestrator consultant_integration hook + redirect fix | `src/run_orchestrator.py` | `consultant_integration` now auto-runs when `reports_dir` is provided (previously the UI Reports field was a path-constant pass-through with no effect). `OUTPUT_GF_TEAM_VERSION` and `OUTPUT_SUSPICIOUS_ROWS` no longer redirected to `_orchestrator_disabled/<mode>/` — those outputs don't depend on reports. |
+| **9A.6** WAL → DELETE journal mode | `src/run_memory.py` | Defensive hardening against multi-process WAL corruption on FUSE-bridged filesystems. Symptoms initially seen turned out to be a sandbox-side cross-mount artifact, not real corruption — but DELETE is more robust under this app's access pattern. |
+
+Closure document: `docs/implementation/PHASE_9A_BASELINE_LIFECYCLE_DIAGNOSTIC.md`.
+Snapshots: `_diagnostic_snapshots/A/`, `_diagnostic_snapshots/B/`, `_diagnostic_snapshots/C/`.
+Backup: `C:\Users\GEMO 050224\Desktop\cursor\GF updater 3 versions\_backup_before_lifecycle_diagnostic\20260506_120747\`.
+
+Follow-ups (not release blockers):
+- Cycle B's `report_memory.db` ended empty despite consultant_integration producing `consultant_match_report.xlsx` (40 KB schema-only). Replay needed to confirm root cause; operational impact zero (Counter-Attack identical).
+- Snapshot tool's DB read should fall back to immutable-mode URI when sandbox FUSE returns "malformed" — already documented as Hazard H-7 in `11_TOOLING_HAZARDS.md`.
+- Document the "reports don't affect Counter-Attack" finding in operational README.
+
+---
+
 ## Phase 6X — closed (status as of 2026-05-04)
 
 ACTION MOEX data-truth correction. Eight bucket-routing defects rooted in
@@ -738,6 +765,24 @@ continues to chain_timeline refresh. Startup behavior is correct.
 **Root fix needed:** Add the `severity` column to the chain_onion export
 (likely in `src/chain_onion/exporter.py`) so the D19 check passes and the
 harness exits 0. Low urgency — workaround fully covers startup path.
+
+---
+
+## Final_Polish_P1 — closed (status as of 2026-05-05)
+
+UI weird-character / encoding audit and fix. Audit identified 15 broken JSX-text occurrences in `ui/jansa/shell.jsx` and `ui/jansa/overview.jsx` where French copy was authored with `\uXXXX` JS-style escapes inside JSX text content (which JSX does not decode), causing literal display of `Chargement des données…` etc. Backend, exports, and generated artefacts audited clean (no mojibake, no `U+FFFD`, all UTF-8). Plan: `docs/implementation/FINAL_POLISH_P1.md`.
+
+| Step | Status | Summary |
+|---|---|---|
+| **P1-A** UI literal unicode escape cleanup | ✅ CLOSED | 15 surgical replacements in `shell.jsx` + `overview.jsx`. Plus 3 incidental but functionally-identical replacements on `shell.jsx:298` (JSX attribute), `:877` (comment), `:908` (JS string in ternary) — flagged, accepted. Validation: 4× `py_compile` PASS, UTF-8/no-BOM clean, remaining `\u…` hits all verified safe (JS string literals or JSX attribute strings). |
+| **P1-B** UI mojibake cleanup | ⊘ EMPTY BY AUDIT | No mojibake hits in any active UI file. Skipped. |
+| **P1-C** Export encoding fix | ⊘ EMPTY BY AUDIT | All export builders write UTF-8 explicitly (`encoding="utf-8"`, `ensure_ascii=False`, `text.encode("utf-8")`); sampled artefacts (`COUNTER_ATTACK_ITEMS.csv`, `CHAIN_NARRATIVES.csv`, `top_issues.json`, AI Audit Pack `README_FOR_AI.md`) clean. Skipped. |
+| **P1-D** Regression validation | ✅ CLOSED | UI walkthrough by project owner. Loading screen, sidebar footer, focus topbar gear, stale-threshold popover, Reports page, sidebar navigation, overview empty-states all render proper French. Browser dev console clean. |
+| **P1-E** `data_loader.py:678` comment FFFD | ⏸ DEFERRED | 2 stray `U+FFFD` bytes inside a Unicode box-drawing comment rule in `src/reporting/data_loader.py` line 678. Not user-visible. Low-priority cleanup if the file is touched for any other reason. |
+
+**New tooling hazard recorded.** `context/11_TOOLING_HAZARDS.md` updated with H-6 — JSX text content does not decode `\uXXXX` escape sequences; only JS string literals and JSX attribute values do. Authors of new French UI copy must write actual UTF-8 characters in JSX text positions.
+
+**False-alarm retraction (2026-05-05).** During Cowork-side review of P1-A, an `app.py` truncation alarm was raised based on stale sandbox-bash view of the file. Read tool confirmed `app.py` was intact on Windows; project owner's smoke run confirmed runtime works. This is the same stale-mount hazard already documented as H-1 in `11_TOOLING_HAZARDS.md`; a 2026-05-05 change-log row has been added there.
 
 ---
 

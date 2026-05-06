@@ -58,7 +58,16 @@ def _conn(db_path: str) -> sqlite3.Connection:
     for attempt, delay in enumerate(_SQLITE_WRITE_RETRY_DELAYS):
         try:
             conn = sqlite3.connect(db_path, timeout=5)
-            conn.execute("PRAGMA journal_mode=WAL")
+            # Phase 9A.6 (2026-05-06): switched from WAL to DELETE (rollback)
+            # journal mode. WAL mode requires shared-memory coordination via
+            # -wal and -shm sidecar files. With multiple processes (UI worker
+            # thread + chain_onion subprocess + prewarm thread) opening this
+            # DB on a Windows-NTFS-bridged-to-Linux-mount filesystem, the SHM
+            # coordination has been observed to corrupt the main DB pages
+            # (Cycle B 2026-05-06 hit this twice). DELETE mode is robust under
+            # concurrent multi-process access and the perf cost is negligible
+            # for this app's write volume (~30 inserts per pipeline run).
+            conn.execute("PRAGMA journal_mode=DELETE")
             conn.execute("PRAGMA busy_timeout=5000")
             conn.execute("PRAGMA foreign_keys=ON")
             return conn

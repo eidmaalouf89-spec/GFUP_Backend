@@ -170,7 +170,7 @@ function Sidebar({ active, onNav, focusMode, focusCount, runCount, consultantCou
         }}>EM</div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Eid Maalouf</div>
-          <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>OPC — Contr\u00f4le Visa</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>OPC — Contrôle Visa</div>
         </div>
       </div>
     </aside>
@@ -295,7 +295,7 @@ function FocusToggle({ focusMode, setFocusMode, stats, staleDays, onStaleChange 
       {focusMode && (
         <button
           onClick={() => setShowPopover(p => !p)}
-          title="Seuil de p\u00e9remption"
+          title="Seuil de péremption"
           style={{
             width: 30, height: 30, borderRadius: 99,
             background: showPopover
@@ -308,7 +308,7 @@ function FocusToggle({ focusMode, setFocusMode, stats, staleDays, onStaleChange 
             transition: 'all 0.18s',
             boxShadow: showPopover ? '0 0 0 3px rgba(10,132,255,0.2)' : 'none',
           }}
-        >\u2699</button>
+        >⚙</button>
       )}
 
       {/* Stale-threshold popover */}
@@ -324,7 +324,7 @@ function FocusToggle({ focusMode, setFocusMode, stats, staleDays, onStaleChange 
           <div style={{
             fontSize: 10.5, fontWeight: 600, letterSpacing: '.12em',
             textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 14,
-          }}>Seuil de p\u00e9remption</div>
+          }}>Seuil de péremption</div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
             <input
@@ -343,16 +343,16 @@ function FocusToggle({ focusMode, setFocusMode, stats, staleDays, onStaleChange 
           {stats && (
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
               <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 6 }}>
-                Documents exclus\u00a0: {stats.excluded ?? '\u2014'}
+                Documents exclus : {stats.excluded ?? '\u2014'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>
-                \u00b7 R\u00e9solus\u00a0: {stats.resolved ?? 0}
+                · Résolus : {stats.resolved ?? 0}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>
-                \u00b7 P\u00e9rim\u00e9s (&gt;{staleDays != null ? staleDays : 90}j)\u00a0: {stats.stale ?? 0}
+                · Périmés (&gt;{staleDays != null ? staleDays : 90}j) : {stats.stale ?? 0}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                \u00b7 Total trac\u00e9s\u00a0: {stats.total_dernier ?? 0}
+                · Total tracés : {stats.total_dernier ?? 0}
               </div>
             </div>
           )}
@@ -470,7 +470,7 @@ function LoadingScreen({ error }) {
         </div>
       ) : (
         <div style={{ fontSize: 13, color: 'var(--text-3)', letterSpacing:'.06em' }}>
-          Chargement des donn\u00e9es\u2026
+          Chargement des données…
         </div>
       )}
     </div>
@@ -680,7 +680,7 @@ function App() {
                 <span style={{ fontWeight: 700, color:'#fff', fontSize: 15 }}>J</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-3)', letterSpacing:'.06em' }}>
-                Chargement des donn\u00e9es\u2026
+                Chargement des données…
               </div>
             </div>
           )}
@@ -833,7 +833,7 @@ function ReportsPage() {
         color: 'var(--text)', margin: '0 0 6px',
       }}>Rapports &amp; Exports</h1>
       <p style={{ marginTop: 0, marginBottom: 32, fontSize: 14, color: 'var(--text-2)' }}>
-        G\u00e9n\u00e9rer et exporter les documents de suivi du projet.
+        Générer et exporter les documents de suivi du projet.
       </p>
 
       {/* Tableau de Suivi VISA */}
@@ -847,7 +847,7 @@ function ReportsPage() {
             Tableau de Suivi VISA
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-            Exporte le Grand Fichier enrichi (version \u00e9quipe)\u00a0\u2014
+            Exporte le Grand Fichier enrichi (version équipe) —
             {' '}<span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)' }}>
               Tableau de suivi de visa DD_MM_YYYY.xlsx
             </span>
@@ -874,7 +874,7 @@ function ReportsPage() {
         </button>
       </div>
 
-      {/* G\u00e9n\u00e9rer Pack Audit IA */}
+      {/* Générer Pack Audit IA */}
       <div style={{
         background: 'var(--bg-elev)', border: '1px solid var(--line)',
         borderRadius: 16, padding: 24, marginBottom: 16,
@@ -882,10 +882,10 @@ function ReportsPage() {
       }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-            G\u00e9n\u00e9rer Pack Audit IA
+            Générer Pack Audit IA
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-            Pr\u00e9pare un dossier ZIP avec les donn\u00e9es JANSA + prompts IA pour analyse externe.
+            Prépare un dossier ZIP avec les données JANSA + prompts IA pour analyse externe.
           </div>
         </div>
         <button
@@ -905,7 +905,7 @@ function ReportsPage() {
         >
           {aiPacking ? 'Export en cours\u2026'
             : aiPackResult ? (aiPackResult.ok ? '\u2713 Export\u00e9' : '\u2717 Erreur')
-            : 'G\u00e9n\u00e9rer Pack Audit IA'}
+            : 'Générer Pack Audit IA'}
         </button>
       </div>
     </div>

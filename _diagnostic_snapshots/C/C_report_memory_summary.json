@@ -1,0 +1,29 @@
+{
+  "tables": [
+    "ingested_reports",
+    "persisted_report_responses",
+    "sqlite_sequence"
+  ],
+  "ingested_reports_row_count": 81,
+  "persisted_report_responses_row_count": 1045,
+  "sqlite_sequence_row_count": 2,
+  "active_count": 1045,
+  "confidence_distribution": {
+    "0.7": 26,
+    "1.0": 1019
+  },
+  "status_distribution": {
+    "DEF": 37,
+    "FAV": 218,
+    "HM": 23,
+    "REF": 50,
+    "SUS": 90,
+    "VAO": 486,
+    "VAOB": 20,
+    "VSO": 121
+  },
+  "ingested_status_distribution": {
+    "INGESTED": 76,
+    "INGESTED_BOOTSTRAP": 5
+  }
+}

@@ -1,0 +1,318 @@
+{
+  "run_memory": {
+    "tables": [
+      "run_artifacts",
+      "run_corrections",
+      "run_inputs",
+      "run_invalidation_log",
+      "runs",
+      "sqlite_sequence"
+    ],
+    "run_artifacts_row_count": 33,
+    "run_corrections_row_count": 0,
+    "run_inputs_row_count": 0,
+    "run_invalidation_log_row_count": 0,
+    "runs_row_count": 1,
+    "sqlite_sequence_row_count": 2,
+    "status_distribution": {
+      "COMPLETED": 1
+    },
+    "latest_run": {
+      "run_number": 0,
+      "status": "COMPLETED",
+      "is_current": 1,
+      "completed_at": "2026-05-06T13:11:03.272036+00:00"
+    },
+    "artifact_type_distribution": {
+      "ANOMALY_REPORT": 1,
+      "AUTO_RESOLUTION_LOG": 1,
+      "CONSULTANT_MATCH_REPORT": 1,
+      "CONSULTANT_REPORTS": 1,
+      "DEBUG_COARSE_GROUPS": 1,
+      "DEBUG_DISCREPANCY_SAMPLE": 1,
+      "DEBUG_EXCLUSION_SUMMARY": 1,
+      "DEBUG_FAMILY_CLUSTERS": 1,
+      "DEBUG_GF_DUPLICATES": 1,
+      "DEBUG_GF_SHEET_SCHEMA": 1,
+      "DEBUG_LIFECYCLE_RESOLUTION": 1,
+      "DEBUG_MISSING_IN_GED_SUMMARY": 1,
+      "DEBUG_MISSING_IN_GF_SUMMARY": 1,
+      "DEBUG_NEW_SUBMITTAL_SUMMARY": 1,
+      "DEBUG_RECONCILIATION_SUMMARY": 1,
+      "DEBUG_ROUTING_SUMMARY": 1,
+      "DISCREPANCY_REPORT": 1,
+      "DISCREPANCY_REVIEW_REQUIRED": 1,
+      "FINAL_GF": 1,
+      "FLAT_GED": 1,
+      "FLAT_GED_DEBUG_TRACE": 1,
+      "FLAT_GED_RUN_REPORT": 1,
+      "GF_TEAM_VERSION": 1,
+      "IGNORED_ITEMS_LOG": 1,
+      "INSERT_LOG": 1,
+      "MISSING_IN_GED_DIAGNOSIS": 1,
+      "MISSING_IN_GED_TRUE": 1,
+      "MISSING_IN_GF_DIAGNOSIS": 1,
+      "MISSING_IN_GF_TRUE": 1,
+      "NEW_SUBMITTAL_ANALYSIS": 1,
+      "RECONCILIATION_LOG": 1,
+      "REPORT_MEMORY_DB": 1,
+      "SUSPICIOUS_ROWS_REPORT": 1
+    }
+  },
+  "report_memory": {
+    "tables": [
+      "ingested_reports",
+      "persisted_report_responses",
+      "sqlite_sequence"
+    ],
+    "ingested_reports_row_count": 81,
+    "persisted_report_responses_row_count": 1045,
+    "sqlite_sequence_row_count": 2,
+    "active_count": 1045,
+    "confidence_distribution": {
+      "0.7": 26,
+      "1.0": 1019
+    },
+    "status_distribution": {
+      "DEF": 37,
+      "FAV": 218,
+      "HM": 23,
+      "REF": 50,
+      "SUS": 90,
+      "VAO": 486,
+      "VAOB": 20,
+      "VSO": 121
+    },
+    "ingested_status_distribution": {
+      "INGESTED": 76,
+      "INGESTED_BOOTSTRAP": 5
+    }
+  },
+  "output_artifacts": {
+    "GF_V0_CLEAN.xlsx": {
+      "exists": true,
+      "bytes": 906913,
+      "mtime": 1778072834.0688553
+    },
+    "GF_TEAM_VERSION.xlsx": {
+      "exists": true,
+      "bytes": 2574198,
+      "mtime": 1778073032.2943227
+    },
+    "DISCREPANCY_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 180082,
+      "mtime": 1778073051.1592956
+    },
+    "DISCREPANCY_REVIEW_REQUIRED.xlsx": {
+      "exists": true,
+      "bytes": 7864,
+      "mtime": 1778073051.1932967
+    },
+    "ANOMALY_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 6605,
+      "mtime": 1778072834.1410377
+    },
+    "AUTO_RESOLUTION_LOG.xlsx": {
+      "exists": true,
+      "bytes": 48963,
+      "mtime": 1778072834.3412316
+    },
+    "IGNORED_ITEMS_LOG.xlsx": {
+      "exists": true,
+      "bytes": 15727,
+      "mtime": 1778073051.2768893
+    },
+    "RECONCILIATION_LOG.xlsx": {
+      "exists": true,
+      "bytes": 18668,
+      "mtime": 1778073049.7950475
+    },
+    "MISSING_IN_GED_DIAGNOSIS.xlsx": {
+      "exists": true,
+      "bytes": 89953,
+      "mtime": 1778073052.0921128
+    },
+    "MISSING_IN_GED_TRUE_ONLY.xlsx": {
+      "exists": true,
+      "bytes": 5842,
+      "mtime": 1778073052.1031127
+    },
+    "MISSING_IN_GF_DIAGNOSIS.xlsx": {
+      "exists": true,
+      "bytes": 7209,
+      "mtime": 1778073052.1391988
+    },
+    "MISSING_IN_GF_TRUE_ONLY.xlsx": {
+      "exists": true,
+      "bytes": 5828,
+      "mtime": 1778073052.152213
+    },
+    "INSERT_LOG.xlsx": {
+      "exists": true,
+      "bytes": 6087,
+      "mtime": 1778073052.2380383
+    },
+    "NEW_SUBMITTAL_ANALYSIS.xlsx": {
+      "exists": true,
+      "bytes": 440246,
+      "mtime": 1778073057.7399454
+    },
+    "SUSPICIOUS_ROWS_REPORT.xlsx": {
+      "exists": true,
+      "bytes": 5292,
+      "mtime": 1778073032.3011782
+    },
+    "consultant_match_report.xlsx": {
+      "exists": true,
+      "bytes": 269590,
+      "mtime": 1778072763.6148405
+    },
+    "consultant_reports.xlsx": {
+      "exists": true,
+      "bytes": 153820,
+      "mtime": 1778072756.847778
+    }
+  },
+  "intermediate": {
+    "FLAT_GED.xlsx": {
+      "exists": true,
+      "bytes": 8897773,
+      "mtime": 1778072672.179699
+    },
+    "DEBUG_TRACE.csv": {
+      "exists": true,
+      "bytes": 75627674,
+      "mtime": 1778072673.80411
+    },
+    "flat_ged_run_report.json": {
+      "exists": true,
+      "bytes": 580,
+      "mtime": 1778072673.807145
+    },
+    "COUNTER_ATTACK_ITEMS.csv": {
+      "exists": true,
+      "bytes": 2904582,
+      "mtime": 1778073295.3344622
+    },
+    "CHAIN_TIMELINE_ATTRIBUTION.json": {
+      "exists": true,
+      "bytes": 4650976,
+      "mtime": 1778073222.6460757
+    },
+    "CHAIN_TIMELINE_ATTRIBUTION.csv": {
+      "exists": true,
+      "bytes": 801502,
+      "mtime": 1778073222.6943967
+    },
+    "FLAT_GED_cache_meta.json": {
+      "exists": true,
+      "bytes": 792602,
+      "mtime": 1778073098.5613847
+    }
+  },
+  "chain_onion_files": {
+    "CHAIN_REGISTER.csv": {
+      "exists": true,
+      "bytes": 565076,
+      "mtime": 1778073174.9319263
+    },
+    "CHAIN_VERSIONS.csv": {
+      "exists": true,
+      "bytes": 518534,
+      "mtime": 1778073174.973546
+    },
+    "CHAIN_EVENTS.csv": {
+      "exists": true,
+      "bytes": 5243853,
+      "mtime": 1778073175.1564455
+    },
+    "CHAIN_METRICS.csv": {
+      "exists": true,
+      "bytes": 603561,
+      "mtime": 1778073175.203023
+    },
+    "ONION_LAYERS.csv": {
+      "exists": true,
+      "bytes": 2081828,
+      "mtime": 1778073175.2449195
+    },
+    "ONION_SCORES.csv": {
+      "exists": true,
+      "bytes": 834420,
+      "mtime": 1778073175.279194
+    },
+    "CHAIN_NARRATIVES.csv": {
+      "exists": true,
+      "bytes": 1220830,
+      "mtime": 1778073175.3034449
+    },
+    "CHAIN_ONION_SUMMARY.xlsx": {
+      "exists": true,
+      "bytes": 1732128,
+      "mtime": 1778073179.8780603
+    },
+    "dashboard_summary.json": {
+      "exists": true,
+      "bytes": 338,
+      "mtime": 1778073175.3054044
+    },
+    "top_issues.json": {
+      "exists": true,
+      "bytes": 14352,
+      "mtime": 1778073175.33557
+    }
+  },
+  "chain_onion_counts": {
+    "CHAIN_REGISTER.csv": 2819,
+    "CHAIN_VERSIONS.csv": 4848,
+    "CHAIN_EVENTS.csv": 36947,
+    "CHAIN_METRICS.csv": 2819,
+    "ONION_LAYERS.csv": 7788,
+    "ONION_SCORES.csv": 2819,
+    "CHAIN_NARRATIVES.csv": 2819,
+    "CHAIN_ONION_SUMMARY.xlsx": {
+      "exists": true,
+      "bytes": 1732128,
+      "mtime": 1778073179.8780603
+    },
+    "dashboard_summary.json": {
+      "kind": "object",
+      "keys": [
+        "archived_chains",
+        "avg_pressure_live",
+        "dormant_ghost_ratio",
+        "engine_version",
+        "escalated_chain_count",
+        "generated_at",
+        "legacy_chains",
+        "live_chains",
+        "top_theme_by_impact",
+        "total_chains"
+      ]
+    },
+    "top_issues.json": {
+      "kind": "list",
+      "len": 20
+    }
+  },
+  "runs_dir": {
+    "present": true,
+    "run_dirs": [
+      "run_0000"
+    ],
+    "count": 1
+  },
+  "counter_attack": {
+    "row_count": 1524,
+    "bucket_counts": {
+      "CONSULTANT_A_ATTAQUER": 210,
+      "DECISION_MOEX": 8,
+      "ENTREPRISE_A_RELANCER": 122,
+      "FERMER_MAINTENANT": 66,
+      "MOEX_SHAME_INTERNAL": 989,
+      "SECONDAIRE_EXPIRE": 129
+    }
+  }
+}

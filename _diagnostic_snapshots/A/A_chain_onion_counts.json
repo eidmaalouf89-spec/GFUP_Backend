@@ -1,0 +1,33 @@
+{
+  "CHAIN_REGISTER.csv": 2819,
+  "CHAIN_VERSIONS.csv": 4848,
+  "CHAIN_EVENTS.csv": 36947,
+  "CHAIN_METRICS.csv": 2819,
+  "ONION_LAYERS.csv": 7788,
+  "ONION_SCORES.csv": 2819,
+  "CHAIN_NARRATIVES.csv": 2819,
+  "CHAIN_ONION_SUMMARY.xlsx": {
+    "exists": true,
+    "bytes": 1732091,
+    "mtime": 1778068477.2129524
+  },
+  "dashboard_summary.json": {
+    "kind": "object",
+    "keys": [
+      "archived_chains",
+      "avg_pressure_live",
+      "dormant_ghost_ratio",
+      "engine_version",
+      "escalated_chain_count",
+      "generated_at",
+      "legacy_chains",
+      "live_chains",
+      "top_theme_by_impact",
+      "total_chains"
+    ]
+  },
+  "top_issues.json": {
+    "kind": "list",
+    "len": 20
+  }
+}

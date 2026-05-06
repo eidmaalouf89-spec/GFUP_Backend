@@ -354,7 +354,7 @@ function WeeklyActivity({ data, focusMode, onDrill }) {
   const W = 820, H = 220, pad = { l: 36, r: 16, t: 20, b: 34 };
   const weekly = data.weekly || [];
   const weeks = focusMode ? weekly.slice(-12) : weekly;
-  if (!weeks.length) return <OvCard padding={24}><OvEyebrow>Activit\u00e9</OvEyebrow><div style={{ fontSize: 12, color:'var(--text-3)', padding: '20px 0' }}>Aucune donn\u00e9e d\u2019activit\u00e9.</div></OvCard>;
+  if (!weeks.length) return <OvCard padding={24}><OvEyebrow>Activité</OvEyebrow><div style={{ fontSize: 12, color:'var(--text-3)', padding: '20px 0' }}>Aucune donnée d’activité.</div></OvCard>;
   const maxVal = Math.max(...weeks.flatMap(w => [w.opened, w.closed]));
   const n = weeks.length;
 
@@ -569,7 +569,7 @@ function FocusRadial({ f, onDrill }) {
 
 /* Stacked horizontal bar per consultant */
 function FocusByConsultant({ items, onNavigate, onOpenConsultant }) {
-  if (!items || !items.length) return <div style={{ fontSize: 12, color:'var(--text-3)', padding: 12 }}>Aucune donn\u00e9e par consultant.</div>;
+  if (!items || !items.length) return <div style={{ fontSize: 12, color:'var(--text-3)', padding: 12 }}>Aucune donnée par consultant.</div>;
   const max = Math.max(...items.map(c => c.p1 + c.p2 + c.p3 + c.p4));
   return (
     <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
