@@ -587,7 +587,7 @@ def _collect_evidence(ctx: Any, numero: str) -> dict[str, Any]:
 
 def _build_output_row(ctx: Any, row: pd.Series, bucket: str) -> dict[str, Any]:
     numero = _safe_str(row.get("numero"))
-    indice = _safe_str(row.get("indice") or row.get("latest_indice"))
+    indice = _safe_str(row.get("latest_indice") or row.get("indice"))
     family_key = _safe_str(row.get("family_key") or numero)
     emetteur_code = _safe_str(row.get("emetteur"))
     emetteur_name = resolve_emetteur_name(emetteur_code) if emetteur_code else ""

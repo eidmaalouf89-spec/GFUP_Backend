@@ -114,12 +114,19 @@ def search_documents(
 
     subset = subset.copy()
     subset["_rank"] = subset.apply(_rank, axis=1)
-    subset = subset.sort_values("_rank").head(limit)
+    subset = subset.sort_values("_rank", kind="mergesort")
+    subset = subset.drop_duplicates(subset=["numero"], keep="first").head(limit)
 
     # For each result compute primary_tag and latest_status summary
     results = []
     for _, row in subset.iterrows():
         doc_row = row.to_dict()
+        numero = str(doc_row.get("numero") or "")
+        if numero:
+            try:
+                doc_row, _ = _resolve_doc_rows(ctx, numero, None)
+            except Exception as exc:
+                logger.warning("search_documents: latest indice resolve failed for %s: %s", numero, exc)
         try:
             resps = _get_latest_responses_for_doc(ctx, doc_row)
             days = _compute_days_since_moex_ref(ctx, resps)
