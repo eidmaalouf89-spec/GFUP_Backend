@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 ENTREPRISE_DELAY_THRESHOLD_DAYS = 15
 TRES_ANCIEN_THRESHOLD_DAYS = 60
 BLOCKING_STATUSES = frozenset({"REF", "DEF", "SUS"})
+TECHNICAL_APPROVAL_STATUSES = frozenset({"VAO", "VAOB", "VSO", "FAV"})
 DECISIVE_STATUSES = frozenset({"REF", "DEF", "SUS", "VAO", "HM"})
 MOEX_REF_STATUSES = frozenset({"REF", "SAS REF"})
 MOEX_CANONICAL = "Maître d'Oeuvre EXE"
@@ -282,6 +283,14 @@ def _moex_called(latest_responses: list[dict]) -> bool:
     return any(r.get("reviewer") == MOEX_CANONICAL for r in latest_responses)
 
 
+def _is_technical_consultant_response(response: dict) -> bool:
+    """True for real consultant responses used in MOEX technical arbitration."""
+    return (
+        response.get("reviewer") != MOEX_CANONICAL
+        and response.get("tier") in {"PRIMARY", "SECONDARY"}
+    )
+
+
 def _get_latest_responses_for_doc(ctx, doc_row: dict) -> list[dict]:
     """Return list of response dicts for the given doc_row's doc_id.
 
@@ -409,10 +418,11 @@ def _compute_primary_tag(
     if focus_owner_tier == "MOEX":
         bet_statuses = [
             r["status"] for r in latest_responses
-            if r["reviewer"] != MOEX_CANONICAL and r.get("status")
+            if _is_technical_consultant_response(r) and r.get("status")
         ]
         has_blocking = any(s in BLOCKING_STATUSES for s in bet_statuses)
-        return "Att MOEX — Arbitrage" if has_blocking else "Att MOEX — Facile"
+        has_approval = any(s in TECHNICAL_APPROVAL_STATUSES for s in bet_statuses)
+        return "Att MOEX — Arbitrage" if has_blocking and has_approval else "Att MOEX — Facile"
     return "Inconnu"
 
 
@@ -426,7 +436,7 @@ def _compute_secondary_tags(
     tags = []
 
     # Refus multiples: ≥2 BET responses with blocking status
-    bet_responses = [r for r in latest_responses if r["reviewer"] != MOEX_CANONICAL]
+    bet_responses = [r for r in latest_responses if _is_technical_consultant_response(r)]
     blocking_count = sum(1 for r in bet_responses if r.get("status") in BLOCKING_STATUSES)
     if blocking_count >= 2:
         tags.append("Refus multiples")
@@ -706,7 +716,7 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         # Compute blocking_bet_count: BET responses (non-MOEX) with blocking status
         bet_responses = [
             r for r in latest_responses
-            if r["reviewer"] != MOEX_CANONICAL and r.get("status") in BLOCKING_STATUSES
+            if _is_technical_consultant_response(r) and r.get("status") in BLOCKING_STATUSES
         ]
         blocking_bet_count = len(bet_responses)
 
@@ -797,7 +807,7 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         # Compute blocking_bet_count: BET responses (non-MOEX) with blocking status
         bet_responses = [
             r for r in latest_responses
-            if r["reviewer"] != MOEX_CANONICAL and r.get("status") in BLOCKING_STATUSES
+            if _is_technical_consultant_response(r) and r.get("status") in BLOCKING_STATUSES
         ]
         blocking_bet_count = len(bet_responses)
 

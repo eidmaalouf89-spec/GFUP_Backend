@@ -78,6 +78,7 @@ The remaining Phase 8-family items (D-010 broad WorkflowEngine cleanup, Chain+On
 **Status:** ✅ Shipped. Backend wired via recovery cycle 2026-05-01. Every Overview interaction (KPI tile, VisaFlow segment, WeeklyActivity bar, Focus radial ring) opens a backend-driven drilldown drawer with rows and a row-click hand-off to the Document Command Center.
 
 **What's live.** `Api.get_documents_drilldown(kind, params, focus, stale_days)` exposed on the `Api` class; delegates to `reporting.drilldown_builder.build_drilldown` (which had been authored in Phase 3 but never wired). Validated 2026-05-01: Documents soumis (4834), Bloquants en attente (3723), VisaFlow REF (320), WeeklyActivity bin (107), Focus P1 (3093) — all return rows. Row click opens DCC.
+SAS administrative statuses (VAO-SAS / VSO-SAS / REF-SAS where applicable) must never be used to create technical MOEX arbitration. SAS remains visible in history and may drive SAS-gate analytics, but MOEX arbitration is based only on real technical consultant responses.
 
 **Backend.** Single new method on `Api` in `app.py`. Focus-handling mirrors `get_dashboard_data` (FocusConfig + `apply_focus_filter` + `_build_live_operational_numeros` + `_apply_live_narrowing`). `drilldown_builder.py` was already on disk — no source changes there. JS bridge (`data_bridge.js:loadDrilldown`) was already correct. Drawer (`overview.jsx:DrilldownDrawer`) was already correct.
 

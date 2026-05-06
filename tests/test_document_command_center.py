@@ -24,7 +24,7 @@ _SRC_DIR = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
-from reporting.document_command_center import compute_dcc_tags_bulk, MOEX_CANONICAL
+from reporting.document_command_center import compute_dcc_tags_bulk, MOEX_CANONICAL, _compute_primary_tag
 from reporting.data_loader import RunContext
 
 
@@ -217,3 +217,29 @@ def test_document_command_center_has_no_today_or_now_business_fallbacks():
         "pd.Timestamp.now",
     ]
     assert not any(pattern in source for pattern in forbidden)
+
+
+class TestMoexTechnicalArbitration:
+    def test_sas_status_is_not_technical_arbitrage(self):
+        responses = [
+            {"reviewer": "0-SAS", "tier": "UNKNOWN", "status": "VSO-SAS"},
+            {"reviewer": "BET Electricité", "tier": "PRIMARY", "status": "REF"},
+            {"reviewer": MOEX_CANONICAL, "tier": "MOEX", "status": ""},
+        ]
+        assert _compute_primary_tag("MOEX", responses, None) == "Att MOEX — Facile"
+
+    def test_two_real_technical_consultants_disagree_is_arbitrage(self):
+        responses = [
+            {"reviewer": "BET Electricité", "tier": "PRIMARY", "status": "REF"},
+            {"reviewer": "BET Structure", "tier": "PRIMARY", "status": "VAO"},
+            {"reviewer": MOEX_CANONICAL, "tier": "MOEX", "status": ""},
+        ]
+        assert _compute_primary_tag("MOEX", responses, None) == "Att MOEX — Arbitrage"
+
+    def test_sas_only_approval_is_moex_facile(self):
+        responses = [
+            {"reviewer": "0-SAS", "tier": "UNKNOWN", "status": "VSO-SAS"},
+            {"reviewer": "BET Structure", "tier": "PRIMARY", "status": "VAO"},
+            {"reviewer": MOEX_CANONICAL, "tier": "MOEX", "status": ""},
+        ]
+        assert _compute_primary_tag("MOEX", responses, None) == "Att MOEX — Facile"
