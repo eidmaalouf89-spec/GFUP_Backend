@@ -189,6 +189,8 @@ def build_document_command_center(
 
         # Compute tags
         focus_owner_tier = str(doc_row.get("_focus_owner_tier") or "")
+        if not _moex_called(latest_responses) and _called_consultant_final(latest_responses)[0]:
+            focus_owner_tier = "CLOSED"
         days_since_moex_ref = _compute_days_since_moex_ref(ctx, latest_responses)
         primary_tag = _compute_primary_tag(focus_owner_tier, latest_responses, days_since_moex_ref)
         chain_payload = chain_timeline.get(numero)
@@ -239,6 +241,47 @@ def _resolve_doc_rows(ctx, numero: str, indice: Optional[str]):
     return row.to_dict(), latest_indice
 
 
+def _is_uncalled_response_row(row) -> bool:
+    raw = str(row.get("approver_raw", "") or "").strip().upper()
+    if not raw.startswith("0-") or raw == "0-SAS":
+        return False
+    step = str(row.get("flat_step_type", "") or "").strip().upper()
+    if step not in ("", "CONSULTANT", "MOEX"):
+        return False
+    raw_status = row.get("status_clean")
+    status = "" if raw_status is None or pd.isna(raw_status) else str(raw_status).strip()
+    answered = row.get("date_answered")
+    has_answer = answered is not None and not pd.isna(answered)
+    return not status and not has_answer
+
+
+def _called_consultant_final(latest_responses: list[dict]) -> tuple[Optional[str], Optional[object]]:
+    called = [
+        r for r in latest_responses
+        if r.get("tier") in {"PRIMARY", "SECONDARY"}
+        and r.get("reviewer") != MOEX_CANONICAL
+    ]
+    if not called or any(r.get("is_open") for r in called):
+        return None, None
+
+    rank = {"REF": 5, "DEF": 5, "SUS": 4, "VAO": 3, "VAOB": 3, "VSO": 2, "FAV": 2}
+    candidates = [
+        r for r in called
+        if str(r.get("status") or "").strip().upper()
+        and str(r.get("status") or "").strip().upper() != "HM"
+    ]
+    if not candidates:
+        hm = [r for r in called if str(r.get("status") or "").strip().upper() == "HM"]
+        return ("HM", hm[-1].get("response_date")) if hm else (None, None)
+
+    chosen = max(candidates, key=lambda r: rank.get(str(r.get("status") or "").strip().upper(), 0))
+    return str(chosen.get("status") or "").strip().upper(), chosen.get("response_date")
+
+
+def _moex_called(latest_responses: list[dict]) -> bool:
+    return any(r.get("reviewer") == MOEX_CANONICAL for r in latest_responses)
+
+
 def _get_latest_responses_for_doc(ctx, doc_row: dict) -> list[dict]:
     """Return list of response dicts for the given doc_row's doc_id.
 
@@ -253,6 +296,8 @@ def _get_latest_responses_for_doc(ctx, doc_row: dict) -> list[dict]:
 
     results = []
     for _, r in rows.iterrows():
+        if _is_uncalled_response_row(r):
+            continue
         canonical = str(r.get("approver_canonical") or "")
         status_type = str(r.get("date_status_type") or "NOT_CALLED")
 
@@ -270,10 +315,13 @@ def _get_latest_responses_for_doc(ctx, doc_row: dict) -> list[dict]:
 
         is_open = status_type in ("PENDING_IN_DELAY", "PENDING_LATE") or response_date is None
 
+        raw_status = r.get("status_clean")
+        status_clean = "" if raw_status is None or pd.isna(raw_status) else str(raw_status)
+
         results.append({
             "reviewer": canonical,
             "tier": classify_consultant(canonical),
-            "status": str(r.get("status_clean") or ""),
+            "status": status_clean,
             "response_date": response_date,
             "deadline": deadline,
             "comment": str(r.get("response_comment") or "").strip(),
@@ -451,7 +499,19 @@ def _build_latest_status(latest_responses: list[dict], doc_row: dict) -> dict:
         if visa_date_str:
             summary += f" ({visa_date_str})"
     else:
-        pending = [r for r in latest_responses if r.get("is_open") and r.get("reviewer")]
+        final_status, final_date = _called_consultant_final(latest_responses)
+        if final_status and not _moex_called(latest_responses):
+            summary = f"VISA {final_status}"
+            if final_date is not None:
+                fd = final_date.date() if hasattr(final_date, "date") else final_date
+                summary += f" ({fd})"
+            return {
+                "visa_global": None,
+                "visa_date": None,
+                "summary": summary,
+            }
+        else:
+            pending = [r for r in latest_responses if r.get("is_open") and r.get("reviewer")]
         if pending:
             names = ", ".join(r["reviewer"] for r in pending[:2])
             summary = f"En attente: {names}"
@@ -637,6 +697,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         latest_responses = _get_latest_responses_for_doc(ctx, doc_row)
         days_since_moex_ref = _compute_days_since_moex_ref(ctx, latest_responses)
         focus_owner_tier = str(doc_row.get("_focus_owner_tier") or "")
+        if not _moex_called(latest_responses) and _called_consultant_final(latest_responses)[0]:
+            focus_owner_tier = "CLOSED"
         primary_tag = _compute_primary_tag(focus_owner_tier, latest_responses, days_since_moex_ref)
         chain_payload = chain_timeline.get(numero)
         secondary_tags = _compute_secondary_tags(ctx, doc_row, latest_responses, chain_payload)
@@ -653,6 +715,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
 
         # Visa global
         visa_global = doc_row.get("_visa_global")
+        if not visa_global and not _moex_called(latest_responses):
+            visa_global = _called_consultant_final(latest_responses)[0]
 
         deadline_truth = _compute_open_consultant_deadlines(ctx, latest_responses)
 
@@ -724,6 +788,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
         latest_responses = _get_latest_responses_for_doc(ctx, doc_row)
         days_since_moex_ref = _compute_days_since_moex_ref(ctx, latest_responses)
         focus_owner_tier = str(doc_row.get("_focus_owner_tier") or "")
+        if not _moex_called(latest_responses) and _called_consultant_final(latest_responses)[0]:
+            focus_owner_tier = "CLOSED"
         primary_tag = _compute_primary_tag(focus_owner_tier, latest_responses, days_since_moex_ref)
         chain_payload = chain_timeline.get(numero)
         secondary_tags = _compute_secondary_tags(ctx, doc_row, latest_responses, chain_payload)
@@ -740,6 +806,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
 
         # Visa global
         visa_global = doc_row.get("_visa_global")
+        if not visa_global and not _moex_called(latest_responses):
+            visa_global = _called_consultant_final(latest_responses)[0]
 
         deadline_truth = _compute_open_consultant_deadlines(ctx, latest_responses)
 

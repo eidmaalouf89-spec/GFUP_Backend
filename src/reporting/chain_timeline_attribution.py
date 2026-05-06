@@ -121,12 +121,18 @@ def _cap_secondary_delays(
     """
     df = chain_events_df.copy()
     df["cap_synthetic"] = False
+    df["delay_contribution_days"] = pd.to_numeric(
+        df["delay_contribution_days"], errors="coerce"
+    ).fillna(0).astype(int)
 
     synthetic_rows: list[dict] = []
     secondary_mask = df["actor_type"] == "SECONDARY_CONSULTANT"
+    versions_with_moex = set(df[df["actor_type"] == "MOEX"]["version_key"].astype(str))
 
     for idx, row in df[secondary_mask].iterrows():
         vk = row["version_key"]
+        if str(vk) not in versions_with_moex:
+            continue
         last_primary = last_primary_dates.get(vk)
         if last_primary is None:
             continue
@@ -293,14 +299,25 @@ def _build_indice_phases(
     # Change 4: MOEX never called but all non-MOEX/non-SAS actors completed →
     # use max(response_dates) as effective review_end (delay collapses to 0)
     if review_end is None:
-        non_moex_ops = ops[~ops["actor_type"].isin({"MOEX", "CONTRACTOR", "SAS"})]
+        non_moex_ops = ops[~ops["actor_type"].isin({"MOEX", "CONTRACTOR", "SAS"})].copy()
+        if not non_moex_ops.empty:
+            called_mask = (
+                (non_moex_ops["is_completed"].astype(str).str.lower() == "true")
+                | (non_moex_ops["is_blocking"].astype(str).str.lower() == "true")
+                | non_moex_ops["status"].fillna("").astype(str).str.strip().ne("")
+            )
+            non_moex_ops = non_moex_ops[called_mask]
         if not non_moex_ops.empty:
             all_done = (non_moex_ops["is_completed"].astype(str).str.lower() == "true").all()
             if all_done:
+                decisive = non_moex_ops[
+                    non_moex_ops["status"].fillna("").astype(str).str.strip().str.upper() != "HM"
+                ]
+                if decisive.empty:
+                    decisive = non_moex_ops
                 completed_dates = [
-                    d for d in (
-                        _parse_event_date(v) for v in non_moex_ops["event_date"]
-                    ) if d is not None
+                    d for d in (_parse_event_date(v) for v in decisive["event_date"])
+                    if d is not None
                 ]
                 if completed_dates:
                     review_end = max(completed_dates)

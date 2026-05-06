@@ -201,6 +201,33 @@ def _map_issue_signal(
     return signals[0] if signals else "NONE"
 
 
+def _uncalled_placeholder_mask(df: pd.DataFrame, step_type_raw: pd.Series) -> pd.Series:
+    """Rows with no response/status are placeholders, not delay owners.
+
+    This deliberately does not rely on the approver prefix alone. A ``0-`` row
+    with a real response remains a real event; only empty pending
+    consultant/MOEX rows are neutralized.
+    """
+    actor_raw = (
+        df.get("actor_raw", pd.Series("", index=df.index))
+        .fillna("").astype(str).str.strip().str.upper()
+    )
+    response_date = pd.to_datetime(
+        df.get("response_date", pd.Series(pd.NaT, index=df.index)), errors="coerce"
+    )
+    status = (
+        df.get("status_clean", pd.Series("", index=df.index))
+        .fillna("").astype(str).str.strip()
+    )
+    return (
+        step_type_raw.isin({"CONSULTANT", "MOEX"})
+        & actor_raw.str.startswith("0-")
+        & actor_raw.ne("0-SAS")
+        & response_date.isna()
+        & status.eq("")
+    )
+
+
 def _assign_event_seq(df: pd.DataFrame) -> pd.Series:
     """
     Assign event_seq 1..N gapless within each family_key.
@@ -263,6 +290,8 @@ def _build_ops_events(ops_df: pd.DataFrame) -> pd.DataFrame:
         df.get("step_type", pd.Series("", index=df.index))
         .fillna("").astype(str).str.strip().str.upper()
     )
+    uncalled_placeholder = _uncalled_placeholder_mask(df, step_type_raw)
+    is_blocking = is_blocking & ~uncalled_placeholder
     is_open_doc = step_type_raw == "OPEN_DOC"
 
     # OPEN_DOC → submittal_date; others → response_date
@@ -275,8 +304,8 @@ def _build_ops_events(ops_df: pd.DataFrame) -> pd.DataFrame:
 
     # ── actor_type (vectorized via list comprehension — 32k rows, negligible) ──
     actor_type = [
-        _map_actor_type(st, ac)
-        for st, ac in zip(step_type_raw, actor)
+        "UNKNOWN" if uncalled else _map_actor_type(st, ac)
+        for st, ac, uncalled in zip(step_type_raw, actor, uncalled_placeholder)
     ]
 
     # ── semantic step_type ─────────────────────────────────────────────────
@@ -303,6 +332,7 @@ def _build_ops_events(ops_df: pd.DataFrame) -> pd.DataFrame:
         .fillna(0)
         .astype(int)
     )
+    delay_days = delay_days.where(~uncalled_placeholder, 0)
 
     # ── identity keys ──────────────────────────────────────────────────────
     family_key  = df.get("family_key",  pd.Series("", index=df.index)).fillna("").astype(str)

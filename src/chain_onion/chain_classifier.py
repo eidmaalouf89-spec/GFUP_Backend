@@ -147,6 +147,74 @@ def _normalize_bool_series(s: pd.Series) -> pd.Series:
     )
 
 
+def _empty_placeholder_mask(df: pd.DataFrame) -> pd.Series:
+    """Return True for empty GED placeholder consultant/MOEX rows.
+
+    The prefix alone is not enough: ``0-SAS`` is a real SAS track, and any
+    ``0-`` row with a response/status must remain a real event. Only empty
+    placeholder rows are neutralized.
+    """
+    if df is None or df.empty:
+        return pd.Series(dtype=bool)
+    step = (
+        df.get("step_type", pd.Series("", index=df.index))
+        .fillna("").astype(str).str.strip().str.upper()
+    )
+    actor_raw = (
+        df.get("actor_raw", pd.Series("", index=df.index))
+        .fillna("").astype(str).str.strip().str.upper()
+    )
+    status = (
+        df.get("status_clean", pd.Series("", index=df.index))
+        .fillna("").astype(str).str.strip()
+    )
+    response_date = pd.to_datetime(
+        df.get("response_date", pd.Series(pd.NaT, index=df.index)),
+        errors="coerce",
+    )
+    return (
+        step.isin({"CONSULTANT", "MOEX"})
+        & actor_raw.str.startswith("0-")
+        & actor_raw.ne("0-SAS")
+        & status.eq("")
+        & response_date.isna()
+    )
+
+
+def _called_consultant_final_status(group: pd.DataFrame) -> Optional[str]:
+    """Final consultant status when the latest version closed without MOEX."""
+    if group is None or group.empty:
+        return None
+    df = group.copy()
+    step = df.get("step_type", pd.Series("", index=df.index)).fillna("").astype(str).str.upper()
+    placeholder = _empty_placeholder_mask(df)
+
+    moex_called = ((step == "MOEX") & ~placeholder).any()
+    if moex_called:
+        return None
+
+    called = df[(step == "CONSULTANT") & ~placeholder].copy()
+    if called.empty:
+        return None
+    if called.get("is_blocking", pd.Series(False, index=called.index)).map({True: True, False: False, "True": True, "False": False}).fillna(False).any():
+        return None
+
+    completed = called[
+        called.get("is_completed", pd.Series(False, index=called.index))
+        .map({True: True, False: False, "True": True, "False": False})
+        .fillna(False)
+    ].copy()
+    if len(completed) != len(called):
+        return None
+
+    statuses = completed.get("status_clean", pd.Series("", index=completed.index)).fillna("").astype(str).str.strip().str.upper()
+    statuses = [s for s in statuses if s and s != "HM"]
+    if not statuses:
+        return "HM"
+    priority = {"REF": 5, "DEF": 5, "SUS": 4, "VAO": 3, "VAOB": 3, "VSO": 2, "FAV": 2}
+    return max(statuses, key=lambda s: priority.get(s, 0))
+
+
 def _get_data_date(ops_df: pd.DataFrame) -> Optional[pd.Timestamp]:
     """Extract data_date from ops_df. Returns None if unavailable."""
     if ops_df is None or ops_df.empty or "data_date" not in ops_df.columns:
@@ -172,7 +240,7 @@ def _compute_version_final_status(ops_df: pd.DataFrame) -> dict[str, Optional[st
     if ops_df is None or ops_df.empty or "version_key" not in ops_df.columns:
         return result
     for vk, group in ops_df.groupby("version_key", sort=False):
-        result[str(vk)] = _derive_visa_global(group)
+        result[str(vk)] = _derive_visa_global(group) or _called_consultant_final_status(group)
     return result
 
 
@@ -236,7 +304,11 @@ def _compute_blocker_profile(
         else:
             df[col] = False
 
-    blocking = df[df["is_blocking"] & df["version_key"].isin(latest_vk_set)].copy()
+    blocking = df[
+        df["is_blocking"]
+        & df["version_key"].isin(latest_vk_set)
+        & ~_empty_placeholder_mask(df)
+    ].copy()
     if blocking.empty:
         return profile
 
@@ -259,6 +331,29 @@ def _compute_blocker_profile(
             "has_sas_blocking":       bool(grp["_is_sas"].any()),
         }
     return profile
+
+
+def _compute_blocking_count_by_family(
+    ops_df: pd.DataFrame,
+    latest_vk_set: set[str],
+) -> dict[str, int]:
+    if ops_df is None or ops_df.empty:
+        return {}
+    df = ops_df.copy()
+    df["is_blocking"] = (
+        df.get("is_blocking", pd.Series(False, index=df.index))
+        .map({"True": True, "False": False, True: True, False: False})
+        .fillna(False)
+        .astype(bool)
+    )
+    blocking = df[
+        df["is_blocking"]
+        & df["version_key"].isin(latest_vk_set)
+        & ~_empty_placeholder_mask(df)
+    ].copy()
+    if blocking.empty:
+        return {}
+    return blocking.groupby("family_key")["actor_clean"].nunique().astype(int).to_dict()
 
 
 def _compute_family_version_facts(
@@ -607,6 +702,7 @@ def classify_chains(
     # ── Step 5: blocker profile per family (MOEX / primary / secondary) ───
     latest_vk_set = set(latest_vk_by_family.values()) - {""}
     blocker_profile_by_family = _compute_blocker_profile(ops_df, latest_vk_set)
+    blocking_count_by_family = _compute_blocking_count_by_family(ops_df, latest_vk_set)
 
     # ── Step 6: last_real_activity_date per family ─────────────────────────
     last_activity_map = _compute_last_real_activity_dates(chain_events_df)
@@ -623,6 +719,15 @@ def classify_chains(
             reg[col] = _normalize_bool_series(reg[col])
         else:
             reg[col] = False
+    reg["current_blocking_actor_count"] = (
+        reg["family_key"].astype(str).map(blocking_count_by_family).fillna(0).astype(int)
+    )
+    reg["waiting_primary_flag"] = reg["family_key"].astype(str).map(
+        lambda fk: blocker_profile_by_family.get(fk, {}).get("has_primary_blocking", False)
+    )
+    reg["waiting_secondary_flag"] = reg["family_key"].astype(str).map(
+        lambda fk: blocker_profile_by_family.get(fk, {}).get("has_secondary_blocking", False)
+    )
 
     # ── Step 9: classify each family ──────────────────────────────────────
     horizon_ts = pd.Timestamp(OPERATIONAL_HORIZON_DATE)
