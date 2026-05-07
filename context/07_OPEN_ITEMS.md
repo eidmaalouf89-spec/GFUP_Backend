@@ -734,6 +734,37 @@ opens them via `open_file_in_explorer(path)` (the API already exists).
 
 ---
 
+---
+
+## Operational dashboard redesign — follow-up items (2026-05-07)
+
+> Cross-reference: `docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md`.
+
+### OD-01 — Action-bucket coverage gap (1,659 rows)
+
+1,659 operational rows currently have no `action_bucket` assignment in
+`COUNTER_ATTACK_ITEMS.csv`. These rows are represented in the operational dashboard
+(`operational_total = 2,460`) but not in Action MOEX (1,524 curated rows). Extending
+bucket coverage to the unassigned rows is a follow-up phase, out of scope for the
+operational dashboard redesign.
+
+### OD-02 — Stale-segment priority breakdown
+
+Priority counts (`priority_p1` through `priority_p5`) are computed over the **full**
+operational mask with no stale exclusion — consistent with the redesign contract.
+If product feedback requests a stale-only priority breakdown (i.e. priorities computed
+over the stale sub-segment only), that would require a separate new field set. Not in
+scope for this redesign; log as a follow-up request.
+
+### OD-03 — `*.pre_patch_backup` files not in `.gitignore`
+
+Files `app.py.pre_patch_backup`, `src/reporting/aggregator.py.pre_patch_backup`, and
+`ui/jansa/overview.jsx.pre_patch_backup` are present in the working tree but not
+covered by `.gitignore`. Housekeeping follow-up: either add `*.pre_patch_backup` to
+`.gitignore` or delete the backup files after confirming the patches are stable.
+
+---
+
 ## Highest ROI first three fixes (ranking, not prescription)
 
 1. **Wire the Contractors page** (#1). Pure frontend; backend has all the

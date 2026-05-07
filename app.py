@@ -608,6 +608,7 @@ class Api:
                 compute_weekly_timeseries,
                 compute_consultant_summary,
                 compute_contractor_summary,
+                compute_operational_dashboard,
             )
             from reporting.focus_filter import apply_focus_filter, FocusConfig
 
@@ -633,6 +634,7 @@ class Api:
                 "consultants": consultants,
                 "contractors": contractors,
                 "focus": focus_result.stats,
+                "operational": compute_operational_dashboard(ctx),
             }
             if focus:
                 payload["priority_queue"] = focus_result.priority_queue[:50]

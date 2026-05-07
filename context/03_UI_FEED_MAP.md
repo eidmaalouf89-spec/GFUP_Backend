@@ -326,6 +326,55 @@ key (lates first, then earliest deadline).
 > at the 6A builder under Phase 6X — the 6B adapter passes
 > `subject_label` through verbatim, no JSX-side reformatting.
 
+---
+
+## E. Operational dashboard — shipped state (2026-05-07)
+
+> This section supersedes the Focus-as-primary description in §B `OverviewPage` for
+> the overview feed. See `docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md`
+> for the full contract and locked baseline.
+
+**Default view:** The JANSA Overview now shows the **operational dashboard** as the
+primary surface. It is bound to `window.OVERVIEW.operational` (21 keys), produced
+by `src/reporting/aggregator.py::compute_operational_dashboard` (lines 554–660) and
+forwarded verbatim by `ui_adapter.adapt_overview` (lines 236–239).
+
+**Backend call chain:**
+1. `app.py::get_dashboard_data` → calls `compute_operational_dashboard(ctx)` after
+   the existing focus-filter block and merges result under key `"operational"`.
+2. `ui_adapter.adapt_overview` passes `dashboard["operational"]` through verbatim.
+3. `window.OVERVIEW.operational` is populated at startup with all 21 keys.
+
+**21 keys at `window.OVERVIEW.operational`:**
+
+```
+operational_total, fresh_total, stale_total,
+moex_total, moex_fresh, moex_stale,
+primary_total, secondary_total, consultants_total,
+priority_p1, priority_p2, priority_p3, priority_p4, priority_p5,
+enterprise_ref_sas_candidates, enterprise_action_rows,
+old_debt_age_days_min, old_debt_age_days_median, old_debt_age_days_max,
+stale_threshold_days, universe_definition
+```
+
+**Operational universe rule:** latest-indice only (`ctx.dernier_df`, one row per
+`numero`); `portfolio_bucket ∈ {LIVE_OPERATIONAL, LEGACY_BACKLOG}`; AND
+`_visa_global ∉ {VSO, VAO, REF, SAS REF, HM}`. Stale (>90 d) is a **visible
+segment**, not an exclusion.
+
+**Legacy Focus payload (`window.OVERVIEW.focus`, 11 keys):**
+`focused, p1_overdue, p2_urgent, p3_soon, p4_ok, total_dernier, excluded, stale, resolved, by_consultant, by_contractor`
+
+This payload remains fully exposed and callable via `get_dashboard_data(focus=True,
+stale_days=90)` but is **no longer the default** — it is a preserved legacy path.
+The Focus toggle in the UI, if present, now acts as a segment selector
+(Fresh / Stale / All) for display grouping only; it does not drive backend filtering.
+
+**UI tiles:** `OperationalDashboard` A–F + `OperationalPriorityRow` P1–P5 in
+`ui/jansa/overview.jsx`. No JSX arithmetic — all counts come from the backend dict.
+
+---
+
 ### Document Command Center wiring (deployed 2026-04-28)
 
 The right-side drawer panel built in Phase 4 of the DCC project. Pure
