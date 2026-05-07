@@ -206,7 +206,10 @@ def _uncalled_placeholder_mask(df: pd.DataFrame, step_type_raw: pd.Series) -> pd
 
     This deliberately does not rely on the approver prefix alone. A ``0-`` row
     with a real response remains a real event; only empty pending
-    consultant/MOEX rows are neutralized.
+    consultant/MOEX rows are neutralized. Genuinely blocking rows are NEVER
+    masked, because their delay contribution is real and downstream
+    classification needs to see them as actor_type=PRIMARY/SECONDARY/MOEX
+    rather than UNKNOWN.
     """
     actor_raw = (
         df.get("actor_raw", pd.Series("", index=df.index))
@@ -219,12 +222,16 @@ def _uncalled_placeholder_mask(df: pd.DataFrame, step_type_raw: pd.Series) -> pd
         df.get("status_clean", pd.Series("", index=df.index))
         .fillna("").astype(str).str.strip()
     )
+    is_blocking_safe = _normalize_bool_series(
+        df.get("is_blocking", pd.Series(False, index=df.index))
+    )
     return (
         step_type_raw.isin({"CONSULTANT", "MOEX"})
         & actor_raw.str.startswith("0-")
         & actor_raw.ne("0-SAS")
         & response_date.isna()
         & status.eq("")
+        & ~is_blocking_safe
     )
 
 

@@ -5,6 +5,88 @@
 
 ---
 
+## Chain+Onion UNKNOWN_CHAIN_STATE elimination — CLOSED 2026-05-07
+
+**Issue:** `output/chain_onion/CHAIN_REGISTER.csv` contained 185 rows with
+`current_state = UNKNOWN_CHAIN_STATE`, hiding three distinct bugs.
+
+**Root causes (all confirmed against current data):**
+
+1. **False placeholder suppression.**
+   `_empty_placeholder_mask()` in `src/chain_onion/chain_classifier.py` and
+   `_uncalled_placeholder_mask()` in `src/chain_onion/chain_builder.py` both
+   masked any `0-*` consultant/MOEX row with empty status + null
+   response_date, regardless of `is_blocking`. This wiped genuinely blocking
+   `0-*` rows in the GED, so the classifier saw `has_blocking=False` for
+   chains that actually had real waiting actors. The chain_builder copy of
+   the bug additionally forced `actor_type=UNKNOWN` for those events, so
+   CHAIN_EVENTS could not surface them either.
+2. **Missing classifier rule (REF/SAS REF/DEF + new cycle).** Latest version
+   with `requires_new_cycle_flag=True` and a final visa in {REF, SAS REF,
+   DEF} (no blocker, no corrected indice yet) had no priority match and
+   fell through to `UNKNOWN_CHAIN_STATE` instead of being recognised as
+   awaiting contractor correction → `WAITING_CORRECTED_INDICE`.
+3. **SUS routing (final 2 rows).** Per product owner: **SUS is conceptually
+   VAO-equivalent (accepted-with-observation)**; SUS does NOT require a new
+   cycle by itself. With `requires_new_cycle_flag=False`, SUS now routes to
+   `CLOSED_VAO`. If a SUS row is explicitly flagged
+   `requires_new_cycle_flag=True`, the `WAITING_CORRECTED_INDICE` path
+   takes precedence.
+
+**Final business rules captured:**
+- MOEX is not always called.
+- No-MOEX consultant-only closure is valid; the worst consultant response
+  determines `visa_global` (composed in `_called_consultant_final_status`
+  and `query_library._derive_visa_global`).
+- Secondary consultants are capped 10 days after primary closure
+  (`SECONDARY_WINDOW_DAYS=10` in `src/reporting/chain_timeline_attribution.py`
+  and `src/reporting/focus_ownership.py`; chain_onion deliberately does not
+  enforce this cap — see `obsidian_repo_mind/07_CHAIN_ONION_MENTAL_MODEL.md`).
+- REF / SAS REF / DEF + `requires_new_cycle_flag=True`, no blocker, not
+  stale beyond `ABANDONED_DAYS` → `WAITING_CORRECTED_INDICE`.
+- SUS + `requires_new_cycle_flag=False` → `CLOSED_VAO` (VAO-equivalent).
+
+**Files changed (allowed scope only):**
+- `src/chain_onion/chain_classifier.py` — `is_blocking` guard on
+  `_empty_placeholder_mask`; new `latest_requires_new_cycle` per-family
+  fact; priority-6 latest-rejected rule; SUS-as-VAO-equivalent rule under
+  priority 1 guarded by `not latest_requires_new_cycle`.
+- `src/chain_onion/chain_builder.py` — `is_blocking` guard on
+  `_uncalled_placeholder_mask`.
+- `tests/test_chain_classifier_unknown_fix.py` — focused test file with
+  12 tests (placeholder-mask guards, blocking actor_type integrity,
+  latest-rejected rule, SUS-VAO equivalence, SUS-with-cycle override).
+
+No new state literal was introduced. No UI, app.py, flat_ged, report_memory,
+run_memory, pipeline, input, runs, db, or manual output edits.
+
+**Validation:**
+- `python run_chain_onion.py` → `Chain + Onion pipeline complete — PASS`.
+- Validation harness → `WARN` (1 pre-existing escalation warning, 0 failures).
+- `python -m pytest tests/test_chain_classifier_unknown_fix.py tests/test_chain_classifier.py tests/test_chain_builder.py` → 85 passed, 2 skipped.
+
+| Metric | Before | After |
+|---|---|---|
+| `UNKNOWN_CHAIN_STATE` rows | 185 | **0** |
+| `WAITING_CORRECTED_INDICE` rows | 160 | 294 |
+| CHAIN_EVENTS `actor_type=UNKNOWN` | 5667 | 1451 |
+| CHAIN_EVENTS UNKNOWN ∧ blocking | 0 | 0 |
+| family 28210 | UNKNOWN_CHAIN_STATE | CLOSED_VAO (SUS VAO-equivalent) |
+| family 128125 | UNKNOWN_CHAIN_STATE | CLOSED_VAO (SUS VAO-equivalent) |
+
+Backups: `backup/debug_unknown_chain_<ts>/` (Patch A/B/C) and
+`backup/debug_unknown_chain_sus_<ts>/` (SUS tail).
+
+**Watchpoints:**
+- Unmasking blocking actors materially shifted `CLOSED_VAO`/`CLOSED_VSO`
+  totals (the previous "closed" labels were partly artefacts of the
+  placeholder bug). Downstream consumers reading `current_state` will see
+  more `OPEN_WAITING_*` chains. Intended correction, not a regression.
+- SUS chains classed `CLOSED_VAO` are bucketed `ARCHIVED_HISTORICAL`,
+  consistent with terminal closure semantics.
+
+---
+
 ## Phase 9A — Baseline Lifecycle Diagnostic — CLOSED 2026-05-06
 
 UI-driven lifecycle test (Cycle A no-reports → Cycle B additive → Cycle C clean-with-reports). Verdict: **`PASS_OPERATIONAL_EQUIVALENCE`**. `COUNTER_ATTACK_ITEMS.csv` is byte-identical across all three cycles (`sha256[:16] = 03ca6f5a35be5d11`). Chain identity layer (REGISTER, VERSIONS, EVENTS, METRICS) also byte-identical. Only the scoring/narrative layer (ONION_LAYERS, ONION_SCORES, CHAIN_NARRATIVES) varies between cycles. **Reports do not affect Counter-Attack bucket assignment, ownership, or action priorities.**

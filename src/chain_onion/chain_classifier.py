@@ -152,7 +152,9 @@ def _empty_placeholder_mask(df: pd.DataFrame) -> pd.Series:
 
     The prefix alone is not enough: ``0-SAS`` is a real SAS track, and any
     ``0-`` row with a response/status must remain a real event. Only empty
-    placeholder rows are neutralized.
+    placeholder rows are neutralized. Genuinely blocking rows are NEVER
+    masked, even if they look like a 0-* placeholder, because their delay
+    contribution is real and must reach the classifier.
     """
     if df is None or df.empty:
         return pd.Series(dtype=bool)
@@ -172,12 +174,16 @@ def _empty_placeholder_mask(df: pd.DataFrame) -> pd.Series:
         df.get("response_date", pd.Series(pd.NaT, index=df.index)),
         errors="coerce",
     )
+    is_blocking_safe = _normalize_bool_series(
+        df.get("is_blocking", pd.Series(False, index=df.index))
+    )
     return (
         step.isin({"CONSULTANT", "MOEX"})
         & actor_raw.str.startswith("0-")
         & actor_raw.ne("0-SAS")
         & status.eq("")
         & response_date.isna()
+        & ~is_blocking_safe
     )
 
 
@@ -401,6 +407,7 @@ def _compute_family_version_facts(
         axis=1,
     )
     cv["_non_latest_requires_cycle"] = (~cv["_is_latest"]) & cv["requires_new_cycle_flag"]
+    cv["_latest_requires_cycle"] = cv["_is_latest"] & cv["requires_new_cycle_flag"]
 
     agg = (
         cv.groupby("family_key", sort=False)
@@ -408,6 +415,7 @@ def _compute_family_version_facts(
             count_rejected_versions=("_is_rejected", "sum"),
             any_version_approved=("_is_approved", "any"),
             non_latest_requires_cycle=("_non_latest_requires_cycle", "any"),
+            latest_requires_new_cycle=("_latest_requires_cycle", "any"),
         )
         .reset_index()
     )
@@ -419,11 +427,17 @@ def _compute_family_version_facts(
 # Per-family classification
 # ─────────────────────────────────────────────────────────────────────────────
 
+_LATEST_REJECTED_AWAITING_CORRECTION_STATUSES: frozenset = frozenset({
+    "REF", "SAS REF", "SUS", "DEF",
+})
+
+
 def _classify_one_family(
     fk: str,
     total_versions: int,
     latest_indice: str,
     latest_vk_final: Optional[str],
+    latest_requires_new_cycle: bool,
     current_blocking_actor_count: int,
     count_rejected_versions: int,
     any_version_approved: bool,
@@ -444,6 +458,16 @@ def _classify_one_family(
     # ── PRIORITY 1: CLOSED_VAO ────────────────────────────────────────────
     if not has_blocking and latest_vk_final in _VAO_FAMILY_STATUSES:
         return ("CLOSED_VAO", f"latest status {latest_vk_final}", 1)
+
+    # SUS is conceptually VAO-equivalent (accepted-with-observation) UNLESS
+    # the version is explicitly flagged as requiring a new cycle, in which
+    # case the WAITING_CORRECTED_INDICE rule below takes over.
+    if (
+        not has_blocking
+        and latest_vk_final == "SUS"
+        and not latest_requires_new_cycle
+    ):
+        return ("CLOSED_VAO", "latest status SUS (VAO-equivalent)", 1)
 
     # ── PRIORITY 2: CLOSED_VSO ────────────────────────────────────────────
     if not has_blocking and latest_vk_final == "VSO":
@@ -533,6 +557,25 @@ def _classify_one_family(
         # ── PRIORITY 10: OPEN_WAITING_MIXED_CONSULTANTS ───────────────────
         # Mixed = (primary+secondary) or (MOEX+consultants) or any other combo
         return ("OPEN_WAITING_MIXED_CONSULTANTS", "mixed blocking actors", 10)
+
+    # ── PRIORITY 6 (latest-rejected variant): WAITING_CORRECTED_INDICE ────
+    # Latest version rejected / cycle-required, no blocker, no corrected
+    # version submitted yet, not stale enough for VOID/ABANDONED. This is
+    # the contractor-correction wait state — reuse existing literal.
+    if (
+        not has_blocking
+        and latest_requires_new_cycle
+        and (latest_vk_final or "").upper() in _LATEST_REJECTED_AWAITING_CORRECTION_STATUSES
+    ):
+        not_stale = True
+        if data_date is not None and last_real_activity_date is not None:
+            not_stale = (data_date - last_real_activity_date).days < ABANDONED_DAYS
+        if not_stale:
+            return (
+                "WAITING_CORRECTED_INDICE",
+                f"latest version rejected ({latest_vk_final}); awaiting contractor correction",
+                6,
+            )
 
     # ── PRIORITY 11: ABANDONED_CHAIN ──────────────────────────────────────
     # No blocking but also no real activity for a long time
@@ -712,6 +755,7 @@ def classify_chains(
     reg["count_rejected_versions"] = reg["count_rejected_versions"].fillna(0).astype(int)
     reg["any_version_approved"] = reg["any_version_approved"].fillna(False).astype(bool)
     reg["non_latest_requires_cycle"] = reg["non_latest_requires_cycle"].fillna(False).astype(bool)
+    reg["latest_requires_new_cycle"] = reg["latest_requires_new_cycle"].fillna(False).astype(bool)
 
     # ── Step 8: normalize bool columns from chain_register ────────────────
     for col in ("waiting_primary_flag", "waiting_secondary_flag"):
@@ -770,6 +814,7 @@ def classify_chains(
             count_rejected_versions=int(row.get("count_rejected_versions", 0)),
             any_version_approved=bool(row.get("any_version_approved", False)),
             non_latest_requires_cycle=bool(row.get("non_latest_requires_cycle", False)),
+            latest_requires_new_cycle=bool(row.get("latest_requires_new_cycle", False)),
             blocker_profile=blocker_profile_by_family.get(fk, {}),
             last_real_activity_date=last_activity,
             latest_submission_date=latest_submission,
@@ -818,7 +863,7 @@ def classify_chains(
     reg["classifier_priority_hit"]     = priorities
 
     # Drop intermediate columns added by merge (not part of contract)
-    for col in ("count_rejected_versions", "any_version_approved", "non_latest_requires_cycle"):
+    for col in ("count_rejected_versions", "any_version_approved", "non_latest_requires_cycle", "latest_requires_new_cycle"):
         if col in reg.columns:
             reg = reg.drop(columns=[col])
 
