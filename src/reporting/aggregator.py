@@ -6,8 +6,10 @@ When a FocusResult is supplied, every iteration is filtered to focused_doc_ids o
 import logging
 import math
 from collections import defaultdict
+from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 
 from .data_loader import RunContext
@@ -524,3 +526,135 @@ def compute_contractor_summary(
                 entry[k] = None
 
     return result
+
+
+# ── Operational Dashboard (Phase 2) ──────────────────────────────────────────
+
+_OPERATIONAL_STALE_THRESHOLD = 90
+
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+def _build_operational_keys():
+    """Return the set of family_key strings for LIVE_OPERATIONAL ∪ LEGACY_BACKLOG.
+
+    Reuses chain_onion.query_hooks (same join pattern as app.py:_build_live_operational_numeros).
+    """
+    from chain_onion.query_hooks import QueryContext, get_live_operational, get_legacy_backlog
+
+    co_dir = _BASE_DIR / "output" / "chain_onion"
+    qctx = QueryContext(output_dir=co_dir)
+    live_df = get_live_operational(qctx)
+    legacy_df = get_legacy_backlog(qctx)
+    keys = set(live_df["family_key"].dropna().astype(str))
+    keys |= set(legacy_df["family_key"].dropna().astype(str))
+    return keys
+
+
+def compute_operational_dashboard(ctx: RunContext) -> dict:
+    """Compute the 19-field operational dashboard payload.
+
+    Source: ctx.dernier_df joined to chain_onion portfolio_bucket via family_key.
+    See docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md §3 for the locked baseline.
+    """
+    dernier = ctx.dernier_df
+    operational_keys = _build_operational_keys()
+    bucket_mask = dernier["numero_normalized"].astype(str).isin(operational_keys)
+    op_broad = dernier[bucket_mask]
+
+    # Resolved documents (terminal visa) are excluded from the operational universe.
+    # Same terminal set as focus_filter.py:29 TERMINAL_STATUSES.
+    _RESOLVED_VISAS = {"VSO", "VAO", "REF", "SAS REF", "HM"}
+    open_mask = ~op_broad["_visa_global"].isin(_RESOLVED_VISAS)
+    op = op_broad[open_mask]
+
+    days = op["_days_since_last_activity"]
+    fresh_mask = days <= _OPERATIONAL_STALE_THRESHOLD
+    stale_mask = days > _OPERATIONAL_STALE_THRESHOLD
+
+    tier = op["_focus_owner_tier"]
+    moex_mask = tier == "MOEX"
+    primary_mask = tier == "PRIMARY"
+    secondary_mask = tier == "SECONDARY"
+
+    operational_total = int(len(op))
+    fresh_total = int(fresh_mask.sum())
+    stale_total = int(stale_mask.sum())
+    moex_total = int(moex_mask.sum())
+    moex_fresh = int((moex_mask & fresh_mask).sum())
+    moex_stale = int((moex_mask & stale_mask).sum())
+    primary_total = int(primary_mask.sum())
+    secondary_total = int(secondary_mask.sum())
+    consultants_total = primary_total + secondary_total
+
+    prio = op["_focus_priority"]
+    priority_p1 = int((prio == 1).sum())
+    priority_p2 = int((prio == 2).sum())
+    priority_p3 = int((prio == 3).sum())
+    priority_p4 = int((prio == 4).sum())
+    priority_p5 = int((prio == 5).sum())
+
+    # enterprise_ref_sas_candidates counts REF/SAS REF in the BROAD bucket mask
+    # (these are resolved docs that still need enterprise follow-up).
+    enterprise_ref_sas_candidates = int(
+        op_broad["_visa_global"].isin(["REF", "SAS REF"]).sum()
+    )
+
+    # enterprise_action_rows: output/intermediate/COUNTER_ATTACK_ITEMS.csv
+    # (written by counter_attack_builder.build_counter_attack_items, line 629)
+    ca_path = _BASE_DIR / "output" / "intermediate" / "COUNTER_ATTACK_ITEMS.csv"
+    ca_warning = ""
+    enterprise_action_rows = None
+    if ca_path.exists():
+        try:
+            ca_df = pd.read_csv(str(ca_path), dtype=str)
+            enterprise_action_rows = int(
+                (ca_df["action_bucket"] == "ENTREPRISE_A_RELANCER").sum()
+            )
+        except Exception as exc:
+            ca_warning = f"; warning: COUNTER_ATTACK_ITEMS.csv read error: {exc}"
+            enterprise_action_rows = None
+    else:
+        ca_warning = "; warning: COUNTER_ATTACK_ITEMS.csv missing"
+
+    stale_days = op.loc[stale_mask, "_days_since_last_activity"]
+    if stale_days.empty:
+        old_debt_age_days_min = None
+        old_debt_age_days_median = None
+        old_debt_age_days_max = None
+    else:
+        old_debt_age_days_min = int(stale_days.min())
+        old_debt_age_days_median = int(np.median(stale_days.dropna().values))
+        old_debt_age_days_max = int(stale_days.max())
+
+    universe_definition = (
+        "operational = dernier_df ⨝ portfolio_bucket ∈ {LIVE_OPERATIONAL, LEGACY_BACKLOG} "
+        "∧ _visa_global ∉ {VSO,VAO,REF,SAS REF,HM}; "
+        f"stale_threshold={_OPERATIONAL_STALE_THRESHOLD}; "
+        f"counter_attack_path={ca_path}"
+        f"{ca_warning}"
+    )
+
+    return {
+        "operational_total": operational_total,
+        "fresh_total": fresh_total,
+        "stale_total": stale_total,
+        "moex_total": moex_total,
+        "moex_fresh": moex_fresh,
+        "moex_stale": moex_stale,
+        "primary_total": primary_total,
+        "secondary_total": secondary_total,
+        "consultants_total": consultants_total,
+        "priority_p1": priority_p1,
+        "priority_p2": priority_p2,
+        "priority_p3": priority_p3,
+        "priority_p4": priority_p4,
+        "priority_p5": priority_p5,
+        "enterprise_ref_sas_candidates": enterprise_ref_sas_candidates,
+        "enterprise_action_rows": enterprise_action_rows,
+        "old_debt_age_days_min": old_debt_age_days_min,
+        "old_debt_age_days_median": old_debt_age_days_median,
+        "old_debt_age_days_max": old_debt_age_days_max,
+        "stale_threshold_days": _OPERATIONAL_STALE_THRESHOLD,
+        "universe_definition": universe_definition,
+    }
