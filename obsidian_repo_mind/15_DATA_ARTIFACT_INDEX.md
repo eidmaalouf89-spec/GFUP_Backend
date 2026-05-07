@@ -29,6 +29,7 @@
 | `output/intermediate/FLAT_GED_cache_docs.pkl` | `data_loader._save_flat_normalized_cache` | `data_loader._load_flat_normalized_cache` | Perf cache only | Stale: all UI metrics from wrong data (delete to force rebuild) |
 | `output/intermediate/FLAT_GED_cache_resp.pkl` | same | same | Perf cache only | same |
 | `output/intermediate/FLAT_GED_cache_meta.json` | same | same | Cache version + audit fields | Schema version mismatch forces rebuild (correct behavior) |
+| `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv` | `src/flat_ged/source_exclusions.py` | BENTIN/LGD source-exclusion canary; manual audit | Source-level document exception ledger. Current code: `BENTIN_SOURCE_OLD_NOT_LISTED` | Missing ledger hides document-level source exclusions |
 | `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json` | `src/reporting/chain_timeline_attribution.py` | DCC Chronologie section; `app.py::get_chain_timeline` | Per-chain timing | DCC Chronologie shows wrong/missing timing |
 | `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.csv` | same | (tabular form) | Same | Same |
 | `output/intermediate/COUNTER_ATTACK_ITEMS.csv` | `src/reporting/counter_attack_builder.py` (via `scripts/build_counter_attack.py`) | `counter_attack_query.py`; Action MOEX UI | Action MOEX item list | Action MOEX shows outdated priorities |

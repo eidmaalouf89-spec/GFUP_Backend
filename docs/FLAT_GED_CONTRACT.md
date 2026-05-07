@@ -393,4 +393,18 @@ Downstream code must not expect:
 
 ---
 
+## Source Qualification Addendum (2026-05-07)
+
+Batch Flat GED builds also produce
+`output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`. This ledger records raw
+GED document-level exceptions before rows enter Flat GED grouping.
+
+Current source-level rule: BEN/BENTIN rows are included only when they match
+`context/source_exclusions/remaining bentin.csv` by `NUMERO+INDICE` or parsed
+`DOCUMENT` tail+`INDICE`, or when raw GED `Créé le >= 2026-03-10`. Other
+BEN/BENTIN rows are excluded with `BENTIN_SOURCE_OLD_NOT_LISTED`.
+
+The old LGD pre-2026 year filter is retired. LGD rows must not be excluded
+merely because they are pre-2026.
+
 *End of FLAT_GED_CONTRACT.md v1.0*

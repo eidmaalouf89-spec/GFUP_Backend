@@ -108,7 +108,7 @@ The UI always reads the **latest completed** run. There is no UI mechanism to se
 `runs/run_0000/` is the immutable baseline created from the initial clean run.
 - `scripts/nuke_and_rebuild_run0.py` and `scripts/reset_to_clean_run0.py` are the only scripts allowed to mutate it
 - Manual editing breaks sha256 verification on the next run
-- Run 0 baseline metrics (from `docs/VALIDATION_BASELINE.md`): `docs_total=6491`, `responses_total=31586`, `final_gf_rows=4728`, `artifacts_registered_count=30`, `consultant_report_memory_rows_loaded=1245`
+- Run 0 baseline metrics (from `docs/VALIDATION_BASELINE.md`, rebuilt 2026-05-07): `flat_open_doc_rows=4374`, `docs_df_rows=4360`, `responses_df_rows=24788`, `final_gf_rows=4349`, `artifacts_registered_count=33`, `consultant_report_memory_rows_loaded=1045`, `BENTIN_SOURCE_OLD_NOT_LISTED=701`
 
 ---
 

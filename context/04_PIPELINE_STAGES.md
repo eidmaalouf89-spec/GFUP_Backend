@@ -98,8 +98,8 @@ each stage reads/writes attributes on it.
   `output/debug/exclusion_summary.xlsx`.
 - **Reads `src/config_loader.py`** for:
   - `EXCLUDED_SHEETS = {"LOT I01-VDSTP", "LOT I02-FKI"}`
-  - `SHEET_YEAR_FILTERS = {"LOT 03-GOE-LGD": 2026,
-    "LOT 31 à 34-IN-BX-CFO-BENTIN": 2026}`
+  - `SHEET_YEAR_FILTERS = {}`. The old LGD/BENTIN pre-2026 filters are retired;
+    BENTIN source qualification is owned by `src/flat_ged/source_exclusions.py`.
   - `SHEET_EMETTEUR_FILTER` (35+ sheets, contractor code ↔ sheet rules).
 
 ### 6. `stage_report_memory`

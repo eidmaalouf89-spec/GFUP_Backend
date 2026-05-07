@@ -1,5 +1,12 @@
 # TRIAGE — Phase 0 Step 0.5
 
+> 2026-05-07 supersession: BEN/BENTIN document-level source qualification now
+> happens in `src/flat_ged/source_exclusions.py` using
+> `context/source_exclusions/remaining bentin.csv` and the 2026-03-10 cutoff.
+> The old Phase 0 BEN totals and BENTIN_OLD legacy-filter divergences below are
+> historical audit evidence, not the current Run 0 baseline. Current canary:
+> raw BEN = 912, included = 211, source-excluded = 701, unresolved = 0.
+
 > One row per real divergence found by Step 0.4 (`docs/audit/DIVERGENCE_REPORT.md`)
 > plus the canary findings from Step 0.2 (`docs/audit/CANARY_BEN.md`) plus the
 > §10 P0/P1 items in `docs/implementation/PHASE_0_BACKEND_DEBUGGING.md`.

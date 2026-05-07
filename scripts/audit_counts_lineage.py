@@ -81,13 +81,13 @@ EXPECTED_BASELINES = {
     "raw_submission_rows":          6901,
     "raw_unique_numero":            2819,
     "raw_unique_numero_indice":     4848,
-    "ged_raw_flat_rows":            27261,
-    "ged_operations_rows":          32099,
-    "open_doc_rows":                4848,
-    "sas_rows":                     4848,
-    "consultant_rows":              18911,
-    "moex_rows":                    3492,
-    "stage_read_flat_docs_df_rows": 4834,
+    "ged_raw_flat_rows":            24812,
+    "ged_operations_rows":          29176,
+    "open_doc_rows":                4374,
+    "sas_rows":                     4374,
+    "consultant_rows":              17244,
+    "moex_rows":                    3184,
+    "stage_read_flat_docs_df_rows": 4360,
 }
 
 # ── Expected divergence rules (§5.4 — DATA, not silent ifs) ──────────────────
@@ -97,6 +97,30 @@ EXPECTED_BASELINES = {
 # conditionals elsewhere in this file.
 EXPECTED_DIVERGENCES: list[dict] = [
     {
+        "name":                   "raw_to_flat_source_exclusion_bentin",
+        "categories":             ["active_version_count", "numero_indice_count"],
+        "from_layer":             "L0_RAW_GED",
+        "to_layer":               "L1_FLAT_GED_XLSX",
+        "is_difference_expected": True,
+        "explanation": (
+            "BENTIN_SOURCE_OLD_NOT_LISTED source exclusion runs before Flat GED "
+            "grouping. Current Run 0: raw unique NUMERO+INDICE=4848, "
+            "Flat GED OPEN_DOC=4374."
+        ),
+    },
+    {
+        "name":                   "raw_sas_ref_to_flat_projection_after_source_exclusion",
+        "categories":             ["status_SAS_REF"],
+        "from_layer":             "L0_RAW_GED",
+        "to_layer":               "L1_FLAT_GED_XLSX",
+        "is_difference_expected": True,
+        "explanation": (
+            "RAW SAS REF rows include source-excluded BENTIN rows and other "
+            "RAW->FLAT projection collapses. Current Run 0: L0 SAS REF=836, "
+            "L1 SAS REF=236."
+        ),
+    },
+    {
         "name":                   "raw_to_ged_raw_flat_different_concepts",
         "categories":             ["submission_instance_count", "workflow_step_count"],
         "from_layer":             "L0_RAW_GED",
@@ -104,7 +128,8 @@ EXPECTED_DIVERGENCES: list[dict] = [
         "is_difference_expected": True,
         "explanation": (
             "DIFFERENT CONCEPTS. GED_RAW_FLAT is one-row-per-(doc, approver, step), "
-            "not one-per-submission. L0=6155 raw rows vs L1 GED_RAW_FLAT=27261 step rows."
+            "not one-per-submission. L0=6901 raw rows vs L1 GED_RAW_FLAT=24812 step rows "
+            "after BENTIN_SOURCE_OLD_NOT_LISTED source exclusion."
         ),
     },
     {
@@ -114,15 +139,15 @@ EXPECTED_DIVERGENCES: list[dict] = [
         "to_layer":               "L1_FLAT_GED_XLSX",
         "is_difference_expected": True,
         "explanation": (
-            "EQUAL expected. L0 raw_unique_numero_indice=4848 should equal "
-            "L1 OPEN_DOC step_type count=4848."
+            "SOURCE FILTER expected. L0 raw_unique_numero_indice=4848 becomes "
+            "L1 OPEN_DOC step_type count=4374 after BENTIN_SOURCE_OLD_NOT_LISTED."
         ),
     },
     {
         "name":                   "open_doc_vs_docs_df_sas_filter",
         "categories":             [
             "active_version_count", "numero_indice_count", "open_doc_row_count",
-            "workflow_step_count", "sas_row_count",
+            "workflow_step_count", "sas_row_count", "status_SAS_REF",
         ],
         "from_layer":             "L1_FLAT_GED_XLSX",
         "to_layer":               "L2_STAGE_READ_FLAT",

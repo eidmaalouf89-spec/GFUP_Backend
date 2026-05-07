@@ -152,6 +152,36 @@ Other scripts under `scripts/` (read each before running — these mutate state)
 
 ---
 
+## F.1 BENTIN/LGD source-exclusion canary
+
+```bash
+python scripts/check_bentin_source_exclusion.py
+```
+
+Expected current dataset canaries:
+
+- raw BEN total = 912
+- BEN included = 211
+- `BENTIN_SOURCE_OLD_NOT_LISTED` = 701
+- BEN unresolved = 0
+- `context/source_exclusions/remaining bentin.csv` exists and is readable
+- `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv` exists after Flat GED
+  build and carries the source-ledger columns
+
+Future import canaries covered by the same script:
+
+- BEN 2026-03-11 not in registry => included
+- BEN 2026-03-09 not in registry => `BENTIN_SOURCE_OLD_NOT_LISTED`
+- BEN before cutoff but listed in registry => included
+- LGD before 2026 is not excluded by the retired LGD year filter
+
+This script is the surgical validation for the Raw GED -> Flat GED
+BENTIN/BEN positive-inclusion rule. It must not use
+`output/debug/BENTIN_FINAL_POLICY_PREVIEW.csv`; debug previews are validation
+evidence only.
+
+---
+
 ## G. Useful greps for inspection
 
 ```bash

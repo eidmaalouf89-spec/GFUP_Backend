@@ -143,11 +143,11 @@ New contractors/consultants on the project require explicit additions to these f
 
 **Symptom:** A document appears in `DISCREPANCY_REPORT.xlsx` as `REVIEW_REQUIRED` but the classification doesn't match expectations. Or a document lands in the wrong GF sheet.
 
-**Root cause:** `stage_route.py` applies `ExclusionConfig` from `src/config_loader.py`. `stage_discrepancy.py` Part H-1 handles BENTIN_LEGACY_EXCEPTION. If a new lot, emetteur, or year pattern isn't in the config, documents fall through to unexpected buckets.
+**Root cause:** `stage_route.py` applies `ExclusionConfig` from `src/config_loader.py`. Raw GED source qualification for BEN/BENTIN now happens earlier in `src/flat_ged/source_exclusions.py`; the source ledger is `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`. `stage_discrepancy.py` Part H-1 still contains BENTIN_LEGACY_EXCEPTION as a downstream compatibility path. If a new lot, emetteur, or source-exclusion pattern is wrong, documents fall through to unexpected buckets.
 
-**First diagnostic:** check `SHEET_EMETTEUR_FILTER` and `SHEET_YEAR_FILTERS` in `src/config_loader.py`. Check `BENTIN_TARGET_TYPES` in `stage_discrepancy.py`.
+**First diagnostic:** check `src/flat_ged/source_exclusions.py`, `context/source_exclusions/remaining bentin.csv`, and `RAW_GED_SOURCE_EXCLUSIONS.csv` for BENTIN/BEN. Check `SHEET_EMETTEUR_FILTER` in `src/config_loader.py`. `SHEET_YEAR_FILTERS` should be empty; LGD and BENTIN pre-2026 year filters are retired. Check `BENTIN_TARGET_TYPES` in `stage_discrepancy.py` only for residual downstream compatibility behavior.
 
-**Likely files:** `src/config_loader.py`, `src/pipeline/stages/stage_discrepancy.py`
+**Likely files:** `src/flat_ged/source_exclusions.py`, `context/source_exclusions/remaining bentin.csv`, `src/config_loader.py`, `src/pipeline/stages/stage_discrepancy.py`
 
 ---
 

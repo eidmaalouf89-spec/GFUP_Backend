@@ -9,6 +9,15 @@
 
 ## Documented open items (from `context/07_OPEN_ITEMS.md` and README)
 
+### Closed 2026-05-07 — BENTIN/LGD source exclusion ownership
+
+- LGD pre-2026 year filtering is retired; `SHEET_YEAR_FILTERS` should be empty.
+- BEN/BENTIN source qualification now runs in `src/flat_ged/source_exclusions.py`.
+- Runtime registry: `context/source_exclusions/remaining bentin.csv`.
+- Ledger: `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`.
+- Current canary: raw BEN total 912, included 211, source-excluded 701, unresolved 0.
+- Future canary: BEN after 2026-03-10 is included even if absent from registry; BEN before cutoff and absent from registry is excluded with `BENTIN_SOURCE_OLD_NOT_LISTED`; LGD before 2026 is not excluded by a retired year filter.
+
 ### D-003 — RAW → FLAT SAS REF projection gap (upstream, deferred)
 
 - **What:** L0 RAW GED has 836 SAS REF rows; L1 FLAT GED has 284. Phase 8B explained 99.3% (830/836 rows).

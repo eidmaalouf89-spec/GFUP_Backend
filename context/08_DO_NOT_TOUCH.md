@@ -111,7 +111,7 @@ See `context/06_EXCEPTIONS_AND_MAPPINGS.md` § I.3 before touching.
 
 ### `src/reporting/contractor_quality.py` — Phase 7 backend module
 
-Business logic includes the BENTIN_OLD legacy filter, the dormant-time extension on `_contractor_delay_for_chain`, and the strip-dormant patch on `_long_chains` share (Phase 0 D-004). Read-only; modify only via a new phase plan.
+Business logic still contains residual BENTIN legacy compatibility handling, plus the dormant-time extension on `_contractor_delay_for_chain` and the strip-dormant patch on `_long_chains` share (Phase 0 D-004). The authoritative BENTIN source-exclusion owner is now `src/flat_ged/source_exclusions.py`; do not rediscover BENTIN OLD in reporting without a scoped plan.
 
 ### `src/reporting/chain_timeline_attribution.py` (DCC chain-time layer)
 
@@ -201,7 +201,9 @@ These are NOT off-limits, but every value below has a direct user-visible
 or contractual meaning. Changing them changes operational behavior.
 
 - `src/config_loader.py:EXCLUDED_SHEETS` — sheets removed from clean GF.
-- `src/config_loader.py:SHEET_YEAR_FILTERS` — pre-2026 BENTIN/LGD exclusion.
+- `src/config_loader.py:SHEET_YEAR_FILTERS` — must stay empty unless a new
+  explicit source-exclusion rule is approved. The old pre-2026 BENTIN/LGD
+  route/year exclusions are retired.
 - `src/config_loader.py:SHEET_EMETTEUR_FILTER` — routing emetteur whitelist
   per sheet.
 - `src/flat_ged/input/source_main/consultant_mapping.py` —

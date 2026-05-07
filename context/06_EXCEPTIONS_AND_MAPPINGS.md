@@ -259,6 +259,16 @@ them at clean-GF time.
 
 ## D. Sheet exclusion + year filters (`src/config_loader.py`)
 
+**Current contract, 2026-05-07:** `SHEET_YEAR_FILTERS = {}`. The old
+`PRE_2026:LOT 03-GOE-LGD` and
+`PRE_2026:LOT 31 à 34-IN-BX-CFO-BENTIN` rules are retired. LGD must not be
+excluded merely because it is pre-2026. BENTIN/BEN old handling moved to
+Raw GED -> Flat GED source qualification in
+`src/flat_ged/source_exclusions.py`.
+
+The historical notes below describe the retired mechanism and should not be
+treated as active production behavior.
+
 ```python
 EXCLUDED_SHEETS = {
     "LOT I01-VDSTP",   # infrastructure-only
@@ -285,6 +295,62 @@ the project rules explicitly call out:
 2. **BENTIN OLD** — pre-2026 BEN docs on
    `LOT 31 à 34-IN-BX-CFO-BENTIN`. The legacy `OLD 31 à 34-IN-BX-CFO-BENTIN`
    sheet is fully excluded via routing (OLD-* sheets never get docs).
+
+---
+
+## D.0 — Document-level source exceptions (`src/flat_ged/source_exclusions.py`)
+
+Document-level exception = a raw GED document/row intentionally excluded from
+the operational Raw GED -> Flat GED population. This is not status vocabulary,
+SOCOTEC mapping, UI wording, consultant display names, or visa-label
+normalization unless it directly causes a raw document to disappear.
+
+### BENTIN/BEN positive inclusion rule
+
+Production source of truth:
+
+- `context/source_exclusions/remaining bentin.csv`
+- current raw GED fields `EMETTEUR`, `NUMERO`, `INDICE`, `Créé le`
+- cutoff date `2026-03-10` (10 March 2026)
+
+For every GED import, BEN/BENTIN rows are included if:
+
+1. raw `NUMERO + INDICE` matches registry `N° Doc + IND`;
+2. or raw `NUMERO + INDICE` matches parsed registry `DOCUMENT` tail + `IND`;
+3. or raw GED `Créé le >= 2026-03-10`.
+
+Otherwise the row is source-excluded with
+`BENTIN_SOURCE_OLD_NOT_LISTED`.
+
+Runtime must recompute this from the current GED import. Debug files such as
+`output/debug/BENTIN_FINAL_POLICY_PREVIEW.csv` are validation evidence only,
+not production source-of-truth. Do not hardcode `raw_row_id`.
+
+Ledger:
+
+- `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`
+- expected current count: `BENTIN_SOURCE_OLD_NOT_LISTED = 701`
+- required fields: `exclusion_code`, `exclusion_reason`, `raw_row_id`,
+  `source_sheet`, `NUMERO`, `INDICE`, `Créé le`, `EMETTEUR`, `LOT`,
+  `Libellé du document`, `matched_policy`, `matched_reference_id`,
+  `source_module`.
+
+Current canaries:
+
+- raw BEN total = 912
+- BEN included = 211
+- BEN source-excluded = 701
+- BEN unresolved = 0
+- no active `PRE_2026:LOT 03-GOE-LGD`
+- no active `PRE_2026:LOT 31 à 34-IN-BX-CFO-BENTIN`
+
+Future GED import canaries:
+
+- BEN row dated 2026-03-11 and not in registry => included.
+- BEN row dated 2026-03-09 and not in registry => excluded with
+  `BENTIN_SOURCE_OLD_NOT_LISTED`.
+- BEN row dated before cutoff but listed in registry => included.
+- LGD row dated before 2026 => not excluded by retired LGD pre-2026 logic.
 
 ---
 

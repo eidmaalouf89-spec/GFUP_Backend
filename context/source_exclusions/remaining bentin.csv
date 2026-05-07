@@ -1,0 +1,1437 @@
+﻿S U I V I    D E S    V I S A S     - LOT 31 à 34  -   IN  - BX -  CFO - BENTIN;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;VSO;;Visé sans observations;;;;;REF;Visé avec observation bloquante;;;;;;;;;;;;;;;;;;;;;;;
+;;VAO;;Visé avec observations;;;;;;Retard sur visa;;;;Priorité;;;;;;;;;;;;;;;;;;;
+;;Annulé;;Voir visa indice supérieur;;;;;HM;Hors mission;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+DOCUMENT;TITRE;Date diffusion;LOT;TYPE DOC;N° Doc;IND;NIV;Type;ANCIEN;N°BDX;Date réception;non reçu papier;"DATE CONTRACTUELLE VISA SYNTHESE
+( 14 jours )";"VISA
+GLOBAL";APPROBATEURS;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;MOEX GEMO;;;ARCHI MOX;;;BET EGIS;;;ACOUSTICIEN AVLS;;;AMO HQE LE SOMMER;;;SOCOTEC;;;OBSERVATIONS
+;;;;;;;;;;;;;;;DATE;N°;STATUT;DATE;N°;STATUT;DATE;N°;STATUT;DATE;N°;STATUT;DATE;N°;STATUT;DATE;N;STATUT;
+P17_T2_IN_EXE_BEN_CFO_I031_LST_IZ_TX_045000;Liste prvisionnelle des Documents dExecution CFO INFRA;24/2/2026;I031;LST;45 000;A;TX;pdf;;;24/02/26;X;11/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_SYQ_IZ_TX_045100;SYNOPTIQUE HT-BT (INFRA + VdP);6/3/2026;I031;SYQ;45 100;A;TX;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_SYQ_IZ_TX_045101;SYNOPTIQUE CFO BT (INFRA + VdP);4/3/2026;I031;SYQ;45 101;A;TX;pdf;;;04/03/26;X;19/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_LTE_IZ_S1_045120;MAQUETTAGE PT PK 2000KVA YC TGS;4/3/2026;I031;LST;45 120;A;S1;pdf;;;04/03/26;X;19/03/26;VSO;;;;17/03/26;;VSO.;30/3/2026;;REF;;;;;;;;;;"MOX : VSO
+sous réserve visa Egis et BCT
+EGIS : REF
+-         Le type de cellules HT (encadré à droite) du Poste de transformation Infra n’est pas conforme à celui de la FIP (SF6 ici contre AirSet dans la FIP),
+-         La distance devant le TGBT VDP n’est pas respectée !
+-         La distance devant le TGS peut être optimisée, ainsi on gagnerait de la place dans le poste transfo,
+-         Après confirmation des dimensions du TGS, il peut être tourné à 90°, le local TGS peut ainsi être réduit pour laisser plus de place au local transfo,
+-         Les luminaires doivent être positionnés de façon à éclairer les équipement principaux (devant les TGBT, autour du transfo, devant les TD, etc.),
+-         Préciser à quoi correspond le TD appelé « VDP Hors Lot SNC »,
+-         Rajouter BAPI dans le TGS,
+-         Présenter le cheminement pour l’évacuation du transfo, y compris par la porte en largeur et en hauteur. Le cas échéant, exprimer les besoins pour les dimensions de la porte (le transfo peut être partiellement démonter avant l’évacuation),
+-         Fournir l’accord du bureau de contrôle pour la protection du transfo de 2000kVA par un inter-fusible,
+-         Pour valider la quantité et les dimensions des CDC, les notes de remplissage des CDC, selon les critères du marché, doivent nous être fournies. Notamment, il semble manquer les CDC IRVE,
+-         Voir avec le MOA et la MOEX si une séparation les CDC production commune et VDP doit être prévue
+-         Sous réserve de validation des NDC d’éclairement,
+-         Sous réserve de validation des fiches produits correspondants,
+-         Sous réserve de validation d’Enedis et du bureau de contrôle.
+-         Sous réserve de confirmation des dimensions des TGBT/ TGS/ C 13-100 après fabrication,
+-         Attention, la sélectivité avec la protection du poste de livraison n’est pas assurée"
+P17_T2_IN_EXE_BEN_CFO_I031_LTE_IZ_R0_045121;MAQUETTAGE POSTE DE LIVRAISON ENEDIS;4/3/2026;I034;LTE;45 121;A;TX;pdf;;;04/03/26;X;19/03/26;VAO;;;;30/03/26;;VAO;30/3/2026;;VAO;;;;;;;;;;"MOX : VAO
+préciser les besoins en ventilation + la necessité de trou forain
+obtenir l'avis d'Egis + BCT
+EGIS : VAO
+-         Prendre en compte les remarques d’Enedis et faire valider le maquettage par Enedis (par ex., prévoir l’ouverture de la porte d’entrée à 170° ; coter les distances entre et devant les équipements,
+-         Plan de maquettage du Poste transfo Infra ne correspond pas au dernier plan fourni, le mettre à jour (ou les rendre cohérents). En plus, la distance devant les TGBT n’est pas respectée,
+-         Poste transfo Bureaux : la distance devant le TGBT n’est pas respectée,
+-         Fournir l’accord du bureau de contrôle pour la protection du transfo de 2000kVA par un inter-fusible,
+-         L’éclairage doit permettre de bien voir les façades des cellules et des autres équipements,
+-         Quid la réglementation UE 2024/ 573 pour les cellules RM6 ?
+-         Sous réserve de validation des fiches produits correspondants,
+-         Sous réserve de confirmation des dimensions des TGBT/ TGS/ C 13-100 après fabrication,
+-         Sous réserve de validation des NDC d’éclairement,
+-         Attention, la sélectivité entre la protection du poste de livraison et les protection transfo n’est pas assurée"
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_TX_045200;BILAN DE PUISSANCES (INFRA + VdP);6/3/2026;I031;NDC;45 200;A;TX;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_TX_045210;NDC BT;4/3/2026;I031;NDC;45 210;A;TX;pdf;;;04/03/26;X;19/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_S1_045220;NDC E S1;6/3/2026;I031;NDC;45 220;A;S1;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_S2_045221;NDC E S2;6/3/2026;I031;NDC;45 221;A;S2;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_S3_045222;NDC E S3;6/3/2026;I031;NDC;45 222;A;S3;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_S4_045223;NDC E S4;6/3/2026;I031;NDC;45 223;A;S4;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_NDC_IZ_S5_045224;NDC E S5;6/3/2026;I031;NDC;45 224;A;S5;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_S1_046300;CENTRALE VIDEOPHONIE COMM;25/3/2026;I034;PLN;45 300;A;S1;pdf;;;25/03/26;X;09/04/26;;27/03/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Incohérence entre l'indice de la GED et celui de la page de garde"
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_TX_046301;POSTE D'INTERPHONIE COMME;25/3/2026;I034;PLN;45 301;A;S1;pdf;;;25/03/26;X;09/04/26;VSO;;;;08/04/26;;VSO;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_TX_046302;POSTE VIDEOPHONE COMMEND;25/3/2026;I034;PLN;45 302;A;S1;pdf;;;25/03/26;X;09/04/26;;27/03/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Incohérence entre l'indice de la GED et celui de la page de garde"
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_S1_046303;POSTE RECEPTION COMMEND;25/3/2026;I034;PLN;45 303;A;S1;pdf;;;25/03/26;X;09/04/26;;27/03/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Incohérence entre l'indice de la GED et celui de la page de garde"
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_S1_046310;CENTRALE CA;25/3/2026;I034;PLN;45 310;A;S1;pdf;;;25/03/26;X;09/04/26;;;;;08/04/26;;HM;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_TX_046311;LECTEUR DE BADGE;25/3/2026;I034;PLN;45 311;A;S1;pdf;;;25/03/26;X;09/04/26;VSO;;;;08/04/26;;VSO;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_S1_046312;ENROLEUR;25/3/2026;I034;PLN;45 312;A;S1;pdf;;;25/03/26;X;09/04/26;VAO;;;;08/04/26;;VAO;;;;;;;;;;;;;"MOX : VAO
+liaison filaire à encastrer"
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_TX_046313;BP DE SORTIE;25/3/2026;I034;PLN;45 313;A;S1;pdf;;;25/03/26;X;09/04/26;VAO;;;;08/04/26;;VAO;;;;;;;;;;;;;"MOX : VAO
+localisation à préciser
+sous réserve avis preneur"
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_TX_046314;BBG;25/3/2026;I034;PLN;45 314;A;S1;pdf;;;25/03/26;X;09/04/26;VSO;;;;08/04/26;;VSO;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFA_I034_MAT_IZ_S1_046340;POSTE DE SUPERVISION;25/3/2026;I034;PLN;45 340;A;S1;pdf;;;25/03/26;X;09/04/26;;;;;07/04/26;;HM;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_PLN_IZ_S1_045401;PLAN CDC CFO-CFA _ SS1;4/3/2026;I034;PLN;45 401;A;S1;pdf;;;04/03/26;X;19/03/26;REF;;;;30/03/26;;VAO.;31/3/2026;;REF;;;;;;;;;;"MOX : VAO
+VISA MOX 
+- Attention hauteurs règlementaires 2.20 m!
+- Réduire les coudes inutiles
+- Sous réserve de synthèse et de prise en compte des observations sur les indices précédents 
+EGIS : REF
+-         Faire apparaitre dans la légende tous les CDC, par ex, il manque les CDC opérateurs, HT, Bureaux, etc.,
+-         Indiquer les passages des CDC dans les gaines coupe-feu de façon plus claire, notamment pour le CDC HT est-ce que le CF est prévu sur toute la longueur ?
+-         Il faut séparer dans la légende et sur le plan les CDC de différents types, par exemple, dalle marine, treillis soudé, MKSM, etc.
+-         Faire apparaitre les CDC capotés, soit via une couleur différente, soit via un hachurage supplémentaire ou autre solution. PM : tous les CDC du PK doivent être capotés.
+-         Les CDC opérateur montent au RDC. Indiquer d’où ils viennent,
+-         Utiliser les mêmes couleurs pour les mêmes CDC aux différents niveaux, par ex, les couleurs de CDC OPE ne sont pas les mêmes entre le SS1 et les RDC (plan du dossier bureaux) ; pareil pour les CDC bureaux,
+-         Manque un CDC dans le local vélos au centre du plan (côté exploitation),
+-         Faire apparaitre le nombre de CDC, un CDC de 300mm, sortant du TGBT bureaux est sous-dimensionné,
+-         Les CDC qui partent du TGBT IRVE ne sont pas visibles (local TGBT), il faut qu’ils soient prévus,
+-         Indiquer les verticalités, elles doivent correspondre avec les niveaux au-dessus et en -dessous,
+-         PM : Toutes les armoires et les tableaux divisionnaires doivent apparaitre sur le plan
+-         Sous réserve de la diffusion des notes de dimensionnement des CDC en prenant en compte les réserves demandées,
+-         PM : Sous réserve de validation de la synthèse, y compris pour les réseaux et terminaux des autres corps d’état,
+-         PM : Sous réserve de validation des autres documents EXE de Bentin,
+-         PM : Le CDC IRVE doit être conforme à la FTM07,
+-         PM : Les chemins de câbles CFO/CFA doivent avoir une distance minimale de 30 cm,
+-         PM : tous les passages à plusieurs câbles doivent avoir les CDC, conformément au dossier marché"
+P17_T2_IN_EXE_BEN_CFO_I031_PLN_IZ_S2_045402;PLAN CDC CFO-CFA _ SS2;4/3/2026;I031;PLN;45 402;A;S2;pdf;;;04/03/26;X;19/03/26;REF;;;;30/03/26;;REF;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Séparer les CDC de sécurité conformément au CCTP CFO,
+-         CDC VE : Quel est le principe de cheminement entre les étages ? Depuis le local TGBT au SS1 où se fait la décente ? Si juste sous le TGBT, l’indiquer à tous les niveaux. Si aux axes B8 -BB-BC (comme dans la FTM), rajouter un CDC CFO et un Cfa VE au SS1 qui rejoindraient le TGBT avec cette descente. A quoi sert la descente axes BI-B5 ?
+-         Sous réserve de la diffusion des notes de dimensionnement des CDC en prenant en compte les réserves demandées,
+-         PM : Sous réserve de validation de la synthèse, y compris pour les réseaux et terminaux des autres corps d’état,
+-         PM : Indiquer les passages des CDC dans les gaines coupe-feu le cas échéant,
+-         PM : Indiquer les verticalités,
+-         PM : Le CDC IRVE doit être conforme à la FTM07,
+-         PM : Les chemins de câbles CFO/CFA doivent avoir une distance minimale de 30 cm
+MOX : REF
+VISA MOX 
+- Supprimer les coudes et dévoiements inutiles. (Observation déja émise de nombreuses fois. Justifier l'impossibilité de la prise en compte s'il y en a une)
+- Prendre en compte les observations sur les plans de réseaux déja visés
+- Attention aux hauteurs règlementaires 
+- Prendre en compte les observations sur document 
+- Sous réserve de synthèse 
+- Sous réserve de validation des FT 
+- Sous réserve d'avis Egis "
+P17_T2_IN_EXE_BEN_CFO_I031_PLN_IZ_S3_045403;PLAN CDC CFO-CFA _ SS3;4/3/2026;I031;PLN;45 403;A;S3;pdf;;;04/03/26;X;19/03/26;VAO;;;;30/03/26;;VAO;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Séparer les CDC de sécurité conformément au CCTP CFO,
+-         CDC VE : Quel est le principe de cheminement entre les étages ? Depuis le local TGBT au SS1 où se fait la décente ? Si juste sous le TGBT, l’indiquer à tous les niveaux. Si aux axes B8 -BB-BC (comme dans la FTM), rajouter un CDC CFO et un Cfa VE au SS1 qui rejoindraient le TGBT avec cette descente. A quoi sert la descente axes BI-B5 ?
+-         Remettre les CDC supprimés depuis l’indice C (à droit de la rampe),
+-         Sous réserve de la diffusion des notes de dimensionnement des CDC en prenant en compte les réserves demandées,
+-         PM : Utiliser le dernier fond de plan de l’architecte,
+-         PM : Indiquer les passages des CDC dans les gaines coupe-feu le cas échéant,
+-         PM : Sous réserve de validation de la synthèse,
+-         PM : Indiquer les verticalités,
+-         PM : Le CDC IRVE doit être conforme à la FTM07,
+-         PM : Les chemins de câbles CFO/CFA doivent avoir une distance minimale de 30 cm,
+-         PM : Veuillez fournir les FT des différents chemins de câbles
+MOX : VAO
+VISA MOX 
+- Supprimer les coudes et dévoiements inutiles - Prendre en compte les observations sur les plans de réseaux déja visés 
+- Attention aux hauteurs règlementaires 
+- Prendre en compte les observations sur document 
+- Supportage CDC: choisir un supportage par filetage central ou sur les côtés 
+- Sous réserve de synthèse 
+- Sous réserve de validation des FT 
+- Sous réserve d'avis Egis "
+P17_T2_IN_EXE_BEN_CFO_I031_PLN_IZ_S4_045404;PLAN CDC CFO-CFA _ SS4;4/3/2026;I031;PLN;45 404;A;S4;pdf;;;04/03/26;X;19/03/26;VAO;;;;30/03/26;;VAO;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Séparer les CDC de sécurité conformément au CCTP CFO,
+-         CDC VE : Quel est le principe de cheminement entre les étages ? Depuis le local TGBT au SS1 où se fait la décente ? Si juste sous le TGBT, l’indiquer à tous les niveaux. Si aux axes B8 -BB-BC (comme dans la FTM), rajouter un CDC CFO et un Cfa VE au SS1 qui rejoindraient le TGBT avec cette descente. A quoi sert la descente axes BI-B5 ?
+-         Remettre les CDC Cfa/SSI à droite de la rampe (qui étaient présent en indice C),
+-         Sous réserve de la diffusion des notes de dimensionnement des CDC en prenant en compte les réserves demandées,
+-         PM : Sous réserve de validation de la synthèse, y compris pour les réseaux et terminaux des autres corps d’état,
+-         PM : Indiquer les passages des CDC dans les gaines coupe-feu le cas échéant,
+-         PM : Indiquer les verticalités,
+-         PM : Le CDC IRVE doit être conforme à la FTM07,
+-         PM : Les chemins de câbles CFO/CFA doivent avoir une distance minimale de 30 cm
+MOX : VAO
+VISA MOX 
+- Supprimer les coudes et dévoiements inutiles 
+- Prendre en compte les observations sur les plans de réseaux déja visés
+- Attention aux hauteurs règlementaires 
+- Prendre en compte les observations sur document 
+- Supportage CDC : choisir un supportage par filetage central ou sur les côtés 
+- Sous réserve de synthèse 
+- Sous réserve de validation des FT 
+- Sous réserve d'avis Egis "
+P17_T2_IN_EXE_BEN_CFO_I031_PLN_IZ_S5_045405;PLAN CDC CFO-CFA _ SS5;4/3/2026;I031;PLN;45 405;A;S5;pdf;;;04/03/26;X;19/03/26;VAO;;;;30/03/26;;VAO;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Séparer les CDC de sécurité conformément au CCTP CFO,
+-         CDC VE : Quel est le principe de cheminement entre les étages ? Depuis le local TGBT au SS1 où se fait la décente ? Si juste sous le TGBT, l’indiquer à tous les niveaux. Si aux axes B8 -BB-BC (comme dans la FTM), rajouter un CDC CFO et un Cfa VE au SS1 qui rejoindraient le TGBT avec cette descente. A quoi sert la descente axes BI-B5 ?
+-         Sous réserve de la diffusion des notes de dimensionnement des CDC en prenant en compte les réserves demandées,
+-         PM : Sous réserve de validation de la synthèse, y compris pour les réseaux et terminaux des autres corps d’état,
+-         PM : Indiquer les passages des CDC dans les gaines coupe-feu le cas échéant,
+-         PM : Indiquer les verticalités,
+-         PM : Le CDC IRVE doit être conforme à la FTM07,
+-         PM : Les chemins de câbles CFO/CFA doivent avoir une distance minimale de 30 cm
+MOX : VAO
+VISA MOX 
+- Supprimer les coudes et dévoiements inutiles 
+- Prendre en compte les observations sur les plans de réseaux déja visés
+- Attention aux hauteurs règlementaires 
+- Prendre en compte les observations sur document 
+- Supportage CDC : choisir un supportage par filetage central ou sur les côtés 
+- Sous réserve de synthèse 
+- Sous réserve de validation des FT 
+- Sous réserve d'avis Egis "
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045600;TRANSFORMATEUR 2000 KVA;23/2/2026;I031;MAT;45 600;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045600;TRANSFORMATEUR 2000 KVA;27/2/2026;I031;MAT;45 600;A;S1;pdf;;;27/02/26;X;14/03/26;REF;24/02/26;"SAS
+REF";;11/3/2026;;.HM;18/3/2026;;REF;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0"".
+HQE : HM
+obtenir l'avis du BE et du BCT
+EGIS : REF
+Remarque déjà faite et non prise en compte :
+Sans raison particulière, il est inutile de présenter un transformateur à double tension (15kV/20kV). Choisir un transformateur sec avec les pertes Ak 16000W et A0-10% (2340W)."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_R0_045601;CELLULES HT PDL ENEDIS;23/2/2026;I031;MAT;45 601;A;R0;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_R0_045601;CELLULES HT PDL ENEDIS;27/2/2026;I031;MAT;45 601;A;R0;pdf;;;27/02/26;X;14/03/26;VAO;24/02/26;"SAS
+REF";;11/03/26;;.HM;18/3/2026;;VAO;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0"".
+MOX : HM
+EGIS : VAO
+-         Sous réserve de validation d’Enedis (leur approbation est à fournir),
+-         Quid la réglementation UE 2024/ 573 ?
+-         Coordonner l’emplacement du relais anti-retour pour GE mobile avec Enedis,
+-         Prévoir les cellules pour les fusibles de la cellule de comptage,
+-         Prévoir les coffrets de contrôle en partie supérieure pour raccordement des points GTB sur borniers accessibles non plombés."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045602;CELLULES HT POSTE 2000KVA VDP;23/2/2026;I031;MAT;45 602;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045602;CELLULES HT POSTE VDP;6/3/2026;I031;MAT;45 602;A;S1;pdf;;;06/03/26;X;21/03/26;VAO;;;;;;;18/3/2026;;VAO;;;;17/3/2026;;HM;;;;"MOX : HM
+localisation à indiquer
+sous réserve avis Egis et BCT
+EGIS : VAO
+-         Ce document doit s’appeler Cellules HT Poste de transformation infra et non pas VDP
+-         Je n’ai pas reçu la réponse concernant le respect de la NF C 13-100 (peut on rester sur la protection inter-fusible sur un transfo de 2000kVA ?) Fournir un accord du bureau de contrôle à ce sujet,
+-         Attention, la sélectivité avec la protection du poste de livraison n’est pas assurée"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045610;CHEMIN DE CABLE CFOCFA INFRA;23/2/2026;I031;MAT;45 610;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045610;CHEMIN DE CABLE CFOCFA INFRA;27/2/2026;I031;MAT;45 610;A;TX;pdf;;;27/02/26;X;14/03/26;REF;;;;30/03/26;;VAO.;27/3/2026;;REF;;;;;;;;;;"MOX : VAO
+si possible prévoir les perforations 304/316 L 60 représentée sur la FT
+EGIS : REF
+-         N’est pas conforme au § 3.17.7 du CCTP CFO, notamment traitement (pourquoi pré-galvanisé ?),
+-         Prévoir couvercles (sauf indication contraire de la VDP, voir aussi avec la MOEX et le MOA),
+-         Présenter les produits demandés au CCTP CFa et CFO, bien distinguer les différents types de CDC,
+-         Préciser le principe de mise à la terre, fournir le descriptif de l’éclissage le cas échéant (§ 3.9.4 du CCTP CFO),
+-         Présenter une fiche synthétique (127 pages pour un CDC est trop)."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045611;SUPPORTS CDC;23/2/2026;I031;MAT;45 611;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045611;SUPPORTS CDC;6/3/2026;I031;MAT;45 611;A;TX;pdf;;;06/03/26;X;21/03/26;REF;;;;30/03/26;;REF;27/3/2026;;REF;;;;;;;;;;"MOX : REF
+Prévoir support centraux par tige filetée
+Il ne faut pas d'extremité rouge. Le support doit être uniquement en finition galva
+EGIS : REF
+-         Préciser s’il s’agit des supports des CDC CFO et Cfa,
+-         Choisir le même traitement que celui des CDC, galvanisé à chaud ou électrozingué"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045620;LUMINAIRE TYPE P1;23/2/2026;I031;MAT;45 620;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045620;LUMINAIRE TYPE P1;27/2/2026;I031;MAT;45 620;A;TX;pdf;1;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045620;LUMINAIRE TYPE P1;9/3/2026;I031;MAT;45 620;A;TX;pdf;;;09/03/26;X;24/03/26;VAO;;;;;;;18/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Sous réserve de validation de la NDC d’éclairement,
+-         Choisir 4000K (voir aussi avec l’architecte et le MOA),
+-         Indiquer l’UGR (doit être inférieur à 25 normativement),
+-         Prévoir crochets de fixation en inox anti-vandale (indiquer que l’option est choisie),
+-         Sous réserve de validation du MOA, de l’architecte et d’acceptation de l’échantillon. "
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045621;LUMINAIRE TYPE P2;23/2/2026;I031;MAT;45 621;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045621;LUMINAIRE TYPE P2;27/2/2026;I031;MAT;45 621;A;TX;pdf;;;27/02/26;X;14/03/26;REF;;;;;;;18/3/2026;;REF;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045622;LUMINAIRE TYPE P3;23/2/2026;I031;MAT;45 622;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045622;LUMINAIRE TYPE P3;27/2/2026;I031;MAT;45 622;A;TX;pdf;1;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045622;LUMINAIRE TYPE P3;9/3/2026;I031;MAT;45 622;A;TX;pdf;;;09/03/26;X;24/03/26;VAO;;;;;;;18/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Indiquer la localisation,
+-         Indiquer UGR (doit être conforme à la norme pour les locaux concernés),
+-         Sous réserve de validation de la NDC d’éclairement,
+-         Sous réserve de validation du MOA, de l’architecte et d’acceptation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045623;LUMINAIRE TYPE P4;23/2/2026;I031;MAT;45 623;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045623;LUMINAIRE TYPE P4;27/2/2026;I031;MAT;45 623;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;18/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Indiquer la localisation,
+-         Sous réserve de validation de la NDC d’éclairement,
+-         Sous réserve de validation du MOA, de l’architecte et d’acceptation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045624;LUMINAIRE TYPE P5;23/2/2026;I031;MAT;45 624;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045624;LUMINAIRE TYPE P5;27/2/2026;I031;MAT;45 624;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;18/03/26;;VAO;;;;;;;;;;"EGIS : VAO
+-         Ce luminaire a déjà été visé en tant que base, les remarques n’ont pas été prises en compte :
+o  P3/6 : il manque les lettres dans le texte,
+o  Puissance : parfois 36, des fois 66W ?
+o  Sous réserve de validation de la NDC d’éclairement,
+-         Indiquer la localisation,
+-         Sous réserve de validation du MOA, de l’architecte et d’acceptation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045630;DETECTEUR DE PRESENCE CIRCULATION PK;23/2/2026;I031;MAT;45 630;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045630;DETECTEUR DE PRESENCE CIRCULATION PK;27/2/2026;I031;MAT;45 630;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;30/03/26;;VAO;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+- Si les luminaires Visioled sont installés avec la détection intégré, à quoi servent ces détecteurs ?
+- Sinon :
+o  Pourquoi il est prévu uniquement le détecteur esclave ?
+o  Privilégier l’appareillage étanche dans le PK,
+o  Que veut dire « Aucune Temporisation « ?
+o  La quantité de détecteurs doit assurer une bonne couverture en tout point,
+o  Sous réserve de validation de l’échantillon.
+MOX : VAO
+Préciser leurs localisations.
+Si ces DP sont dans l'espace de circulation sur les CDC, prévoir des DP en finition anodisé (si possible)"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045631;DETECTEUR DE PRESENCE ESCALIERS;23/2/2026;I031;MAT;45 631;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045631;DP ESCALIERS PK;6/3/2026;I031;MAT;45 631;A;TX;pdf;;;06/03/26;X;21/03/26;VAO;;;;30/03/26;;VSO.;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+- Si les luminaires Visioled sont installés avec la détection intégré, à quoi servent ces détecteurs ?
+- Sinon :
+o  La quantité de détecteurs doit assurer une bonne couverture en tout point,
+o  Sous réserve de validation de l’échantillon.
+MOX : VSO
+selon échanges en réunion de présentation échantillons"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045632;DETECTEUR DE PRESENCE LOCAUX TECHNIQUES;23/2/2026;I031;MAT;45 632;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045632;DETECTEUR DE PRESENCE LOCAUX TECHNIQUES;6/3/2026;I031;MAT;45 632;A;S1;pdf;;;06/03/26;X;21/03/26;VAO;;;;18/03/26;;VSO.;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         La quantité de détecteurs doit assurer une bonne couverture en tout point,
+-         Puisque le détecteur n’est pas à 360°, son emplacement dans les locaux techniques doit permettre une détection efficace,
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045633;DETECTEUR DE PRESENCE SANITAIRES;23/2/2026;I031;MAT;45 633;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045633;DETECTEUR DE PRESENCE SANITAIRES;6/3/2026;I031;MAT;45 633;A;S1;pdf;;;06/03/26;X;21/03/26;VAO;;;;1803/2026;;VAO;27/3/2026;;VSO;;;;;;;;;;"MOX : VAO
+sous réserve avis Egis
+EGIS : VSO
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045640;BAES & BA;23/2/2026;I031;MAT;45 640;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045640;BAES & BA;27/2/2026;I031;MAT;45 640;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Indiquer que le BAES est prévu pour le PK, en partie haute mais aussi en partie basse,
+-         Supprimer la dernière page (avec bloc d’ambiance qui est présenté dans la FIP 045641),
+-         Proposer minimum IP55 et non pas IP42, comme dans la première FIP fournie
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045641;BAPI;23/2/2026;I031;MAT;45 641;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045641;BA EAS INFRA;6/3/2026;I031;MAT;45 641;A;S1;pdf;;;06/03/26;X;21/03/26;VAO;;;;;;;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Privilégier minimum IP55 et non pas IP42,
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045642;BAPI;27/2/2026;I031;MAT;45 642;A;S1;pdf;;;27/02/26;X;14/03/26;VAO;;;;11/03/26;;VAO;27/3/2026;;VSO;;;;;;;;;;"MOX : VAO
+sous réserve de :
+localisation à préciser
+avis BCT et BE"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045650;PRISE DE COURANT ETANCHE;23/2/2026;I031;MAT;45 650;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045650;PRISE DE COURANT ETANCHE;27/2/2026;I031;MAT;45 650;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;17/03/26;;VSO.;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Préciser l’emplacement exacte, 
+-         Le CCTP demande l’appareillage PLEXO encastré dans les LT,
+-         La couleur sous réserve de validation de l’architecte,
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045651;PRISE DE COURANT NORMAL;23/2/2026;I031;MAT;45 651;A;TX;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045651;PRISE DE COURANT NORMAL;27/2/2026;I031;MAT;45 651;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;17/03/26;;VSO.;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Où seront installées les prises commandées sans fil (Ref 0 777 34L) ?
+-         Quid PC ondulée en goulotte (rouges ?)
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045652;GOULLOTTE;23/2/2026;I031;MAT;45 652;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_TX_045652;INTERRUPTEUR_VV_ETANCHE;27/2/2026;I031;MAT;45 652;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;18/03/26;;VAO;27/03/2026;;VAO;;;;;;;;;;"MOX : VAO
+préciser les localisations
+EGIS : VAO
+-         Préciser l’emplacement exacte, 
+-         Le CCTP demande l’appareillage PLEXO encastré dans les LT,
+-         La couleur sous réserve de validation de l’architecte,
+-         Sous réserve de validation de l’échantillon."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045654;GOULLOTTE;27/2/2026;I031;MAT;45 654;A;S1;pdf;;;27/02/26;X;14/03/26;REF;;;;30/03/26;;REF;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         En attente de validation de la FTM 027 (le marché demande une goulotte 3 compartiments et non pas 2),
+-         Sous réserve de validation de l’échantillon.
+MOX : REF
+Où sont situées ces goulottes? Dans les espaces de parking, les goulottes doivent être en aluminium anodisé"
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045660;ONDULEUR 15 KVA;23/2/2026;I031;MAT;45 660;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045660;ONDULEUR 15 KVA;6/3/2026;I031;MAT;45 660;A;S1;pdf;;;06/03/26;X;21/03/26;REF;;;;17/3/2026;;.HM;27/3/2026;;REF;;;;;;;;;;"EGIS : REF
+-         Présenter le bilan de puissance des installations ondulées,
+-         Cet onduleur est-il prévu dans la production commune ou pour la VDP ?
+-         L’onduleur est appelé 15kVA et la puissance entourée est de 20kVA, mettre en cohérence,
+-         Indiquer l’autonomie (le CCTP demande 30 min),
+-         Indiquer le type de batteries."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045661;BATTERIES DE CONDENSATEURS;23/2/2026;I031;MAT;45 661;A;S1;pdf;1;;23/02/26;X;10/03/26;;24/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de chaque produit, veuillez utiliser la page de garde propre à cet usage. Une fiche type d'échantillon se trouve dans la GED sous le nom : ""P17&CO-T2-Echantillons-Fiche type-V0""."
+P17_T2_IN_EXE_BEN_CFO_I031_MAT_IZ_S1_045661;BATTERIES DE CONDENSATEURS;6/3/2026;I031;MAT;45 661;A;S1;pdf;;;06/03/26;X;21/03/26;VAO;;;;17/03/26;;.HM;27/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+-         Préciser s’il s’agit de la batterie pour la production commune ?
+-         Confirmer qu’il s’agit du mode opératoire automatique,
+-         Choisir une batterie avec la fréquence de réglage de 210Hz au lieu de 189Hz."
+P17_T2_IN_EXE_BEN_SSI_I034_LST_IZ_TX_047000;Liste prévisionnelle des Documents d'Execution Infrastructure SSI;24/2/2026;I034;MAT;47 000;A;TX;pdf;;;24/02/26;X;11/03/26;;25/02/26;"SAS
+REF";;;;;;;;;;;;;;;;;"SAS : REF
+Pour le partage de la liste prévisionnelle, Il faut utiliser le formulaire type qui se trouve dans la GED sous le nom : ""P17&CO-T2-Bordereau de Transmission-V0.pdf"""
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_SSI_I033_MAT_IZ_TX_047300;DM;9/3/2026;I033;MAT;47 300;A;TX;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_SSI_I033_MAT_IZ_TX_047301;BAAL;9/3/2026;I033;MAT;47 301;A;TX;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_SSI_I033_MAT_IZ_TX_047303;BAASL;9/3/2026;I033;MAT;47 303;A;TX;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_SSI_I033_MAT_IZ_R0_047304;PANNEAU ENTREE INTERDITE;9/3/2026;I033;MAT;47 304;A;R0;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_IN_EXE_BEN_SSI_I033_MAT_IZ_TX_047305;SYSTÈME DAD AUTONOME;9/3/2026;I033;MAT;47 305;A;R0;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_S1_145230;NDC E SS1;9/3/2026;B031;NDC;145 230;A;S1;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R0_145231;NDC E RDC;9/3/2026;B031;NDC;145 231;A;R0;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R1_145232;NDC E R+1;9/3/2026;B031;NDC;145 232;A;R1;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R2_145233;NDC E R+2;9/3/2026;B031;NDC;145 233;A;R2;pdf;;;09/03/26;X;24/03/26;REF;;;;;;;25/2/2026;;REF;;;;18/11/2025;;HM;16/02/26;;VSO;"EGIS : REF
+VISAS REF pour principe de prudence. La référence du présent document est caduque et sera reprise par l'Entreprise sur demande MOEX pour rediffusion suivant une nouvelle numérotation de la liste de diffusion. Le VISA MOE sera fait sur la nouvelle numérotation. L’Entreprise doit joindre pour chaque document rediffusé les anciens VISAS pour suivi, avec le statut et l’observation associée, au-dessus du cartouche ou en folio complémentaire.
+SOCOTEC : VSO
+Avis favorable sur la distribution proposée"
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R3_145234;NDC E R+3;9/3/2026;B031;NDC;145 234;A;R3;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R4_145235;NDC E R+4;9/3/2026;B031;NDC;145 235;A;R4;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R5_145236;NDC E R+5;9/3/2026;B031;NDC;145 236;A;R5;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R6_145237;NDC E R+6;9/3/2026;B031;NDC;145 237;A;R6;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_NDC_BZ_R7_145238;NDC E R+7;9/3/2026;B031;NDC;145 238;A;R7;pdf;;;09/03/26;X;24/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R0_145501;PLAN CDC CFO-CFA-SSI RDC;24/3/2026;B031;PLN;145 501;A;TX;pdf;;;24/03/26;X;08/04/26;REF;;;;;;;31/3/2026;;REF;;;;;;;;;;"EGIS : REF
+·      Eviter de passer les CDC dans les locaux à risques, comme local déchets (axes B6 -BC), ou bien prévoir une gaine CF (voir avec le bureau de contrôle),
+·      Le passage des réseaux dans les escaliers encloisonnés doit être encoffré CF (sauf pour les réseaux à destination de l’escalier). Fait pour l’escalier B2. Quid le passage dans l’escalier B3 ?
+·      A quoi sert le CDC CFO Bureaux dans le hall ? S’il sert à alimenter le PCS, ça doit être le CDC SGX. Peut-il venir au PCS depuis la circulation axes B4-B5 ?
+·      Si nécessaire, un CDC SGX doit être rajouté dans le hall pour la distribution du hall. Le CDC SGX qui y passe est un CDC dévoyé, il semble avoir une autre utilité,
+·      Pourquoi couleur violette (CDC Cfa et SSI) dans le poste HTA PK ?
+·      Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+·      Indiquer les descentes/remontées entre poste de livraison et le SS1 (HTA),
+·      Commerces :
+Si les TD commerces ne sont pas prévus, l’indiquer sur le plan, par exemple « Hors lot CFO »,
+Pourquoi vers un TD commerce, il y a un CDC qui arrive et à l’autre non, uniformiser, prévoir au moins un CDC jusque chaque commerce, coordonner avec le MOA et la MOEX,
+Valider avec le bureau de contrôle la non-séparation CF des cheminements prévus pour alimentation des commerces par rapport aux bureaux,
+Indiquer le principe de cheminement pour les commerces (un CDC séparé ? commun avec CDC bureaux ou SGX ?) .
+·      Merci de représenter les cheminements jusqu'au droit de toutes les armoires ainsi que les descentes ou remontées vers celles-ci. Par exemple, le CDC CFO Bureaux n’arrive pas au TD Incubateur RDC,
+·      TD Commerces :
+·      La couleur des TD commerce ne correspond pas à celle de la légende. Le corriger.
+·      Le CDC CFO PB : Confirmer la présente du plancher bas,
+·      PM : Sous réserve de validation de la synthèse,
+·      PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+·      PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R1_145502;PLAN CDC CFO-CFA-SSI R+1;24/3/2026;B031;PLN;145 502;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Le CDC CFO en faux plancher doit être de 30cm,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+1_1),
+Indiquer l’ouverture des gaines Cfa/ SGX/SSI/ OPE2 dans la circulation centrale,
+Y-a-t-il un lien à prévoir entre la gaine OPE2 et le local VDI ?
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R2_145503;PLAN CDC CFO-CFA-SSI R+2;24/3/2026;B031;PLN;145 503;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Le CDC CFO en faux plancher doit être de 30cm,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+1_1),
+Indiquer l’ouverture des gaines Cfa/ SGX/SSI/ OPE2 dans la circulation centrale,
+Y-a-t-il un lien à prévoir entre la gaine OPE2 et le local VDI ?
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R3_145504;PLAN CDC CFO-CFA-SSI R+3;24/3/2026;B031;PLN;145 504;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Le CDC CFO en faux plancher doit être de 30cm,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+1_1),
+Indiquer l’ouverture des gaines Cfa/ SGX/SSI/ OPE2 dans la circulation centrale,
+Y-a-t-il un lien à prévoir entre la gaine OPE2 et le local VDI ?
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R4_145505;PLAN CDC CFO-CFA-SSI R+4;24/3/2026;B031;PLN;145 505;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Le CDC CFO en faux plancher doit être de 30cm,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+1_1),
+Indiquer l’ouverture des gaines Cfa/ SGX/SSI/ OPE2 dans la circulation centrale,
+Y-a-t-il un lien à prévoir entre la gaine OPE2 et le local VDI ?
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R5_145506;PLAN CDC CFO-CFA-SSI R+5;24/3/2026;B031;PLN;145 506;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Le CDC CFO en faux plancher doit être de 30cm,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+1_1),
+Indiquer l’ouverture des gaines Cfa/ SGX/SSI/ OPE2 dans la circulation centrale,
+Y-a-t-il un lien à prévoir entre la gaine OPE2 et le local VDI ?
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Pourquoi le CDC CFO PB passe directement dans les bureaux (axes B5-B6) et non pas dans le couloir ?
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R6_145507;PLAN CDC CFO-CFA-SSI R+6;24/3/2026;B031;PLN;145 507;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Appeler les TD avec les noms correspondant au synoptique (ex., TD CFO BX R+6_1),
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+PH : d’où remonte le CDC SGX ? il ne semble pas être dévoyé au R+5,
+Plusieurs gaines axes BF – B4 (SSI, OPE2, CFA, SGX) ont été supprimées par rapport à l’indice d’avant. Elles apparaissent sur le plan de l’architecte. Confirmer leur suppression,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R7_145508;PLAN CDC CFO-CFA-SSI R+7;24/3/2026;B031;PLN;145 508;A;TX;pdf;;;24/03/26;X;08/04/26;VAO;;;;;;;31/3/2026;;VAO;;;;;;;;;;"EGIS : VAO
+Veuillez fournir la note de dimensionnement de chemins de câbles en prenant en compte les 30% de réserves,
+Aucun CDC SSI n’est prévu horizontalement. Si un câblage SSI existe sur le plateau, indiquer par quel CDC il est distribué,
+Prévoir les fourreaux pour le passage des câbles aux endroits d’interruption des CDC,
+Où passe le CDC sono, prévu dans la légende ?
+PM : Sous réserve de validation de la synthèse,
+PM : Les chemins de câbles CFO et Cfa doivent être écartés de 30cm,
+PM : Sous réserve de fourniture et validation des fiches produits des matériels"
+P17_T2_IN_EXE_BEN_CFO_B031_DET_BZ_TX_145540;Crosses terrasses;6/3/2026;B031;DET;145 540;A;TX;pdf;;;06/03/26;X;21/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R0_145601;PLAN ECLAIRAGE RDC;27/3/2026;B031;PLN;145 601;A;R0;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R1_145602;PLAN ECLAIRAGE R+1;27/3/2026;B031;PLN;145 602;A;R1;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R2_145603;Plan d'implatation Eclairage R+2;13/3/2026;B031;PLN;145 603;A;R2;pdf;1;;13/03/26;X;28/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R2_145603;PLAN ECLAIRAGE R+2;27/3/2026;B031;PLN;145 603;A;R2;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R3_145604;PLAN ECLAIRAGE R+3;27/3/2026;B031;PLN;145 604;A;R3;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R4_145605;PLAN ECLAIRAGE R+4;27/3/2026;B031;PLN;145 605;A;R4;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R5_145606;PLAN ECLAIRAGE R+5;27/3/2026;B031;PLN;145 606;A;R5;pdf;;;27/03/26;X;11/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R6_145607;PLAN ECLAIRAGE R+6;31/3/2026;B031;PLN;145 607;A;R6;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R7_145608;PLAN ECLAIRAGE R+7;31/3/2026;B031;PLN;145 608;A;R7;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R0_145621;Plan de Câblage Prises de courant et FM _ RDC;31/3/2026;B031;PLN;145 621;A;R0;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R1_145622;Plan de Câblage Prises de courant et FM _ R+1;31/3/2026;B031;PLN;145 622;A;R1;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R2_145623;Plan de Câblage Prises de courant et FM _ R+2;31/3/2026;B031;PLN;145 623;A;R2;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R3_145624;Plan de Câblage Prises de courant et FM _ R+3;31/3/2026;B031;PLN;145 624;A;R3;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R4_145625;Plan de Câblage Prises de courant et FM _ R+4;31/3/2026;B031;PLN;145 625;A;R4;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R5_145626;Plan de Câblage Prises de courant et FM _ R+5;31/3/2026;B031;PLN;145 626;A;R5;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R6_145627;Plan de Câblage Prises de courant et FM _ R+6;31/3/2026;B031;PLN;145 627;A;R6;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_PLN_BZ_R7_145628;Plan de Câblage Prises de courant et FM _ R+7;31/3/2026;B031;PLN;145 628;A;R7;pdf;;;31/03/26;X;15/04/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_R0_145701;CELLULES_HT_PDL_ENEDIS;27/2/2026;B031;MAT;145 701;A;R0;pdf;;;27/02/26;X;14/03/26;VAO;;;;18/03/26;;VAO;;;;;;;17/3/2026;;HM;;;;"EGIS : VAO
+-         Sous réserve de validation d’Enedis (leur approbation est à fournir),
+-         Quid la réglementation UE 2024/ 573 ?
+-         Coordonner l’emplacement du relais anti-retour pour GE mobile avec Enedis,
+-         Prévoir les cellules pour les fusibles de la cellule de comptage,
+-         Prévoir les coffrets de contrôle en partie supérieure pour raccordement des points GTB sur borniers accessibles non plombés."
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145710;CHEMIN_DE_CABLE_CFOCFA_BUREAU;27/2/2026;B031;MAT;145 710;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;31/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : VAO
+-         La FIP est trop générale, indiquer les CDC prévus pour les bureaux, en fonction de l’espace, CFO ou Cfa, etc.
+-         Préciser le principe de mise à la terre, fournir le descriptif de l’éclissage le cas échéant (§ 3.17.7.3 du CCTP CFO), "
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145720;LUMINAIRE TYPE 1, TYPE 2 ET TYPE 10;27/2/2026;B031;MAT;145 720;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;12/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : VAO
+-         Compléter par la FIP du driver (OSRAM selon la réponse par mail). La puissance du driver doit être supérieure à celle du luminaire,
+-         Système d'intégration dans plafond rayonnant à détailler et valider avec lot(s) concerné(s),
+-         Sous réserve de validation de la note de calcul d’éclairement,
+-         Sous réserve de validation de l'architecte et de validation de l'échantillon."
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145723;LUMINAIRE_TYPE_7_ET_TYPE_8_SANIT;27/2/2026;B031;MAT;145 723;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;12/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"EGIS : VAO
+Ok sous réserve validation BET ELEC
+
+HQE : VAO
+-         Sous réserve de validation des notes de calcul d’éclairement,
+-         Sous réserve de validation de l'architecte et de validation de l'échantillon. "
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145724;LUMINAIRE_TYPE_9_POUR_LES_LOCAUX TECHNIQUES;27/2/2026;B031;MAT;145 724;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;31/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : VAO
+Fournir une fiche lisible, il manque des lettres et des mots
+
+"
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_R0_145729;LUMINAIRE_HALL_ADDITIF_3_DECO;27/2/2026;B031;MAT;145 729;A;R0;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;12/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : VAO
+-         Ce luminaire est DALI, quelle commande d’éclairage est prévue ?
+-         La puissance et le flux ne sont pas ceux de la NDC d‘éclairement (67W 8389lm contre 50W 6398lm dans la NDC)
+-         Indiquer la couleur et la faire valider par l’archi,
+-         Le luminaire semble suspendu, faire valider par l’archi (encastré dans la NDC),
+-         Joindre la FIP du driver.
+-         Sous réserve de validation des notes de calcul d’éclairement qui restent à fournir,
+-         Sous réserve de validation de l'architecte et de validation de l'échantillon."
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_R0_145730;LUMINAIRE_PALIER_RDC_ADDITIF;27/2/2026;B031;MAT;145 730;A;R0;pdf;;;27/02/26;X;14/03/26;REF;;;;;;;;;;;;;;;;;;;"EGIS : REF 
+-         Ce luminaire est DALI, quelle commande d’éclairage est prévue ?
+-         La réf n’est pas celle indiquée dans la NDC d’éclairement (A34P1701830PDS vs A34C198 1830P dans la NDC),
+-         La puissance et le flux ne sont pas ceux de la NDC d‘éclairement (29W 3620lm contre 34W 4214lm dans la NDC)
+-         La longueur du luminaire n’est pas la même que celle dans la NDC (1,7m vs1,98m dans la NDC),
+-         Indiquer la couleur et la faire valider par l’archi,
+-         Le luminaire semble suspendu, faire valider par l’archi (encastré dans la NDC),  
+-         Joindre la FIP du driver.
+-         Sous réserve de validation des notes de calcul d’éclairement qui restent à fournir,
+-         Sous réserve de validation de l'architecte et de validation de l'échantillon.
+HQE : VAO
+Ok sous réserve validation BET ELEC
+
+
+"
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145731;LUMINAIRE_PALIER_ETAGES_ADDITIF 3;27/2/2026;B031;MAT;145 731;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;12/3/2026;;REF;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : REF
+-         Ce luminaire est DALI, quelle commande d’éclairage est prévue ? (en base 1/3 + 2/3 + GTB+ face avant TD),
+-         La réf n’est pas celle indiquée dans la NDC d’éclairement (A34P2261830PDS vs A34C198 1830P dans la NDC),
+-         La puissance et le flux ne sont pas ceux de la NDC d‘éclairement (39W 4812lm contre 20W 2529lm dans la NDC)
+-         La longueur du luminaire n’est pas la même que celle dans la NDC (2,26m vs1,98m dans la NDC),
+-         Joindre la FIP du driver.
+-         Sous réserve de validation des notes de calcul d’éclairement qui restent à fournir,
+-         Sous réserve de validation de l'architecte et de validation de l'échantillon."
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145733;LUMINAIRE_TERRASSE_BORNE_LUMINEUSE;27/2/2026;B031;MAT;145 733;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;31/3/2026;;VAO;17/3/2026;;VAO;;;;;;;"HQE : VAO
+Préciser l'efficacité lumineuse du luminaires. Sous reserve Eff. Lum. > 80 lm/W
+EGIS : VAO
+-         L’indice IP (y compris la mise en œuvre) doit permettre une conservation et fonctionnement durable,
+-         Faire valider par les certificateurs"
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_R0_145734;LUMINAIRE_TYPE_EXT1_EN_FACADE;27/2/2026;B031;MAT;145 734;A;R0;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;31/3/2026;;VAO;;;;17/3/2026;;VAO;;;;"HQE : VAO
+Ok sous réserve validation BET ELEC
+EGIS : VAO
+-         Indiquer la référence exacte qui détermine la T° de couleurs et le flux (K3 ou K4 ? voir avec l’architecte)"
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145740;DETECTEUR_DE_PRESENCE_CIRCULATION;27/2/2026;B031;MAT;145 740;A;TX;pdf;;;27/02/26;X;14/03/26;VAO;;;;;;;31/3/2026;;VAO;;;;17/3/2026;;VSO;;;;"HQE : VSO
+EGIS : VAO
+o  La quantité de détecteurs doit assurer une bonne couverture en tout point,
+o  Sous réserve de validation de l’échantillon,
+o  Prévoir un réglage de la temporisation."
+P17_T2_BX_EXE_BEN_CFO_B031_MAT_BZ_TX_145743;DETECTEUR_DE_PRESENCE_SANITAIRE;27/2/2026;B031;MAT;145 740;A;TX;pdf;;;27/02/26;X;14/03/26;VSO;;;;;;;31/3/2026;;VSO;;;;17/3/2026;;VSO;;;;"HQE : VSO
+EGIS : VSO
+o  Sous réserve de validation de l’échantillon,
+o  Prévoir un réglage de la temporisation."
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_R0_146300;CENTRALE ECS;5/1/2026;B033;MAT;146 300;A;R0;pdf;;;05/01/26;X;20/01/26;REF;;;;;;;;;;;;;;;;;;;"EGIS : REF
+VISAS REF pour principe de prudence. La référence du présent document est caduque et sera reprise par l'Entreprise sur demande MOEX pour rediffusion suivant une nouvelle numérotation de la liste de diffusion. Le VISA MOE sera fait sur la nouvelle numérotation. L’Entreprise doit joindre pour chaque document rediffusé les anciens VISAS pour suivi, avec le statut et l’observation associée, au-dessus du cartouche ou en folio complémentaire."
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_TX_146301;DETECTEUR OPTIQUE DE FUMEE;5/1/2026;B033;MAT;146 301;A;TX;pdf;;;05/01/26;X;20/01/26;REF;;;;;;;;;;;;;;;;;;;"EGIS : REF
+VISAS REF pour principe de prudence. La référence du présent document est caduque et sera reprise par l'Entreprise sur demande MOEX pour rediffusion suivant une nouvelle numérotation de la liste de diffusion. Le VISA MOE sera fait sur la nouvelle numérotation. L’Entreprise doit joindre pour chaque document rediffusé les anciens VISAS pour suivi, avec le statut et l’observation associée, au-dessus du cartouche ou en folio complémentaire."
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_TX_146302;DM ;5/1/2026;B033;MAT;146 302;A;TX;pdf;;;05/01/26;X;20/01/26;REF;;;;;;;;;;;;;;;;;;;"EGIS : REF
+VISAS REF pour principe de prudence. La référence du présent document est caduque et sera reprise par l'Entreprise sur demande MOEX pour rediffusion suivant une nouvelle numérotation de la liste de diffusion. Le VISA MOE sera fait sur la nouvelle numérotation. L’Entreprise doit joindre pour chaque document rediffusé les anciens VISAS pour suivi, avec le statut et l’observation associée, au-dessus du cartouche ou en folio complémentaire."
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_R0_146303;CENTRALE CMSI;27/2/2026;B033;MAT;146 303;A;R0;pdf;;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_TX_146304;BAAS;27/2/2026;B033;MAT;146 304;A;TX;pdf;;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_TX_146305;BAAL;27/2/2026;B033;MAT;146 305;A;TX;pdf;;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+P17_T2_BX_EXE_BEN_SSI_B033_MAT_BZ_TX_146307;TRE;27/2/2026;B033;MAT;146 307;A;TX;pdf;;;27/02/26;X;14/03/26;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

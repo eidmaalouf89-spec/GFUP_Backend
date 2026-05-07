@@ -6,8 +6,7 @@ Exclusion rules and project-level configuration for GF Updater V3.
 Rules:
   1. LOT I01-VDSTP : ignore all documents — sheet is infrastructure-only
   2. LOT I02-FKI   : ignore all documents — sub-lot split, handled separately
-  3. LOT 03-GOE    : only include documents created in 2026 or later
-  4. OLD-* sheets  : always skipped (routing.py already handles this)
+  3. OLD-* sheets  : always skipped (routing.py already handles this)
 
 Emetteur routing filter (Patch A2):
   Maps each GF sheet name → set of ALLOWED emetteur codes.
@@ -34,16 +33,11 @@ EXCLUDED_SHEETS: set = {
 # Lot-normalized prefixes to completely exclude
 EXCLUDED_LOT_CODES: set = set()  # Not used — handled via EXCLUDED_SHEETS + routing
 
-# Year filters: {sheet_name: min_year} — exclude docs before min_year
-SHEET_YEAR_FILTERS: Dict[str, int] = {
-    "LOT 03-GOE-LGD": 2026,
-    # BENTIN sheet: original GF has 135 rows, all dated 2026.
-    # The GED contains 659 BEN DI rows (2024–2026) because OLD_BEN legacy docs
-    # (originally in "OLD 31 à 34-IN-BX-CFO-BENTIN") are also stored in the GED.
-    # Pre-2026 BEN docs = OLD_BEN legacy exceptions → excluded from clean GF.
-    # Valid ANCIEN rows are kept via lifecycle_id membership in active 2026 families.
-    "LOT 31 à 34-IN-BX-CFO-BENTIN": 2026,
-}
+# Year filters: {sheet_name: min_year} — exclude docs before min_year.
+# Retired simplification:
+#   - LGD is no longer excluded merely because it is pre-2026.
+#   - Bentin old handling moved to the Raw GED -> Flat GED source ledger.
+SHEET_YEAR_FILTERS: Dict[str, int] = {}
 
 # Lot prefix + year filter: {lot_prefix: min_year}
 LOT_YEAR_FILTERS: Dict[str, int] = {}

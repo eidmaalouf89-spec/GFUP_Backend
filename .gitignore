@@ -57,6 +57,8 @@ backup_*/
 codex prompt.txt
 prompt codex.txt
 prompt claude*.txt
+EID_Prompts_CODEX/Exact Bentin OLD.csv
+context/source_exclusions/Exact Bentin OLD.csv
 codex prompts/architecture.md
 codex prompts/pipeline_flow.md
 codex prompts/DEVELOPMENT_RULES.md

@@ -704,7 +704,7 @@ Backend validation and UI validation are different layers.
 
 Backend/pipeline changes must validate against `docs/VALIDATION_BASELINE.md`.
 
-Current Run 0 baseline: fresh post-reset FULL run created on 2026-04-22 from `input/`, with `report_memory.db` rebuilt from `input/consultant_reports`.
+Current Run 0 baseline: clean FULL run rebuilt on 2026-05-07 from `input/`, with `run_memory.db` and `report_memory.db` nuked first and `report_memory.db` rebuilt from `input/consultant_reports`. The old 4,848 Flat document baseline is retired after the BENTIN/BEN source-exclusion patch; current Flat GED OPEN_DOC baseline is 4,374, with 701 `BENTIN_SOURCE_OLD_NOT_LISTED` rows in `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`.
 
 | Metric | Value |
 |---|---:|

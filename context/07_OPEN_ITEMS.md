@@ -827,3 +827,22 @@ UI weird-character / encoding audit and fix. Audit identified 15 broken JSX-text
   pre-warm thread).
 - The Babel-from-CDN approach in `jansa-connected.html` (works in pyWebView,
   no compile step needed).
+
+---
+
+## BENTIN/LGD source-exclusion ownership — CLOSED 2026-05-07
+
+LGD pre-2026 year filtering is retired. `SHEET_YEAR_FILTERS` must not contain
+`LOT 03-GOE-LGD`, and LGD rows must not be removed only because they are
+pre-2026.
+
+BENTIN/BEN old handling is now owned by Raw GED -> Flat GED source
+qualification in `src/flat_ged/source_exclusions.py`.
+
+- Production registry: `context/source_exclusions/remaining bentin.csv`.
+- Ledger: `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`.
+- Current canary: raw BEN total 912, included 211, source-excluded 701,
+  unresolved 0.
+
+Do not reopen the old broad `BEN + pre-2026` or `LGD + pre-2026` filters.
+Any future source exclusion needs an explicit document-level reason.

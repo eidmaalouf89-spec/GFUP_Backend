@@ -120,7 +120,9 @@ Every value below has direct user-visible or contractual meaning. Changing them 
 
 | File | Constants |
 |---|---|
-| `src/config_loader.py` | `EXCLUDED_SHEETS`, `SHEET_YEAR_FILTERS` (pre-2026 BENTIN/LGD exclusion), `SHEET_EMETTEUR_FILTER` |
+| `src/config_loader.py` | `EXCLUDED_SHEETS`, `SHEET_YEAR_FILTERS` (must stay empty unless a new explicit rule is approved), `SHEET_EMETTEUR_FILTER` |
+| `src/flat_ged/source_exclusions.py` | BENTIN/BEN positive inclusion source rule; depends on `context/source_exclusions/remaining bentin.csv` and cutoff `2026-03-10` |
+| `context/source_exclusions/remaining bentin.csv` | Production BENTIN/BEN positive inclusion registry; debug previews are not runtime truth |
 | `src/flat_ged/input/source_main/consultant_mapping.py` | `RAW_TO_CANONICAL`, `EXCEPTION_COLUMNS`, `CANONICAL_TO_DISPLAY`, `SPECIAL_CASES` |
 | `src/flat_ged/input/source_main/status_mapping.py` | `VALID_STATUSES`, `BUREAU_CONTROLE_STATUSES`, `PENDING_KEYWORDS`, `DEADLINE_DATE_PATTERN` |
 | `src/flat_ged/input/source_main/ged_parser_contract.py` | Header layout, `CORE_COLUMNS`, `APPROVER_SUB_FIELDS` |

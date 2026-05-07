@@ -26,7 +26,7 @@ _pkg_dir = Path(__file__).parent
 # to prevent shadowing identically-named modules in src/ (e.g. writer.py).
 _FLAT_GED_BARE_MODULES = frozenset({
     "config", "reader", "resolver", "transformer", "processor",
-    "validator", "writer", "utils",
+    "validator", "writer", "utils", "source_exclusions",
 })
 
 

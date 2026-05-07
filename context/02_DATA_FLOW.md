@@ -37,6 +37,7 @@ Output:
   output/intermediate/FLAT_GED.xlsx           (sheets GED_RAW_FLAT + GED_OPERATIONS)
   output/intermediate/DEBUG_TRACE.csv
   output/intermediate/flat_ged_run_report.json
+  output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv
   Then registered as run_memory artifacts: FLAT_GED, FLAT_GED_DEBUG_TRACE,
   FLAT_GED_RUN_REPORT.
                                                   │
@@ -406,3 +407,29 @@ joining flat_ged_ops_df (numero/indice) with effective_responses_df (doc_id).
   `CHAIN_ONION_SUMMARY.xlsx` are produced but not surfaced in the UI.
 - `output/debug/*_summary.xlsx` debug XLSXs are registered as artifacts
   (DEBUG_*) but not consumed by reporting.
+
+---
+
+## Raw GED source qualification
+
+Document-level exceptions are raw GED documents/rows intentionally excluded
+from the operational Raw GED -> Flat GED population. They are not status
+vocabulary mappings, SOCOTEC/FAV/SUS/DEF normalization, UI labels, or
+consultant display names.
+
+Current source-level exception owner:
+
+- `src/flat_ged/source_exclusions.py`
+- `context/source_exclusions/remaining bentin.csv`
+- `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`
+
+BENTIN/BEN rule: for every GED import, BEN/BENTIN rows are included only if
+`NUMERO+INDICE` matches the remaining-Bentin registry, parsed `DOCUMENT`
+tail+`INDICE` matches the registry, or raw GED `Créé le >= 2026-03-10`.
+Otherwise they are source-excluded with `BENTIN_SOURCE_OLD_NOT_LISTED`.
+Debug preview files under `output/debug/` are validation evidence only and
+are not production source-of-truth. Runtime must not hardcode `raw_row_id`.
+
+The old LGD pre-2026 year filter is retired. LGD rows must not disappear
+only because they are pre-2026; any future LGD exclusion needs an explicit
+source-exclusion reason.

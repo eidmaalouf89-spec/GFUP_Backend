@@ -37,6 +37,7 @@ from transformer import process_document, GEDValidationError
 from validator   import check_delay_invariants, check_global_delay_consistency, print_delay_summary
 from writer      import (write_flat_ged, write_flat_ged_batch,
                           write_debug_trace_csv, write_run_report)
+from source_exclusions import BentinSourceExclusionPolicy
 
 
 # ── Timer ─────────────────────────────────────────────────────────────────────
@@ -61,7 +62,8 @@ def _is_valid_numero(val) -> bool:
 def _stream_group_rows(
     data_rows_iter,
     base_cols: dict,
-) -> tuple[dict, int, int]:
+    source_exclusion_policy=None,
+) -> tuple[dict, int, int, int]:
     """Single-pass streaming grouper.
 
     Iterates data rows exactly once, grouping by (numero, indice).
@@ -69,6 +71,7 @@ def _stream_group_rows(
         groups:         {(numero, indice): [(ged_row_index, row_data), ...]}
         total_rows:     count of data rows scanned
         no_numero_cnt:  count of rows excluded for missing/invalid NUMERO
+        source_cnt:     count of rows excluded by source-level policy
     """
     col_by_name = {v: k for k, v in base_cols.items()}
     numero_col  = col_by_name.get("NUMERO")
@@ -80,6 +83,7 @@ def _stream_group_rows(
     groups        = {}   # (numero, indice) → list of (ridx, row_data)
     total_rows    = 0
     no_numero_cnt = 0
+    source_cnt    = 0
     ridx          = 3    # GED data starts at row 3 (1-indexed Excel row)
 
     for row_tuple in data_rows_iter:
@@ -92,6 +96,12 @@ def _stream_group_rows(
             ridx += 1
             continue
 
+        if source_exclusion_policy is not None:
+            if source_exclusion_policy.should_exclude(ridx, row_data, base_cols):
+                source_cnt += 1
+                ridx += 1
+                continue
+
         indice_val = row_data[indice_col] if indice_col < len(row_data) else None
         indice     = str(indice_val).strip() if indice_val is not None else ""
 
@@ -101,7 +111,7 @@ def _stream_group_rows(
         groups[key].append((ridx, row_data))
         ridx += 1
 
-    return groups, total_rows, no_numero_cnt
+    return groups, total_rows, no_numero_cnt, source_cnt
 
 
 # ── Batch mode ────────────────────────────────────────────────────────────────
@@ -147,9 +157,17 @@ def run_batch(args, output_dir: Path):
             sys.exit(str(e))
     print(f"[OK] Approver groups detected: {len(approver_groups)}")
 
+    try:
+        source_exclusion_policy = BentinSourceExclusionPolicy.from_output_dir(output_dir)
+    except Exception as e:
+        wb.close()
+        sys.exit(f"[FAIL] Cannot initialise source exclusions: {e}")
+
     # ── Stage 4: single-pass row scan + grouping ──────────────────────────────
     with _timer("row_scan_and_group"):
-        groups, total_rows, no_numero_cnt = _stream_group_rows(data_rows_iter, base_cols)
+        groups, total_rows, no_numero_cnt, source_cnt = _stream_group_rows(
+            data_rows_iter, base_cols, source_exclusion_policy
+        )
 
     # Close the read_only workbook as soon as streaming is done
     wb.close()
@@ -157,6 +175,7 @@ def run_batch(args, output_dir: Path):
     n_docs = len(groups)
     print(f"[INFO] Total GED data rows:        {total_rows}")
     print(f"[INFO] Rows excluded (no NUMERO):  {no_numero_cnt}")
+    print(f"[INFO] Rows excluded (source):     {source_cnt}")
     print(f"[INFO] Unique document codes:      {n_docs}")
     print()
 
@@ -171,6 +190,8 @@ def run_batch(args, output_dir: Path):
         "data_date":               str(data_date),
         "total_rows_scanned":      total_rows,
         "rows_excluded_no_numero": no_numero_cnt,
+        "rows_excluded_source":    source_cnt,
+        "source_exclusions":       source_exclusion_policy.summary,
         "unique_doc_codes":        n_docs,
         "docs_with_duplicates":    0,
         "synthetic_sas_count":     0,
@@ -247,6 +268,10 @@ def run_batch(args, output_dir: Path):
     # ── Stage 6: write output ─────────────────────────────────────────────────
     print()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    with _timer("output_write_source_exclusions"):
+        source_exclusion_path = source_exclusion_policy.write_ledger(output_dir)
+    print(f"[DONE] {source_exclusion_path}  ({source_cnt} rows)")
 
     if not skip_xlsx:
         with _timer("output_write_xlsx"):

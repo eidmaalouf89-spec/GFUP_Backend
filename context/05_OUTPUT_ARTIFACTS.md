@@ -51,6 +51,7 @@ the lookup used by `app.Api.export_team_version`.
 | `FLAT_GED.xlsx` | `flat_ged_runner.build_flat_ged_artifacts` (pre-pipeline) | `stage_read_flat`, `chain_onion.source_loader`, `data_loader` | Sheets: `GED_RAW_FLAT`, `GED_OPERATIONS` |
 | `DEBUG_TRACE.csv` | same (batch mode) | `chain_onion.source_loader` | Builder debug trace |
 | `flat_ged_run_report.json` | same | (none direct) | Builder run metadata |
+| `RAW_GED_SOURCE_EXCLUSIONS.csv` | `flat_ged.source_exclusions` during Flat GED batch build | Audit/debug; source-exclusion validation | Document-level source exclusions before Raw GED rows enter Flat GED. Current code: `BENTIN_SOURCE_OLD_NOT_LISTED` for BEN/BENTIN rows before 2026-03-10 not listed in `context/source_exclusions/remaining bentin.csv`. Expected current count: 701. |
 | `CHAIN_TIMELINE_ATTRIBUTION.json` | `reporting.chain_timeline_attribution.write_chain_timeline_artifact` | (Phase 4: Document Command Center) | Per-chain timeline + per-segment responsibility. NOT registered in run_memory.db. Auto-refreshed at app startup (Phase 3). |
 | `CHAIN_TIMELINE_ATTRIBUTION.csv` | same | Excel inspection | Flat per-segment-per-attribution rows. |
 | `FLAT_GED_cache_docs.pkl` / `FLAT_GED_cache_resp.pkl` / `FLAT_GED_cache_meta.json` | `data_loader._save_flat_normalized_cache` (writes alongside `FLAT_GED.xlsx`) | `data_loader._load_flat_normalized_cache` (skips xlsx re-parse on hot loads) | Pickle cache for normalized `docs_df` + `responses_df`. `cache_meta.json` carries `cache_schema_version` (currently `"v2"` post Phase 8 step 4), `approver_names`, `flat_doc_meta`, plus 8 audit fields: `source_flat_ged_sha256`, `source_flat_ged_mtime`, `docs_df_rows`, `responses_df_rows`, `active_version_count`, `family_count`, `status_counts`, `generated_at`. Freshness check rejects schema-version mismatches per Phase 0 D-001. Bump `CACHE_SCHEMA_VERSION` whenever stage_read_flat schema or pickle compatibility changes. NOT registered in `run_memory.db`. |
@@ -61,6 +62,12 @@ are registered in `run_memory.db` as `FLAT_GED`, `FLAT_GED_DEBUG_TRACE`,
 `FLAT_GED_RUN_REPORT`. The builder writes `run_report.json` and
 `flat_ged_runner.py` renames it to `flat_ged_run_report.json` (contract
 naming).
+
+Clean Run 0 baseline after the BENTIN source-exclusion patch (2026-05-07):
+`RAW_GED_SOURCE_EXCLUSIONS.csv` has 701
+`BENTIN_SOURCE_OLD_NOT_LISTED` rows; `FLAT_GED.xlsx` has 4,374 OPEN_DOC
+versions, 24,812 `GED_RAW_FLAT` rows, and 29,176 `GED_OPERATIONS` rows. The
+old 4,848 Flat document baseline is retired.
 
 `CHAIN_TIMELINE_ATTRIBUTION.*` is intentionally NOT registered in
 `run_memory.db` â€” it is computed on-demand from chain_onion CSVs +
@@ -253,4 +260,3 @@ and trigger path.
 | Artifact | Location | Trigger | Generator | Purpose / Notes |
 |---|---|---|---|---|
 | `JANSA_AI_AUDIT_PACK_<YYYYMMDD>_<HHMMSS>.zip` | `output/exports/` | `Générer Pack Audit IA` button in `ReportsPage` (`ui/jansa/shell.jsx` post-edit lines 877–910) | `src/reporting/counter_attack_ai_pack.build_ai_audit_pack(ctx, output_dir)` | External-AI evidence pack. Contains 14 required entries: 8 verbatim-copied source CSVs (`DATA/01_COUNTER_ATTACK_ITEMS.csv` through `DATA/08_CHAIN_TIMELINE_ATTRIBUTION.csv`), 1 in-memory-built `DATA/09_FLAT_GED_EXTRACT.csv` (LEFT JOIN of `ctx.docs_df` × `ctx.responses_df`, 20 columns, sorted ascending by `(numero, indice, doc_id, approver_canonical)` with mergesort), 1 `README_FOR_AI.md` (French-first, short English note at end), and 5 `PROMPTS/*.md` files (French-first, covering the six accepted attack angles). Up to 4 optional entries included when present on disk: `DATA/SUBJECT_RISK_DOSSIERS.csv`, `DATA/ACTOR_ATTACK_DOSSIERS.csv`, `DATA/dashboard_summary.json`, `DATA/top_issues.json`. Missing required source → clean error payload (`success: false`), no crash. Missing optional source → recorded in `missing_optional_files`, pack still ships. NOT registered in `run_memory.db`. See `docs/implementation/PHASE_6D_TEAM_AI_AUDIT_PACK.md` §10. |
-
