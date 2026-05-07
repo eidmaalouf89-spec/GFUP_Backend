@@ -754,3 +754,21 @@ Items Phase 2 must know that the plan body does not already cover:
      modified (no source-file edits).
 
 *End of Phase 1 Findings.*
+
+---
+
+## Phase 5 Decision (2026-05-07) — ACTION MOEX scope
+
+ACTION MOEX is a curated action plan, not a full operational
+backlog. The full operational backlog is the operational dashboard
+shipped in Phase 4 (window.OVERVIEW.operational). Action MOEX
+surfaces the curated subset of the backlog for which an action
+bucket has been assigned by counter_attack_builder.
+
+Known gap: 1,659 operational rows currently have no action_bucket.
+Adding bucket coverage for those rows is a follow-up phase, out of
+scope for this redesign.
+
+This phase relabels the ACTION MOEX page subtitle to reflect the
+curated-subset interpretation. No logic in counter_attack_builder
+or counter_attack_query is changed.

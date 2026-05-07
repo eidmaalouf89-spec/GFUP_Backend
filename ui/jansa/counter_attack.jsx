@@ -114,7 +114,7 @@ const AM_COPY = {
   totalEyebrow:        'Total affiché',
   pageEyebrow:         'ACTION MOEX',
   pageTitle:           'Plan d’action MOEX',
-  pageSubtitle:        'Vue opérationnelle des sujets à reprendre, arbitrer, relancer ou justifier. Les compteurs indiquent le volume total par action, pas une charge journalière.',
+  pageSubtitle:        'Plan d\'action — sous-ensemble curé',
   detailHeader:        'Détail action',
   sec1:                'Ce que c’est',
   sec2:                'Pourquoi il est ici',
