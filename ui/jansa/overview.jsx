@@ -109,12 +109,9 @@ function OvSpark({ values, color = 'var(--accent)', height = 34 }) {
 /* ── KPI Row (4 cards) — Total Docs · Pending · Best Consultant · Best Contractor ── */
 function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor, onDrill }) {
   const trend = (data.weekly || []).map(w => w.closed);
-  const pendTrend = (data.weekly || []).map(w => w.opened - w.closed).map((_, i, a) => {
-    // running pending estimate
-    return Math.max(0, 400 + a.slice(0, i + 1).reduce((s, v) => s + v, 0));
-  });
+  // pendTrend reduce removed (R1 option c — no backend-supplied equivalent exists in OVERVIEW)
 
-  // Late count: use visa_flow.late if available, else focus p1_overdue if focus active
+  // Late count: use visa_flow.late if available
   const lateCount = data.visa_flow && data.visa_flow.late != null
     ? data.visa_flow.late
     : null;
@@ -139,7 +136,6 @@ function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor, onDrill 
         delta={data.pending_blocking_delta}
         invertDelta
         sub={pendingSub}
-        spark={pendTrend}
         accent="#FF453A"
         onClick={() => onDrill && onDrill('pending_blocking')}
       />
@@ -507,6 +503,7 @@ function FocusRadial({ f, onDrill }) {
     { key:'p3_soon',    label:'P3 · bientôt ≤15j',value: f.p3_soon,    color:'#FFD60A', r: 62, priority: 3 },
     { key:'p4_ok',      label:'P4 · ok',          value: f.p4_ok,      color:'#30D158', r: 44, priority: 4 },
   ];
+  // pre-existing FocusRadial reduce — operates on data.focus (not operational.*), kept for legend % display
   const total = rings.reduce((s, r) => s + r.value, 0);
   const maxValue = Math.max(...rings.map(r => r.value));
 
@@ -602,6 +599,84 @@ function FocusByConsultant({ items, onNavigate, onOpenConsultant }) {
         );
       })}
     </div>
+  );
+}
+
+/* ── Operational Dashboard — Tiles A–F (Phase 4) ── */
+function OperationalDashboard({ operational }) {
+  const v = (n) => n == null ? '—' : ovFmt(n);
+
+  const staleSub = (
+    <span>
+      Ancienneté: {v(operational.old_debt_age_days_min)}–{v(operational.old_debt_age_days_max)} j,
+      médiane {v(operational.old_debt_age_days_median)}
+    </span>
+  );
+
+  const moexSub = (
+    <>
+      <div>Frais ≤90j: {v(operational.moex_fresh)}</div>
+      <div>Stale >90j: {v(operational.moex_stale)}</div>
+    </>
+  );
+
+  const consultantsSub = (
+    <>
+      <div>PRIMAIRE: {v(operational.primary_total)}</div>
+      <div>SECONDAIRE: {v(operational.secondary_total)}</div>
+    </>
+  );
+
+  const enterpriseSub = (
+    <span>Sur la liste d'action: {v(operational.enterprise_action_rows)}</span>
+  );
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <OvEyebrow style={{ marginBottom: 12 }}>Tableau de bord opérationnel</OvEyebrow>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 14 }}>
+        <HeroKpi eyebrow="Backlog opérationnel" value={v(operational.operational_total)} accent="var(--accent)" />
+        <HeroKpi eyebrow="Flux frais (≤90j)" value={v(operational.fresh_total)} accent="#30D158" />
+        <HeroKpi eyebrow="Vieille dette opérationnelle (>90j)" value={v(operational.stale_total)} accent="#FF9F0A" sub={staleSub} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        <HeroKpi eyebrow="MOEX à traiter" value={v(operational.moex_total)} accent="#FF453A" sub={moexSub} />
+        <HeroKpi eyebrow="Consultants à relancer" value={v(operational.consultants_total)} accent="#BF5AF2" sub={consultantsSub} />
+        <HeroKpi eyebrow="Entreprises à relancer (REF/SAS REF)" value={v(operational.enterprise_ref_sas_candidates)} accent="#FF9F0A" sub={enterpriseSub} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Operational Priority Row — P1–P5 (Phase 4) ── */
+function OperationalPriorityRow({ operational }) {
+  const v = (n) => n == null ? '—' : ovFmt(n);
+  const cells = [
+    { label: 'P1', value: operational.priority_p1, color: '#FF453A' },
+    { label: 'P2', value: operational.priority_p2, color: '#FF9F0A' },
+    { label: 'P3', value: operational.priority_p3, color: '#FFD60A' },
+    { label: 'P4', value: operational.priority_p4, color: '#30D158' },
+    { label: 'P5', value: operational.priority_p5, color: '#0A84FF' },
+  ];
+  return (
+    <OvCard style={{ marginBottom: 20 }}>
+      <OvEyebrow style={{ marginBottom: 14 }}>Priorités opérationnelles</OvEyebrow>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+        {cells.map(c => (
+          <div key={c.label} style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: ovFonts.ui, fontSize: 40, fontWeight: 300,
+              color: c.color, letterSpacing: '-.03em', lineHeight: 1.1,
+            }}>{v(c.value)}</div>
+            <div style={{
+              fontFamily: ovFonts.ui, fontSize: 10.5, fontWeight: 600,
+              color: 'var(--text-3)', letterSpacing: '.12em',
+              textTransform: 'uppercase', marginTop: 4,
+            }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+    </OvCard>
   );
 }
 
@@ -1022,6 +1097,8 @@ function DrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) {
 /* ── Page ── */
 function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContractor }) {
   const data = window.OVERVIEW;
+  // Defensive read-default: operational may be briefly undefined on first paint
+  const operational = (window.OVERVIEW || {}).operational ?? {};
   const [drill, setDrill] = useStateOv(null);
   const openDrill = (kind, params = {}) => setDrill({ kind, params });
   const closeDrill = () => setDrill(null);
@@ -1043,6 +1120,12 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
           {focusMode ? 'Ce qui demande votre attention.' : 'Vue d\u2019ensemble.'}
         </h1>
       </div>
+
+      {/* Operational dashboard tiles A–F — always visible, not gated by focusMode (R2 option a) */}
+      <OperationalDashboard operational={operational}/>
+
+      {/* Operational priority row P1–P5 — replaces focus.priority_* binding */}
+      <OperationalPriorityRow operational={operational}/>
 
       {/* KPI row */}
       <KpiRow data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onOpenContractor={onOpenContractor} onDrill={openDrill}/>
