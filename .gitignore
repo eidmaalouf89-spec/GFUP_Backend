@@ -70,6 +70,7 @@ codex prompts/emergency2
 Thumbs.db
 desktop.ini
 .idea/
+.obsidian/
 .vscode/*
 !.vscode/extensions.json
 *.suo
@@ -77,3 +78,4 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+*.pre_patch_backup
