@@ -398,7 +398,7 @@ def _subject_label(row: pd.Series, emetteur_name: str) -> str:
 def _pick_primary_actor(row: pd.Series) -> str:
     timeline = _load_timeline_attribution()
     numero = _safe_str(row.get("numero"))
-    indice = _safe_str(row.get("indice") or row.get("latest_indice"))
+    indice = _safe_str(row.get("latest_indice") or row.get("indice"))
     if not timeline.empty:
         sub = timeline[
             (timeline["numero"].map(_safe_str) == numero)
