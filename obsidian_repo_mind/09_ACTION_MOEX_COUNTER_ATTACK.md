@@ -28,7 +28,7 @@ It has three sub-layers built across Phase 6:
 **Output:** `output/intermediate/COUNTER_ATTACK_ITEMS.csv`
 
 **What it builds:**
-- One row per chain (latest indice, deduped — 1,525 distinct `family_key` rows as of Phase 6C S3 correction)
+- One row per chain (latest indice, deduped — 1,524 distinct `family_key` rows as of Phase 6X R3 validation)
 - Assigns each chain to an `action_bucket` based on DCC split deadline truth + Chain/Onion wait-day fields
 - Computes `days_late`, `risk_level`, `is_internal_moex_exposure`, `is_external_attackable`
 - Generates `evidence_summary`, `chain_observations_summary`, `consultant_reports_summary`
@@ -161,3 +161,6 @@ an action bucket.
 Known gap: 1,659 operational rows currently have no action_bucket.
 Bucket-coverage extension is a follow-up phase, out of scope for the
 operational dashboard redesign.
+
+Cross-reference: `docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md`
+§5 (Action MOEX relationship) and §Phase 5 Decision.

@@ -14,9 +14,27 @@ operational debt — stale is NOT excluded.
 **Source frame:** `ctx.dernier_df` exclusively. No other data frame is
 a valid source of operational rows.
 
-**Operational mask:** `portfolio_bucket in {"LIVE_OPERATIONAL", "LEGACY_BACKLOG"}`.
+**Operational mask (bucket layer):** `portfolio_bucket in {"LIVE_OPERATIONAL", "LEGACY_BACKLOG"}`.
 This mask already excludes terminal states and `ARCHIVED_HISTORICAL`; no
 additional state filter is required.
+
+**Operational mask (visa exclusion — CO-3 refinement, 2026-05-07):** within the
+bucket-matched rows, documents whose `_visa_global ∈ {VSO, VAO, REF, SAS REF, HM}`
+are further excluded. These are individually-resolved documents that still sit inside
+operationally open chains. The full two-layer mask is therefore:
+
+```
+portfolio_bucket ∈ {LIVE_OPERATIONAL, LEGACY_BACKLOG}
+AND _visa_global ∉ {VSO, VAO, REF, SAS REF, HM}
+```
+
+The visa exclusion removes 332 docs from the bucket-matched set (138 CLOSED-visa
+[VSO + VAO + HM] + 194 CONTRACTOR-tier [REF + SAS REF]) to reach the locked
+`operational_total = 2,460`. The 194 REF/SAS REF docs are separately surfaced as
+`enterprise_ref_sas_candidates` (they retain the bucket but are resolved).
+
+**Implementation:** `src/reporting/aggregator.py::compute_operational_dashboard`
+lines 565–570 (`_RESOLVED_VISAS` exclusion on `_visa_global`).
 
 **Stale threshold:** 90 days (constant; matches the threshold used by
 `focus_filter.py` `apply_focus_filter`). The field tested is
@@ -772,3 +790,52 @@ scope for this redesign.
 This phase relabels the ACTION MOEX page subtitle to reflect the
 curated-subset interpretation. No logic in counter_attack_builder
 or counter_attack_query is changed.
+
+---
+
+## Implementation summary (shipped state — 2026-05-07)
+
+**Backend owner:** `src/reporting/aggregator.py::compute_operational_dashboard`
+(lines 554–660). Returns the 21-key dict below.
+
+**Wire-up:** `app.py::get_dashboard_data` calls `compute_operational_dashboard(ctx)`
+after the existing focus filter block and merges the result into the payload under
+the key `"operational"`. The existing focus block is unchanged.
+
+**UI bridge:** `src/reporting/ui_adapter.py::adapt_overview` (lines 236–239) passes
+`dashboard["operational"]` through verbatim into `window.OVERVIEW.operational`.
+
+**21 keys exposed at `window.OVERVIEW.operational`:**
+
+| Key | Description |
+|---|---|
+| `operational_total` | 2,460 — open operational rows |
+| `fresh_total` | 927 — operational rows ≤ 90 d since last activity |
+| `stale_total` | 1,533 — operational rows > 90 d (old open debt) |
+| `moex_total` | 1,711 — operational rows owned by MOEX tier |
+| `moex_fresh` | 505 — MOEX + fresh |
+| `moex_stale` | 1,206 — MOEX + stale |
+| `primary_total` | 670 — operational rows owned by PRIMARY tier |
+| `secondary_total` | 79 — operational rows owned by SECONDARY tier |
+| `consultants_total` | 749 — primary_total + secondary_total |
+| `priority_p1` | 2,095 — computed over full operational mask (stale included) |
+| `priority_p2` | 13 |
+| `priority_p3` | 90 |
+| `priority_p4` | 262 |
+| `priority_p5` | 0 |
+| `enterprise_ref_sas_candidates` | 194 — REF/SAS REF in the broad bucket mask |
+| `enterprise_action_rows` | 100 — ENTREPRISE_A_RELANCER rows in COUNTER_ATTACK_ITEMS.csv |
+| `old_debt_age_days_min` | 91 |
+| `old_debt_age_days_median` | 204 |
+| `old_debt_age_days_max` | 801 |
+| `stale_threshold_days` | 90 |
+| `universe_definition` | Human-readable mask + path string; includes ca_warning if CSV missing |
+
+**Validation scripts (no source change, regression-insurance):**
+- `scripts/check_operational_payload.py` — verifies all 20 numeric fields match the locked baseline
+- `scripts/check_overview_operational_keys.py` — verifies all 21 keys are present in `window.OVERVIEW.operational`
+- `scripts/audit_counts_lineage.py` — `UI_PAYLOAD: compared=10 matches=10 mismatches=0` baseline
+
+**UI tiles (`ui/jansa/overview.jsx`):** `OperationalDashboard` tiles A–F + `OperationalPriorityRow` P1–P5. `pendTrend reduce()` removed (was lines 112–115). No JSX arithmetic — all counts are backend fields.
+
+**Phase 6 artifact size:** `COUNTER_ATTACK_ITEMS.csv` — 1,524 rows (terminal-excluded) as of Phase 6X R3.
