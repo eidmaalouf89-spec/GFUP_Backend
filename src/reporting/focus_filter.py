@@ -26,7 +26,7 @@ from .data_loader import RunContext
 
 logger = logging.getLogger(__name__)
 
-TERMINAL_STATUSES = {"VSO", "VAO", "SAS REF", "HM"}
+TERMINAL_STATUSES = {"VSO", "VAO", "REF", "SAS REF", "HM"}
 
 
 @dataclass
@@ -46,6 +46,109 @@ class FocusResult:
     priority_queue: list = field(default_factory=list)
     per_actor_queues: dict = field(default_factory=dict)
     stats: dict = field(default_factory=dict)
+
+
+def recompute_focus_stats_after_narrowing(
+    focus_result: FocusResult,
+    legacy_count: int = 0,
+    resolve_name=resolve_emetteur_name,
+) -> FocusResult:
+    """Rebuild FocusResult-derived queues and stats after focused_df narrowing."""
+    fdf = focus_result.focused_df
+    if fdf is None:
+        focus_result.stats["legacy_backlog_count"] = legacy_count
+        return focus_result
+
+    focus_result.focused_doc_ids = set(fdf["doc_id"].tolist())
+    surviving = focus_result.focused_doc_ids
+    focus_result.priority_queue = [
+        item for item in focus_result.priority_queue
+        if item.get("doc_id") in surviving
+    ]
+
+    p_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    per_actor_queues = {}
+    for item in focus_result.priority_queue:
+        try:
+            priority = int(item.get("priority", 5))
+        except (TypeError, ValueError):
+            priority = 5
+        p_counts[priority] = p_counts.get(priority, 0) + 1
+        for owner in item.get("owners", []) or []:
+            per_actor_queues.setdefault(owner, []).append(item.get("doc_id"))
+
+    by_consultant = []
+    for actor_name, doc_ids in per_actor_queues.items():
+        if actor_name in ("CONTRACTOR", "MOEX"):
+            continue
+        actor_p = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for item in focus_result.priority_queue:
+            if actor_name in (item.get("owners", []) or []):
+                try:
+                    priority = int(item.get("priority", 5))
+                except (TypeError, ValueError):
+                    priority = 5
+                actor_p[priority] = actor_p.get(priority, 0) + 1
+        total = sum(actor_p.values())
+        if total > 0:
+            by_consultant.append({
+                "name": actor_name,
+                "slug": actor_name.upper().replace(" ", "_").replace("'", "_"),
+                "p1": actor_p[1],
+                "p2": actor_p[2],
+                "p3": actor_p[3],
+                "p4": actor_p[4],
+                "total": total,
+            })
+    by_consultant.sort(key=lambda x: x["total"], reverse=True)
+
+    by_contractor = {}
+    for item in focus_result.priority_queue:
+        if item.get("owner_tier") != "CONTRACTOR":
+            continue
+        code = (item.get("emetteur") or "").strip()
+        if not code or code == "?":
+            continue
+        code_up = code.upper()
+        bucket = by_contractor.setdefault(code_up, {
+            "code": code_up,
+            "name": (resolve_name(code_up) if resolve_name else None) or code_up,
+            "p1": 0, "p2": 0, "p3": 0, "p4": 0,
+            "total": 0,
+        })
+        try:
+            priority = int(item.get("priority", 5))
+        except (TypeError, ValueError):
+            priority = 5
+        if priority in (1, 2, 3, 4):
+            bucket[f"p{priority}"] += 1
+            bucket["total"] += 1
+
+    tier_counts = fdf["_focus_owner_tier"].value_counts().to_dict()
+    focus_result.per_actor_queues = per_actor_queues
+    focus_result.blocked_upstream_ids = set(
+        fdf.loc[
+            fdf["_focus_owner_tier"].isin(["PRIMARY", "SECONDARY"]),
+            "doc_id",
+        ].tolist()
+    )
+    focus_result.stats["focused_count"] = len(surviving)
+    focus_result.stats["blocked_upstream_count"] = len(focus_result.blocked_upstream_ids)
+    focus_result.stats["p1_overdue"] = p_counts[1]
+    focus_result.stats["p2_urgent"] = p_counts[2]
+    focus_result.stats["p3_soon"] = p_counts[3]
+    focus_result.stats["p4_ok"] = p_counts[4]
+    focus_result.stats["p5_no_deadline"] = p_counts[5]
+    focus_result.stats["moex_actionable"] = tier_counts.get("MOEX", 0)
+    focus_result.stats["contractor_actionable"] = tier_counts.get("CONTRACTOR", 0)
+    focus_result.stats["primary_pending"] = tier_counts.get("PRIMARY", 0)
+    focus_result.stats["secondary_pending"] = tier_counts.get("SECONDARY", 0)
+    focus_result.stats["by_consultant"] = by_consultant
+    focus_result.stats["by_contractor"] = sorted(
+        by_contractor.values(), key=lambda x: x["total"], reverse=True
+    )
+    focus_result.stats["legacy_backlog_count"] = legacy_count
+    return focus_result
 
 
 def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:

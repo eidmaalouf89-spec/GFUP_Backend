@@ -593,16 +593,8 @@ class Api:
             return
         mask = fdf["numero_normalized"].astype(str).isin(live_numeros)
         focus_result.focused_df = fdf[mask].copy()
-        focus_result.focused_doc_ids = set(
-            focus_result.focused_df["doc_id"].tolist()
-        )
-        surviving = focus_result.focused_doc_ids
-        focus_result.priority_queue = [
-            x for x in focus_result.priority_queue
-            if x.get("doc_id") in surviving
-        ]
-        focus_result.stats["focused_count"] = len(surviving)
-        focus_result.stats["legacy_backlog_count"] = legacy_count
+        from reporting.focus_filter import recompute_focus_stats_after_narrowing
+        recompute_focus_stats_after_narrowing(focus_result, legacy_count=legacy_count)
 
     # ── Dashboard / reporting data ─────────────────────────────
 
