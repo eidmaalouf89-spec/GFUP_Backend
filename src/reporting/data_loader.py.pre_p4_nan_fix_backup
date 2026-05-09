@@ -677,8 +677,8 @@ def _precompute_focus_columns(dernier_df: pd.DataFrame,
 
     # ── 4. Focus priority tier ───────────────────────────��──────────
     def _priority(dtd):
-        if pd.isna(dtd):
-            return 5  # P5 — no deadline (covers both Python None and float NaN)
+        if dtd is None:
+            return 5  # P5 — no deadline
         if dtd < 0:
             return 1  # P1 — overdue
         if dtd <= 5:
