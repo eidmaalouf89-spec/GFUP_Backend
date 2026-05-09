@@ -457,3 +457,21 @@ unwired. `priority_queue` exists in OVERVIEW data but is not rendered (no site t
   `KpiRow.BestPerformerCard` ("Consultant de la semaine") and
   `FocusByConsultant` per-row buttons. Both call sites replaced
   `onNavigate('Con
+---
+
+## 2026-05-09 — Operational priority strip P1..P4 (P5 retired)
+
+`OperationalPriorityRow` in `ui/jansa/overview.jsx` now renders 4 cells
+(P1, P2, P3, P4). The 5-column grid was changed to `repeat(4, 1fr)`.
+Backend `compute_operational_dashboard` no longer emits `priority_p5`.
+
+New backend fields on `data.operational`:
+
+| Field | Meaning |
+|---|---|
+| `moex_total` | normal Maître d'Œuvre EXE only (excludes MOEX SAS pollution) |
+| `moex_sas_total` | MOEX SAS / GEMO SAS — SAS-pending docs |
+| `contractor_total` | tier `CONTRACTOR` (REF / DEF / SAS REF / no-MOEX-called negative-worst) |
+
+The JSX continues to read `operational.priority_p1..p4`; no other UI
+changes are required.

@@ -648,7 +648,10 @@ function OperationalDashboard({ operational }) {
   );
 }
 
-/* ── Operational Priority Row — P1–P5 (Phase 4) ── */
+/* ── Operational Priority Row — P1–P4 ──
+   P5 removed 2026-05-09: global workflow is 30 days (business rule A);
+   "no deadline" is no longer a valid operational state. Backend collapses
+   missing-deadline rows into P1 via a 30-day fallback. */
 function OperationalPriorityRow({ operational }) {
   const v = (n) => n == null ? '—' : ovFmt(n);
   const cells = [
@@ -656,12 +659,11 @@ function OperationalPriorityRow({ operational }) {
     { label: 'P2', value: operational.priority_p2, color: '#FF9F0A' },
     { label: 'P3', value: operational.priority_p3, color: '#FFD60A' },
     { label: 'P4', value: operational.priority_p4, color: '#30D158' },
-    { label: 'P5', value: operational.priority_p5, color: '#0A84FF' },
   ];
   return (
     <OvCard style={{ marginBottom: 20 }}>
       <OvEyebrow style={{ marginBottom: 14 }}>Priorités opérationnelles</OvEyebrow>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         {cells.map(c => (
           <div key={c.label} style={{ textAlign: 'center' }}>
             <div style={{
@@ -1124,7 +1126,7 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
       {/* Operational dashboard tiles A–F — always visible, not gated by focusMode (R2 option a) */}
       <OperationalDashboard operational={operational}/>
 
-      {/* Operational priority row P1–P5 — replaces focus.priority_* binding */}
+      {/* Operational priority row P1–P4 (P5 removed 2026-05-09) */}
       <OperationalPriorityRow operational={operational}/>
 
       {/* KPI row */}

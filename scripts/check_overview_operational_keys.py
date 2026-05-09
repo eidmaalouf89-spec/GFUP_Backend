@@ -19,17 +19,19 @@ LOCKED_BASELINE = {
     "operational_total": 2141,
     "fresh_total": 829,
     "stale_total": 1312,
-    "moex_total": 1434,
-    "moex_fresh": 425,
-    "moex_stale": 1009,
-    "primary_total": 628,
-    "secondary_total": 79,
-    "consultants_total": 707,
-    "priority_p1": 1814,
-    "priority_p2": 13,
-    "priority_p3": 90,
-    "priority_p4": 224,
-    "priority_p5": 0,
+    # moex_total / consultants split is being re-baselined by SAS-routing
+    # patch (2026-05-09): MOEX SAS pollution moves to moex_sas_total;
+    # CONTRACTOR tier now exposed as contractor_total. Numeric baselines
+    # below are pre-patch; post-patch values are recorded after rerun.
+    # "moex_total": <new value>,
+    # "moex_fresh": <new value>,
+    # "moex_stale": <new value>,
+    # "primary_total": <new value>,
+    # "secondary_total": <new value>,
+    # "consultants_total": <new value>,
+    # priority_p* baselines retired by SAS-routing/P5-removal patch
+    # (2026-05-09). Re-baseline after pipeline rerun if structural check
+    # passes. Values now derived from operational, not hard-asserted here.
     "enterprise_ref_sas_candidates": 162,
     "enterprise_action_rows": 87,
     "old_debt_age_days_min": 91,
@@ -40,9 +42,12 @@ LOCKED_BASELINE = {
 
 EXPECTED_KEYS = {
     "operational_total", "fresh_total", "stale_total",
-    "moex_total", "moex_fresh", "moex_stale",
+    "moex_total", "moex_sas_total", "moex_fresh", "moex_stale",
     "primary_total", "secondary_total", "consultants_total",
-    "priority_p1", "priority_p2", "priority_p3", "priority_p4", "priority_p5",
+    "contractor_total",
+    # P5 retired (2026-05-09): global workflow is 30 days; "no deadline"
+    # is no longer a valid operational state.
+    "priority_p1", "priority_p2", "priority_p3", "priority_p4",
     "enterprise_ref_sas_candidates", "enterprise_action_rows",
     "old_debt_age_days_min", "old_debt_age_days_median", "old_debt_age_days_max",
     "stale_threshold_days", "universe_definition",

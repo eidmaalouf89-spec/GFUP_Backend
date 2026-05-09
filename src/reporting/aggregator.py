@@ -566,33 +566,61 @@ def compute_operational_dashboard(ctx: RunContext) -> dict:
     # Same terminal set as focus_filter.py:29 TERMINAL_STATUSES.
     _RESOLVED_VISAS = {"VSO", "VAO", "REF", "SAS REF", "HM"}
     open_mask = ~op_broad["_visa_global"].isin(_RESOLVED_VISAS)
-    op = op_broad[open_mask]
+
+    # Business rule D6 (2026-05-09): for no-MOEX-called workflows where the
+    # worst primary/secondary response is favorable (VAO/VSO/FAV/SUS), the
+    # submittal is closed even without a chapeau visa_global. focus_ownership
+    # tags these as tier=="CLOSED"; remove them from the operational
+    # universe so ownership-bucket sums reconcile with operational_total.
+    if "_focus_owner_tier" in op_broad.columns:
+        not_closed_mask = op_broad["_focus_owner_tier"] != "CLOSED"
+        op = op_broad[open_mask & not_closed_mask]
+    else:
+        op = op_broad[open_mask]
 
     days = op["_days_since_last_activity"]
     fresh_mask = days <= _OPERATIONAL_STALE_THRESHOLD
     stale_mask = days > _OPERATIONAL_STALE_THRESHOLD
 
     tier = op["_focus_owner_tier"]
-    moex_mask = tier == "MOEX"
+    # ── MOEX vs MOEX SAS split (business rule C) ──────────────────
+    # Tier remains "MOEX" for both, but owner ["MOEX SAS"] denotes the
+    # SAS-pending variant which routes to the MOEX SAS / GEMO SAS fiche.
+    # Normal Maître d'Œuvre EXE pollution from SAS-gate pending is
+    # subtracted from moex_total here.
+    def _is_moex_sas(owner_val):
+        try:
+            return isinstance(owner_val, list) and owner_val == ["MOEX SAS"]
+        except Exception:
+            return False
+
+    moex_sas_owner_mask = op["_focus_owner"].apply(_is_moex_sas)
+    moex_total_all = tier == "MOEX"
+    moex_mask = moex_total_all & (~moex_sas_owner_mask)  # normal MOEX EXE only
+    moex_sas_mask = moex_total_all & moex_sas_owner_mask
     primary_mask = tier == "PRIMARY"
     secondary_mask = tier == "SECONDARY"
+    contractor_mask = tier == "CONTRACTOR"
 
     operational_total = int(len(op))
     fresh_total = int(fresh_mask.sum())
     stale_total = int(stale_mask.sum())
-    moex_total = int(moex_mask.sum())
+    moex_total = int(moex_mask.sum())            # normal Maître d'Œuvre EXE only
+    moex_sas_total = int(moex_sas_mask.sum())    # MOEX SAS / GEMO SAS
     moex_fresh = int((moex_mask & fresh_mask).sum())
     moex_stale = int((moex_mask & stale_mask).sum())
     primary_total = int(primary_mask.sum())
     secondary_total = int(secondary_mask.sum())
     consultants_total = primary_total + secondary_total
+    contractor_total = int(contractor_mask.sum())
 
     prio = op["_focus_priority"]
     priority_p1 = int((prio == 1).sum())
     priority_p2 = int((prio == 2).sum())
     priority_p3 = int((prio == 3).sum())
     priority_p4 = int((prio == 4).sum())
-    priority_p5 = int((prio == 5).sum())
+    # P5 removed (business rule A — global workflow is 30 days; "no
+    # deadline" is not a valid operational state).
 
     # enterprise_ref_sas_candidates counts REF/SAS REF in the BROAD bucket mask
     # (these are resolved docs that still need enterprise follow-up).
@@ -629,7 +657,8 @@ def compute_operational_dashboard(ctx: RunContext) -> dict:
 
     universe_definition = (
         "operational = dernier_df ⨝ portfolio_bucket ∈ {LIVE_OPERATIONAL, LEGACY_BACKLOG} "
-        "∧ _visa_global ∉ {VSO,VAO,REF,SAS REF,HM}; "
+        "∧ _visa_global ∉ {VSO,VAO,REF,SAS REF,HM} "
+        "∧ _focus_owner_tier ≠ CLOSED (no-MOEX-called favorable closure, rule D6); "
         f"stale_threshold={_OPERATIONAL_STALE_THRESHOLD}; "
         f"counter_attack_path={ca_path}"
         f"{ca_warning}"
@@ -640,16 +669,17 @@ def compute_operational_dashboard(ctx: RunContext) -> dict:
         "fresh_total": fresh_total,
         "stale_total": stale_total,
         "moex_total": moex_total,
+        "moex_sas_total": moex_sas_total,
         "moex_fresh": moex_fresh,
         "moex_stale": moex_stale,
         "primary_total": primary_total,
         "secondary_total": secondary_total,
         "consultants_total": consultants_total,
+        "contractor_total": contractor_total,
         "priority_p1": priority_p1,
         "priority_p2": priority_p2,
         "priority_p3": priority_p3,
         "priority_p4": priority_p4,
-        "priority_p5": priority_p5,
         "enterprise_ref_sas_candidates": enterprise_ref_sas_candidates,
         "enterprise_action_rows": enterprise_action_rows,
         "old_debt_age_days_min": old_debt_age_days_min,

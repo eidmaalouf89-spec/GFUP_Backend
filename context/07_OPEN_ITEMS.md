@@ -928,3 +928,65 @@ qualification in `src/flat_ged/source_exclusions.py`.
 
 Do not reopen the old broad `BEN + pre-2026` or `LGD + pre-2026` filters.
 Any future source exclusion needs an explicit document-level reason.
+
+---
+
+## ✅ CLOSED 2026-05-09 — Focus ownership SAS routing + P5 removal
+
+**Symptoms (project owner):** focus / operational dashboard had polluted
+priority buckets (P5) and false MOEX ownership for SAS REF and SAS
+pending docs. SAS REF was being treated as terminal/CLOSED; SAS-gate
+pending docs were rolled into normal Maître d'Œuvre EXE; missing
+deadlines spawned a synthetic P5 bucket.
+
+**Patch (commit pending):**
+
+- `src/pipeline/stages/stage_read_flat.py`: added `_is_true()` helper;
+  `_derive_visa_global` and `_derive_closure_mode` now use it instead of
+  fragile `is True` identity checks.
+- `src/reporting/data_loader.py::_precompute_focus_columns`: prefers
+  `flat_doc_meta[doc_id].visa_global` over `WorkflowEngine.compute_*`
+  (covers the SAS REF gap). Adds 30-day global-workflow fallback for
+  missing pending deadlines. Priority returns 1..4 only.
+- `src/reporting/focus_ownership.py`: full rewrite. SAS REF removed
+  from `TERMINAL_VISA` and added to `CONTRACTOR_VISA`. Status
+  equivalence sets (`FAVORABLE`/`NEGATIVE`) added. SAS-pending
+  detection from `responses_df`. No-MOEX-called closure derivation
+  (rule D). MOEX SAS routing (rule C).
+- `src/reporting/aggregator.py`: emits `moex_sas_total` and
+  `contractor_total`; removes `priority_p5`. Excludes `tier=="CLOSED"`
+  from operational universe (rule D6).
+- `ui/jansa/overview.jsx`: P5 cell removed; grid → `repeat(4, 1fr)`.
+- `tests/test_focus_ownership_sas_p5.py`: 30 new tests covering
+  bool-robustness, SAS REF / DEF / REF routing, SAS pending → MOEX SAS,
+  no-MOEX-called closure, P5 absence in payload + JSX.
+- `scripts/check_overview_operational_keys.py` /
+  `scripts/check_operational_payload.py`: baselines re-baselined;
+  pre-patch numeric assertions retired (`priority_p5` removed,
+  `moex_sas_total` / `contractor_total` added).
+
+**Validation evidence (post-patch run, 2026-05-09):**
+
+```
+operational_total: 2322
+fresh_total + stale_total: 908 + 1414 = 2322 ✅
+moex + moex_sas + primary + secondary + contractor:
+  1294 + 24 + 850 + 89 + 65 = 2322 ✅
+priority_p1..p4 sum: 2108 + 20 + 102 + 92 = 2322 ✅
+priority_p5: ABSENT from payload ✅
+SAS REF docs: 234 — all 234 → CONTRACTOR (none MOEX, none CLOSED) ✅
+MOEX SAS owner: 24 docs (split off from normal MOEX EXE) ✅
+```
+
+Audit harness: `PASS=16 WARN=0 FAIL=1` (FAIL moved from
+`status_SAS_REF@L1_FLAT_GED_XLSX` to `open_count@L4_AGGREGATOR` — the
+new value reflects the rule-D6 closure exclusion; total FAIL count
+unchanged). Chain+Onion: WARN, 72/73 passed, 0 FAILs. Focused tests:
+30/30 pass. Pre-existing test failures (test_audit_counts_lineage,
+test_cache_meta_v2) are unrelated to this patch — they were already
+failing on the current Run 0 baseline before edits.
+
+**Rerun commands documented in:** `context/10_VALIDATION_COMMANDS.md`
+section "SAS routing + P5 smoke".
+
+**Backup:** `backup/focus_owner_sas_p5_20260509_195155/`

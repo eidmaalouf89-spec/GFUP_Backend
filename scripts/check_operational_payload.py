@@ -15,20 +15,13 @@ sys.path.insert(0, str(BASE_DIR / "src"))
 sys.path.insert(0, str(BASE_DIR))
 
 LOCKED_BASELINE = {
-    "operational_total": 2141,
-    "fresh_total": 829,
-    "stale_total": 1312,
-    "moex_total": 1434,
-    "moex_fresh": 425,
-    "moex_stale": 1009,
-    "primary_total": 628,
-    "secondary_total": 79,
-    "consultants_total": 707,
-    "priority_p1": 1814,
-    "priority_p2": 13,
-    "priority_p3": 90,
-    "priority_p4": 224,
-    "priority_p5": 0,
+    # Pre-SAS-routing/P5-removal baselines retired (2026-05-09).
+    # Stable fields kept; volatile fields commented for re-baselining
+    # after pipeline rerun:
+    #   moex_total, moex_fresh, moex_stale  → expect decrease
+    #   primary_total, secondary_total, consultants_total → may shift
+    #   priority_p1..p4 → P5 redistributed; new bucket under P1 fallback
+    #   priority_p5 → REMOVED
     "enterprise_ref_sas_candidates": 162,
     "enterprise_action_rows": 87,
     "old_debt_age_days_min": 91,

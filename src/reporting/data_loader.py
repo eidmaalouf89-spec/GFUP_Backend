@@ -10,7 +10,7 @@ import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -520,9 +520,15 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
 
         # Focus columns + ownership
         try:
-            _precompute_focus_columns(dernier_df, responses_df, workflow_engine, data_date_val)
+            _precompute_focus_columns(
+                dernier_df, responses_df, workflow_engine, data_date_val,
+                flat_doc_meta=flat_doc_meta,
+            )
             if data_date_val is not None:
-                compute_focus_ownership(dernier_df, workflow_engine, data_date_val)
+                compute_focus_ownership(
+                    dernier_df, workflow_engine, data_date_val,
+                    responses_df=responses_df,
+                )
             logger.info("[FLAT_ARTIFACT] Focus columns pre-computed on dernier_df")
         except Exception as e:
             logger.warning("[FLAT_ARTIFACT] Focus column pre-computation failed (non-fatal): %s", e)
@@ -580,28 +586,39 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
 def _precompute_focus_columns(dernier_df: pd.DataFrame,
                               responses_df: pd.DataFrame,
                               workflow_engine,
-                              data_date_val) -> None:
+                              data_date_val,
+                              flat_doc_meta: dict = None) -> None:
     """Add pre-computed focus columns to dernier_df IN PLACE.
 
     Columns added:
-        _visa_global       : str or None — MOEX visa status
+        _visa_global       : str or None — MOEX visa status (flat_doc_meta first; engine fallback)
         _visa_global_date  : date or None — date of MOEX visa
         _last_activity_date: date or None — max(submission, any response date)
         _days_since_last_activity: int or None — DATA_DATE - _last_activity_date
-        _earliest_deadline : date or None — min(date_limite) among pending responses
+        _earliest_deadline : date or None — min(date_limite) among pending responses,
+                                            with 30-day global-workflow fallback
         _days_to_deadline  : int or None — earliest_deadline - DATA_DATE (negative = overdue)
-        _focus_priority    : int 1-5 — urgency tier from _days_to_deadline
+        _focus_priority    : int 1-4 — urgency tier from _days_to_deadline.
+                                       P5 was removed; missing-deadline rows fall back
+                                       to a 30-day global limit (business rule A) and
+                                       collapse into P1 if still unresolvable.
     """
     if data_date_val is None:
         return
 
     dd = data_date_val.date() if hasattr(data_date_val, 'date') else data_date_val
+    meta = flat_doc_meta or {}
 
-    # ── 1. VISA GLOBAL per doc (O(N) using cached _doc_approvers) ───
+    # ── 1. VISA GLOBAL per doc — prefer flat_doc_meta (Phase 8 D-010 routing) ─
     visa_globals = {}
     visa_dates = {}
     for doc_id in dernier_df["doc_id"]:
-        v, vd = workflow_engine.compute_visa_global_with_date(doc_id)
+        # Engine call still needed for the visa date (flat_doc_meta lacks date)
+        v_engine, vd = workflow_engine.compute_visa_global_with_date(doc_id)
+        m = meta.get(doc_id) or {}
+        v_meta = m.get("visa_global") if isinstance(m, dict) else None
+        # Meta is authoritative when present (covers SAS REF, which engine misses)
+        v = v_meta if v_meta is not None else v_engine
         visa_globals[doc_id] = v
         if vd is not None:
             visa_dates[doc_id] = vd.date() if hasattr(vd, 'date') else vd
@@ -663,9 +680,31 @@ def _precompute_focus_columns(dernier_df: pd.DataFrame,
 
     dernier_df["_earliest_deadline"] = dernier_df["doc_id"].map(earliest_dl)
 
+    # ── 3b. 30-day global-workflow fallback (business rule A) ───────
+    # When no pending response carries a date_limite, derive a synthetic
+    # deadline as last_activity + 30d. This eliminates the legacy
+    # "no-deadline" P5 bucket — P5 is no longer a valid operational state.
+    GLOBAL_WORKFLOW_DAYS = 30
+
+    def _resolve_deadline(row):
+        dl = row.get("_earliest_deadline")
+        if dl is not None and not (isinstance(dl, float) and pd.isna(dl)):
+            return dl
+        # Fallback: last_activity + 30d
+        la = row.get("_last_activity_date")
+        if la is None or (isinstance(la, float) and pd.isna(la)):
+            return None
+        try:
+            la_d = la.date() if hasattr(la, 'date') else la
+            return la_d + timedelta(days=GLOBAL_WORKFLOW_DAYS)
+        except Exception:
+            return None
+
+    dernier_df["_earliest_deadline"] = dernier_df.apply(_resolve_deadline, axis=1)
+
     # Days to deadline (negative = overdue)
     def _days_to_dl(dl):
-        if dl is None or pd.isna(dl):
+        if dl is None or (isinstance(dl, float) and pd.isna(dl)):
             return None
         try:
             d = dl.date() if hasattr(dl, 'date') else dl
@@ -675,17 +714,21 @@ def _precompute_focus_columns(dernier_df: pd.DataFrame,
 
     dernier_df["_days_to_deadline"] = dernier_df["_earliest_deadline"].apply(_days_to_dl)
 
-    # ── 4. Focus priority tier ───────────────────────────��──────────
+    # ── 4. Focus priority tier — P1..P4 only (P5 removed) ──────────
+    # Business rule A: global workflow is 30 days total; there is no
+    # operational concept of "no deadline" for open submittals. Any
+    # row that still lacks a derivable deadline collapses into P1
+    # (treated as overdue/anomaly) — never P5.
     def _priority(dtd):
-        if pd.isna(dtd):
-            return 5  # P5 — no deadline (covers both Python None and float NaN)
+        if pd.isna(dtd) or dtd is None:
+            return 1  # anomaly / unresolvable deadline → P1
         if dtd < 0:
-            return 1  # P1 — overdue
+            return 1  # overdue
         if dtd <= 5:
-            return 2  # P2 — urgent
+            return 2  # urgent
         if dtd <= 15:
-            return 3  # P3 — soon
-        return 4      # P4 — comfortable
+            return 3  # soon
+        return 4      # comfortable
 
     dernier_df["_focus_priority"] = dernier_df["_days_to_deadline"].apply(_priority)
 
@@ -886,12 +929,16 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
             # instead of per-doc Python loops. Computed once, cached with ctx.
             try:
                 _precompute_focus_columns(
-                    dernier_df, responses_df, workflow_engine, data_date_val
+                    dernier_df, responses_df, workflow_engine, data_date_val,
+                    flat_doc_meta=None,  # legacy raw fallback path has no flat meta
                 )
                 # Ownership resolver — adds _focus_owner and _focus_owner_tier
                 if data_date_val is not None:
                     dd_resolved = data_date_val.date() if hasattr(data_date_val, 'date') else data_date_val
-                    compute_focus_ownership(dernier_df, workflow_engine, dd_resolved)
+                    compute_focus_ownership(
+                        dernier_df, workflow_engine, dd_resolved,
+                        responses_df=responses_df,
+                    )
                 logger.info("Focus columns + ownership pre-computed on dernier_df")
             except Exception as e:
                 logger.warning("Focus column pre-computation failed (non-fatal): %s", e)

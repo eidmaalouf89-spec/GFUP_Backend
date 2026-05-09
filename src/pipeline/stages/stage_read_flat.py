@@ -73,6 +73,38 @@ _EN_ATTENTE_PREFIX = "En attente visa"
 _BOOL_COLS = ("is_completed", "is_blocking", "is_sas", "requires_new_cycle")
 
 
+def _is_true(value) -> bool:
+    """Robust truthiness check that survives pandas/numpy/str/bool variants.
+
+    Accepts as True: Python True, numpy.bool_(True), 1, "1", "True", "true",
+    "TRUE", "T", "Y", "yes". Everything else (including "False", NaN, None,
+    0, "", "no", "0") is False.
+    """
+    import numpy as _np
+    if value is None:
+        return False
+    # NaN guard for floats
+    try:
+        if isinstance(value, float) and _np.isnan(value):
+            return False
+    except Exception:
+        pass
+    # Native bool / numpy bool
+    if isinstance(value, (bool, _np.bool_)):
+        return bool(value)
+    # Numeric (int/float/numpy)
+    try:
+        if isinstance(value, (int, _np.integer)):
+            return int(value) == 1
+        if isinstance(value, (float, _np.floating)):
+            return float(value) == 1.0
+    except Exception:
+        pass
+    # String
+    s = str(value).strip().lower()
+    return s in ("true", "1", "t", "y", "yes")
+
+
 # ─────────────────────────────────────────────────────────────
 # PUBLIC API
 # ─────────────────────────────────────────────────────────────
@@ -338,13 +370,13 @@ def _derive_closure_mode(
     if not moex_rows.empty:
         mr = moex_rows.iloc[0]
         if (
-            mr.get("is_completed") is True
+            _is_true(mr.get("is_completed"))
             and str(mr.get("response_date", "")).strip()
         ):
             return "MOEX_VISA"
 
     if moex_rows.empty and not sas_cons_rows.empty:
-        if sas_cons_rows["is_completed"].eq(True).all():
+        if sas_cons_rows["is_completed"].apply(_is_true).all():
             return "ALL_RESPONDED_NO_MOEX"
 
     return "WAITING_RESPONSES"
@@ -376,7 +408,7 @@ def _derive_visa_global(
     if not moex_rows.empty:
         mr = moex_rows.iloc[0]
         if (
-            mr.get("is_completed") is True
+            _is_true(mr.get("is_completed"))
             and str(mr.get("response_date", "")).strip()
         ):
             status = str(mr.get("status_clean", "")).strip()
@@ -389,7 +421,7 @@ def _derive_visa_global(
     if moex_rows.empty and not sas_rows.empty:
         sr = sas_rows.iloc[0]
         if (
-            sr.get("is_completed") is True
+            _is_true(sr.get("is_completed"))
             and str(sr.get("status_clean", "")).strip() == "REF"
         ):
             return "SAS REF"

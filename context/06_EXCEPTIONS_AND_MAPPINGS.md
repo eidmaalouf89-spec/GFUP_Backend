@@ -747,3 +747,75 @@ Final 2026-05-04 R3 distribution: FERMER_MAINTENANT 66, CONSULTANT_A_ATTAQUER
 210, ENTREPRISE_A_RELANCER 122, DECISION_MOEX 8, MOEX_SHAME_INTERNAL 989,
 SECONDAIRE_EXPIRE 129, SUJET_REUNION 0. Total 1524 rows on artifact (2026-04-10
 GED snapshot). See `docs/implementation/PHASE_6X_ACTION_MOEX_DATA_TRUTH_CORRECTION.md` §10.
+
+---
+
+## SAS routing + P5 removal (2026-05-09)
+
+Confirmed by project owner. Changes the focus-ownership classification
+and removes the P5 ("no deadline") priority bucket.
+
+### Status equivalence (response status_clean)
+
+| Status | Equivalent | Class |
+|---|---|---|
+| `VAO` | — | favorable terminal |
+| `VSO` | — | favorable terminal |
+| `FAV` | ≡ `VSO` | favorable terminal |
+| `SUS` | ≡ `VAO` | favorable terminal (no new cycle by itself) |
+| `HM`  | — | favorable terminal |
+| `REF` | — | negative — contractor must resubmit |
+| `DEF` | ≡ `REF` | negative — contractor must resubmit |
+| `SAS REF` | ≡ `REF` (at SAS gate) | **negative — contractor must resubmit; not closed** |
+
+`focus_ownership.py` exposes these as `FAVORABLE_STATUSES` and
+`NEGATIVE_STATUSES` frozensets. The visa-level `TERMINAL_VISA` set no
+longer contains `SAS REF` (it routes via `CONTRACTOR_VISA`).
+
+### Ownership routing (post-2026-05-09)
+
+| Doc state | Owner | Tier |
+|---|---|---|
+| `_visa_global ∈ {REF, DEF, SAS REF}` | `["CONTRACTOR"]` | `CONTRACTOR` |
+| `_visa_global ∈ {VSO, VAO, HM, FAV, SUS}` | `[]` | `CLOSED` |
+| Primary pending | sorted primary names | `PRIMARY` |
+| Secondary pending, ≤10d since last primary | sorted secondary names | `SECONDARY` |
+| Secondary expired (>10d), MOEX called | `["MOEX"]` | `MOEX` |
+| Secondary expired (>10d), no MOEX called | derived from worst PRIMARY status | `CONTRACTOR` or `CLOSED` |
+| All replied, MOEX called, SAS gate pending | `["MOEX SAS"]` | `MOEX` |
+| All replied, MOEX called, no SAS pending | `["MOEX"]` | `MOEX` |
+| All replied, no MOEX called | derived from worst across primary+secondary | `CONTRACTOR` or `CLOSED` |
+
+`MOEX SAS` is a distinct canonical consultant from `Maître d'Oeuvre EXE`
+(see `consultant_fiche.py::CONSULTANT_DISPLAY_NAMES`). The tier is kept
+as `"MOEX"` for both — the owner-name list distinguishes the routing —
+so existing tier consumers (focus_filter, drilldown_builder) stay
+unchanged.
+
+### Operational universe (rule D6)
+
+`compute_operational_dashboard` now excludes both terminal-visa rows
+**and** `tier == "CLOSED"` rows. Background: when no MOEX is called and
+the worst primary/secondary response is favorable, the submittal is
+operationally closed even though there is no chapeau `_visa_global`.
+`focus_ownership` tags these as `CLOSED`; the aggregator drops them.
+This makes `moex_total + moex_sas_total + primary_total + secondary_total
++ contractor_total == operational_total`.
+
+### Priority — P5 retired
+
+Business rule A: global workflow is 30 days total. There is no valid
+operational concept of "no deadline" for an open submittal. P5 is
+removed from `_priority`, from the aggregator output dict, and from the
+JANSA `OperationalPriorityRow`.
+
+`_precompute_focus_columns` now derives a fallback deadline of
+`last_activity_date + 30 days` when no pending response carries a
+`date_limite`. Rows that still cannot resolve a deadline collapse into
+P1 (treated as overdue/anomaly).
+
+### New aggregator payload fields
+
+- `moex_sas_total` — count of `MOEX` tier rows whose owner is `["MOEX SAS"]`
+- `contractor_total` — count of `CONTRACTOR` tier rows in `op`
+- `priority_p5` — **REMOVED**

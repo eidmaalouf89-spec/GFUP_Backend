@@ -406,3 +406,39 @@ git diff --name-only | grep -E '(src/flat_ged/|src/run_memory\.py|src/report_mem
 # Are run/data dbs intact?
 git status data/ runs/             # SHOULD be empty (or only context/, output/ adds)
 ```
+
+---
+
+## SAS routing + P5 smoke (2026-05-09)
+
+After modifying focus-ownership / SAS / priority code:
+
+```
+# 1. Clear flat cache
+rm -f output/intermediate/FLAT_GED_cache_docs.pkl \
+      output/intermediate/FLAT_GED_cache_resp.pkl \
+      output/intermediate/FLAT_GED_cache_meta.json
+
+# 2. Focused tests
+python -m pytest tests/test_focus_ownership_sas_p5.py tests/test_resolve_visa_global.py -q
+
+# 3. Full pipeline
+python main.py
+
+# 4. Chain+Onion regen
+python run_chain_onion.py
+
+# 5. Audit lineage
+python scripts/audit_counts_lineage.py
+
+# 6. Operational payload smoke (prints SAS REF / MOEX SAS / priority breakdown)
+python scripts/smoke_dashboard_post_patch.py
+```
+
+Acceptance:
+- focused tests: 30/30 pass
+- audit harness FAIL count unchanged (still 1)
+- arithmetic: `op_total == fresh+stale == p1+p2+p3+p4 == sum of tier counts`
+- `priority_p5` absent from payload
+- all SAS REF docs have `_focus_owner_tier == CONTRACTOR`
+- 0 docs have `_focus_owner == ["MOEX"]` AND tier-MOEX while having SAS pending
