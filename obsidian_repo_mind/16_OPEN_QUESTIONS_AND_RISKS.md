@@ -34,7 +34,19 @@
 ### D-010 — Route `_precompute_focus_columns` through `resolve_visa_global`
 
 - **What:** Phase 8A item — `_precompute_focus_columns` currently computes `visa_global` independently; should route through the authoritative `resolve_visa_global` path (same as aggregator after Phase 8 Step 3)
-- **Status:** Medium-risk hardening; deferred post-Phase 8A
+- **Status:** ✅ CLOSED 2026-05-09 by SAS-routing patch (commit `e5084b1`). `_precompute_focus_columns` now prefers `flat_doc_meta[doc_id].visa_global` over the engine; engine is fallback. Same authoritative source as aggregator.
+
+### Audit harness FAIL relocation (post-2026-05-09 SAS routing patch)
+
+- **What:** Audit `PASS=16 WARN=0 FAIL=1`. The single FAIL moved from `status_SAS_REF@L1_FLAT_GED_XLSX` (D-011, pre-existing upstream) to `open_count@L4_AGGREGATOR` (NEW — reflects rule D6 closure exclusion that drops `tier=="CLOSED"` from operational universe).
+- **Status:** Total FAIL count unchanged. Re-baselining `scripts/audit_counts_lineage.py` `EXPECTED_BASELINES` for `open_count@L4` is a follow-up; out of scope of the patch (touching the audit script needs its own scope).
+- **Risk:** LOW. Arithmetic is internally coherent (`fresh+stale == p1+p2+p3+p4 == sum_of_tiers == operational_total`). Re-baseline at next maintenance pass.
+
+### Pre-existing test failures unrelated to SAS-routing patch
+
+- **What:** `tests/test_audit_counts_lineage.py` and `tests/test_cache_meta_v2.py` carry stale-baseline values (`open_doc_rows=4848` vs current 4374; cache schema `v2` vs current `v3`). Failing both before and after the 2026-05-09 patch.
+- **Status:** Not blocking; test files not touched by this patch.
+- **Risk:** Tests provide false-FAIL signal; should be re-baselined alongside the harness.
 
 ### H38 — Escalated chain count > 25% of live chains
 

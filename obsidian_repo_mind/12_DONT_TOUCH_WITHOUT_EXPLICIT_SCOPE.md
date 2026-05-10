@@ -126,7 +126,7 @@ Every value below has direct user-visible or contractual meaning. Changing them 
 | `src/flat_ged/input/source_main/consultant_mapping.py` | `RAW_TO_CANONICAL`, `EXCEPTION_COLUMNS`, `CANONICAL_TO_DISPLAY`, `SPECIAL_CASES` |
 | `src/flat_ged/input/source_main/status_mapping.py` | `VALID_STATUSES`, `BUREAU_CONTROLE_STATUSES`, `PENDING_KEYWORDS`, `DEADLINE_DATE_PATTERN` |
 | `src/flat_ged/input/source_main/ged_parser_contract.py` | Header layout, `CORE_COLUMNS`, `APPROVER_SUB_FIELDS` |
-| `src/reporting/focus_ownership.py` | PRIMARY/SECONDARY/MOEX classification, `TERMINAL_VISA`, `SECONDARY_WINDOW_DAYS=10` |
+| `src/reporting/focus_ownership.py` | `PRIMARY_CANONICAL`, `SECONDARY_CANONICAL`, `MOEX_CANONICAL`, `TERMINAL_VISA` (no longer contains `SAS REF`), `CONTRACTOR_VISA={REF,DEF,SAS REF}`, `FAVORABLE_STATUSES={VAO,VSO,FAV,SUS,HM}`, `NEGATIVE_STATUSES={REF,DEF,SAS REF}`, `SECONDARY_WINDOW_DAYS=10`, `MOEX_SAS_NAME="MOEX SAS"`. Status equivalence (SUS≡VAO, FAV≡VSO, DEF≡REF) and SAS-pending → MOEX SAS routing are confirmed business rules — see `context/06_EXCEPTIONS_AND_MAPPINGS.md` "SAS routing + P5 removal" before changing |
 | `src/reporting/consultant_fiche.py` | `CONSULTANT_DISPLAY_NAMES`, `STATUS_LABELS_BY_CANONICAL`, `BET_MERGE_KEYS`, `COMPANY_TO_CANONICAL`, `CONTRACTOR_REFERENCE` |
 | `src/pipeline/stages/stage_discrepancy.py` | Part H-1 `BENTIN_LEGACY_EXCEPTION` pass |
 | `src/pipeline/stages/stage_report_memory.py` | `_ELIGIBLE_CONFIDENCE_VALUES` |

@@ -15,7 +15,7 @@
 | `aggregator.py` | Computes project KPIs, monthly/weekly timeseries, consultant/contractor summaries | `app.py::get_dashboard_data` |
 | `ui_adapter.py` | Shapes aggregator output to `window.OVERVIEW / CONSULTANTS / CONTRACTORS` shapes | `app.py::get_*_for_ui` |
 | `focus_filter.py` | Applies Focus mode (stale_days + live_numeros narrowing) | `app.py::_apply_focus_filter` |
-| `focus_ownership.py` | Computes `primary_owner`, `secondary_owner`, `tier` per document | `stage_report_memory`, `data_loader`, `aggregator` |
+| `focus_ownership.py` | Computes `_focus_owner` (list) + `_focus_owner_tier` per document. Tiers: `PRIMARY`, `SECONDARY`, `MOEX` (incl. owner `["MOEX SAS"]` variant), `CONTRACTOR`, `CLOSED`. Implements no-MOEX-called closure derivation; SAS REF → CONTRACTOR; SAS-pending → MOEX SAS. (Rewritten 2026-05-09.) | `data_loader._precompute_focus_columns`, `aggregator` |
 | `consultant_fiche.py` | Builds per-consultant fiche payload | `app.py::get_consultant_fiche` |
 | `contractor_fiche.py` | Builds per-contractor fiche payload; `resolve_emetteur_name` canonical name resolver | `app.py::get_contractor_fiche_for_ui` |
 | `contractor_quality.py` | Phase 7: per-contractor quality KPIs (peer stats, polar histogram, long-chains, dormant queues) | `app.py::get_contractor_fiche_for_ui` (merges with fiche header) |
@@ -105,19 +105,33 @@ merges the returned dict into the dashboard payload under key `"operational"`.
 `dashboard["operational"]` through verbatim; no reshaping. Result is exposed as
 `window.OVERVIEW.operational` with 21 keys.
 
-**21 keys (verbatim from `compute_operational_dashboard` return dict):**
+**22 keys (verbatim from `compute_operational_dashboard` return dict, post-2026-05-09):**
 
 ```
 operational_total, fresh_total, stale_total,
-moex_total, moex_fresh, moex_stale,
-primary_total, secondary_total, consultants_total,
-priority_p1, priority_p2, priority_p3, priority_p4, priority_p5,
+moex_total, moex_sas_total, moex_fresh, moex_stale,
+primary_total, secondary_total, consultants_total, contractor_total,
+priority_p1, priority_p2, priority_p3, priority_p4,
 enterprise_ref_sas_candidates, enterprise_action_rows,
 old_debt_age_days_min, old_debt_age_days_median, old_debt_age_days_max,
 stale_threshold_days, universe_definition
 ```
 
-See `context/03_UI_FEED_MAP.md §E` for the per-key description and the UI binding.
+**Changes 2026-05-09 (focus-ownership SAS routing + P5 removal patch):**
+- `priority_p5` REMOVED. Global workflow is 30 days (business rule A); "no
+  deadline" is no longer a valid operational state. Backend collapses
+  missing-deadline rows into P1 via a `last_activity + 30d` fallback.
+- `moex_total` is now **normal Maître d'Œuvre EXE only**. SAS-pending
+  pollution moves to the new `moex_sas_total` field (owner `["MOEX SAS"]`,
+  tier still `"MOEX"`).
+- `contractor_total` NEW — counts tier `CONTRACTOR` rows inside `op` (REF /
+  DEF / SAS REF / no-MOEX-called negative-worst closure).
+- `op` universe now also excludes `tier=="CLOSED"` (rule D6 — no-MOEX-called
+  favorable-worst closure); ownership-bucket sums reconcile to `operational_total`.
+
+See `context/03_UI_FEED_MAP.md` (2026-05-09 section) and
+`context/06_EXCEPTIONS_AND_MAPPINGS.md` ("SAS routing + P5 removal") for
+the per-key description, status-equivalence table, and ownership matrix.
 
 **UI screen mapping update:** `OverviewPage` in `ui/jansa/overview.jsx` now reads
 `window.OVERVIEW.operational` as the primary tile source (default view). The legacy
