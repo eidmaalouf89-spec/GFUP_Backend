@@ -229,6 +229,38 @@
     },
 
     /**
+     * Load consultant fiche cell drilldown rows.
+     * @param {string} consultantName
+     * @param {string} filterKey
+     * @param {string|null} lotName
+     * @param {boolean} focusMode
+     * @param {number} staleDays
+     * @param {string|null} periodLabel
+     * @returns {Promise<object>} {docs, count, filter_key, consultant}
+     */
+    loadFicheDrilldown: async function (consultantName, filterKey, lotName, focusMode, staleDays, periodLabel) {
+      if (!bridge.api) return { docs: [], count: 0 };
+      try {
+        var r = await bridge.api.get_doc_details(
+          String(consultantName || ""),
+          String(filterKey || ""),
+          lotName == null ? null : String(lotName),
+          !!focusMode,
+          staleDays != null ? staleDays : 90,
+          periodLabel == null ? null : String(periodLabel)
+        );
+        if (r && r.error) {
+          console.error("[data_bridge] fiche drilldown error:", r.error);
+          return r;
+        }
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] fiche drilldown exception:", e);
+        return { docs: [], count: 0, error: e.message || "Backend exception." };
+      }
+    },
+
+    /**
      * Phase 6B — Counter-Attack home payload (bucket counts + summary).
      * On-demand: NOT eager-loaded by _loadCoreData. Caller owns state.
      * @returns {Promise<object>}  { available, summary, buckets }

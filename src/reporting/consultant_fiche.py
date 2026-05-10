@@ -198,14 +198,22 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
     all_docs = _attach_derived(docs, data_date, s1=s1, s2=s2, s3=s3, ctx=ctx)
 
     # ── Build blocks ─────────────────────────────────────────────────────────
-    # Bloc1, Bloc2: FULL HISTORY (all avis: VSO, VAO, REF, HM + open)
+    focused_docs = all_docs.iloc[0:0]
+    if focus_enabled and owned_ids is not None:
+        id_col = "doc_id_resp" if "doc_id_resp" in all_docs.columns else "doc_id"
+        focused_docs = all_docs[all_docs[id_col].isin(owned_ids)]
+
+    # Bloc1, Bloc2: hybrid in focus mode — full history drives the status
+    # histogram (VSO/VAO/REF/HM, opened, closed) so card sparklines and the
+    # cumulative evolution graph keep their historical content; the focus
+    # scope only drives the weekly open backlog band.
     # Header, Week delta: FULL HISTORY for totals/answered, FOCUSED for open
     # Bloc3: FULL HISTORY for status counts, FOCUSED for open column
     consultant = _build_consultant_meta(ctx, consultant_name)
     header     = _build_header(all_docs, data_date, s1, s2, s3)
     week_delta = _build_week_delta(all_docs, data_date, prev_date, s1, s2, s3)
     if focus_enabled:
-        bloc1 = _build_bloc1_weekly(all_docs, data_date, s1, s2, s3)
+        bloc1 = _build_bloc1_weekly(all_docs, data_date, s1, s2, s3, focus_docs=focused_docs)
     else:
         bloc1 = _build_bloc1(all_docs, data_date, s1, s2, s3)
     bloc2      = _build_bloc2(bloc1)
@@ -213,8 +221,6 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
 
     # ── Focus: override open counts in header/bloc3 with ownership-filtered values
     if focus_enabled and owned_ids is not None:
-        id_col = "doc_id_resp" if "doc_id_resp" in all_docs.columns else "doc_id"
-        focused_docs = all_docs[all_docs[id_col].isin(owned_ids)]
         # Override header open counts
         open_mask = focused_docs["_is_open"]
         header["open_count"] = int(open_mask.sum())
@@ -277,7 +283,7 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
             "p3": p_counts.get(3, 0),
             "p4": p_counts.get(4, 0),
             "p5": p_counts.get(5, 0),
-            "total_focused": len(docs),
+            "total_focused": len(focused_docs),
             "items": my_pq[:20],
         }
 
@@ -288,6 +294,12 @@ def build_consultant_fiche(ctx: RunContext, consultant_name: str,
         "bloc1":       bloc1,
         "bloc2":       bloc2,
         "bloc3":       bloc3,
+        "bloc1_title": "Activité hebdomadaire" if focus_enabled else "Activité mensuelle",
+        "bloc1_period_label": "Semaine" if focus_enabled else "Mois",
+        "blocking_legend": {
+            "blocking": "Bloquant = document/action qui bloque le cycle de visa ou attend une réponse critique.",
+            "non_blocking": "Non bloquant = activité suivie dans le périmètre mais sans blocage immédiat du cycle.",
+        },
         "non_saisi":   non_saisi,
         "focus_priority": focus_priority,
         "focus_enabled": bool(focus_enabled),
@@ -635,9 +647,13 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
     bloc2 = _build_bloc2(bloc1)
 
     # ── BLOC 3 — SAS performance PER CONTRACTOR ─────────────────────────
+    from .contractor_fiche import resolve_emetteur_name
+
     contractor_groups = merged.groupby("_emetteur", dropna=True)
     contractors = []
     for em, sub in contractor_groups:
+        em_code = str(em).strip().upper()
+        em_name = resolve_emetteur_name(em_code)
         sub_checked = int(sub["_sas_is_closed"].sum())
         sub_vso = int((sub["_sas_status"] == "VSO").sum())
         sub_vao = int((sub["_sas_status"] == "VAO").sum())
@@ -661,7 +677,10 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
         lots = sorted(sub["_lot"].unique().tolist())
 
         contractors.append({
-            "name":        str(em),
+            "name":        em_name or str(em),
+            "contractor":  em_name or str(em),
+            "contractor_code": em_code,
+            "contractor_name": em_name,
             "total":       sub_total,
             "checked":     sub_checked,
             "VSO":         sub_vso,
@@ -702,11 +721,20 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
     refus_scored = [(r, r["ref_rate"]) for r in contractors if r["checked"] >= 3]
     refus_scored.sort(key=lambda rp: -rp[1])
     refus_contractors = [
-        [{"name": r["name"]}, p] for r, p in refus_scored[:5]
+        [{
+            "name": r["contractor_name"] or r["name"],
+            "contractor_code": r.get("contractor_code", ""),
+            "contractor_name": r.get("contractor_name", ""),
+        }, p] for r, p in refus_scored[:5]
     ]
 
     pending_contractors = [
-        {"name": r["name"], "open_late": r["pending"]}
+        {
+            "name": r["contractor_name"] or r["name"],
+            "contractor_code": r.get("contractor_code", ""),
+            "contractor_name": r.get("contractor_name", ""),
+            "open_late": r["pending"],
+        }
         for r in sorted(contractors, key=lambda r: -r["pending"])
         if r["pending"] > 0
     ][:5]
@@ -744,6 +772,12 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
         "bloc2":        bloc2,
         "bloc3":        bloc3,
         "bloc4_sas":    bloc4_contractor_ranking,
+        "bloc1_title": "Activité hebdomadaire" if focus_enabled else "Activité mensuelle",
+        "bloc1_period_label": "Semaine" if focus_enabled else "Mois",
+        "blocking_legend": {
+            "blocking": "Bloquant = document/action qui bloque le cycle de visa ou attend une réponse critique.",
+            "non_blocking": "Non bloquant = activité suivie dans le périmètre mais sans blocage immédiat du cycle.",
+        },
         "non_saisi":    None,
         "degraded_mode": False,
         "warnings":     list(ctx.warnings or []),
@@ -791,6 +825,12 @@ def _empty_sas_fiche(ctx: RunContext) -> dict[str, Any]:
             "critical_lots": [], "refus_lots": [],
         },
         "bloc4_sas": [],
+        "bloc1_title": "Activité mensuelle",
+        "bloc1_period_label": "Mois",
+        "blocking_legend": {
+            "blocking": "Bloquant = document/action qui bloque le cycle de visa ou attend une réponse critique.",
+            "non_blocking": "Non bloquant = activité suivie dans le périmètre mais sans blocage immédiat du cycle.",
+        },
         "non_saisi": None,
         "degraded_mode": True,
         "warnings": list(ctx.warnings or []),
@@ -996,9 +1036,21 @@ def _build_bloc1(docs: pd.DataFrame, data_date: date,
 
 
 def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
-                        s1: str, s2: str, s3: str) -> list[dict[str, Any]]:
+                        s1: str, s2: str, s3: str,
+                        focus_docs: pd.DataFrame | None = None) -> list[dict[str, Any]]:
     """Weekly version of bloc1 for Focus Mode.
-    Same structure as monthly but keyed by ISO week."""
+
+    Hybrid payload (2026-05-10): `docs` carries the full consultant history
+    and drives the status histogram — nvx (opened), doc_ferme (closed),
+    s1/s2/s3/hm counts and percentages — so VSO/VAO/REF/HM remain visible
+    week by week. `focus_docs`, when provided, is the focus/live-narrowed
+    actionable scope and drives only the open backlog columns
+    (open_ok/late, open_blocking_ok/late, open_nb). Cumulative bloc2 is
+    derived from this hybrid bloc1 so the evolution graph keeps showing
+    historical statuses while the backlog band reflects the focused scope.
+    When `focus_docs` is None the backlog is computed from `docs` itself
+    (legacy single-source behaviour).
+    """
     if docs.empty:
         return []
 
@@ -1006,6 +1058,13 @@ def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
     for col in ("_created_date", "_date_answered"):
         if col in docs.columns:
             docs[col] = pd.to_datetime(docs[col], errors="coerce")
+
+    if focus_docs is None or focus_docs.empty:
+        backlog_src = docs
+    else:
+        backlog_src = focus_docs.copy()
+        if "_created_date" in backlog_src.columns:
+            backlog_src["_created_date"] = pd.to_datetime(backlog_src["_created_date"], errors="coerce")
 
     closed_statuses = {s1, s2, s3, "HM"}
 
@@ -1072,8 +1131,9 @@ def _build_bloc1_weekly(docs: pd.DataFrame, data_date: date,
         def _pct(c: int) -> float | None:
             return round((c / doc_ferme) * 100, 1) if doc_ferme else None
 
-        # Open snapshot at end of week
-        snapshot = docs[docs["_created_date"].notna() & (docs["_created_date"] <= week_end_ts)]
+        # Open snapshot at end of week — driven by backlog_src so focus/legacy
+        # narrowing applies only to the backlog columns, not to status history.
+        snapshot = backlog_src[backlog_src["_created_date"].notna() & (backlog_src["_created_date"] <= week_end_ts)]
         try:
             open_at_end = snapshot[snapshot.apply(
                 lambda r: r["_open_at_date"](week_end), axis=1
@@ -1149,6 +1209,8 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
     if docs.empty:
         return _empty_bloc3(s1, s2, s3)
 
+    from .contractor_fiche import resolve_emetteur_name
+
     # Group by GF sheet (resolved from NUMERO → gf_sheet mapping in ctx).
     g = docs.groupby("_gf_sheet", dropna=True)
 
@@ -1164,11 +1226,26 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
         blk_late = int((sub["_is_blocking"] & ~sub["_on_time"]).sum())
         nb_count = int((sub["_is_open"] & ~sub["_is_blocking"]).sum())
         total = int(len(sub))
+        em_col = "emetteur_doc" if "emetteur_doc" in sub.columns else (
+                 "emetteur" if "emetteur" in sub.columns else None)
+        if em_col:
+            codes = [
+                str(v).strip().upper()
+                for v in sub[em_col].dropna().tolist()
+                if str(v).strip()
+            ]
+            contractor_code = max(set(codes), key=codes.count) if codes else ""
+        else:
+            contractor_code = ""
+        contractor_name = resolve_emetteur_name(contractor_code) if contractor_code else ""
 
         # Populate BOTH the dynamic-keyed fields (s1/s2/s3 values) AND the
         # canonical VSO/VAO/REF fields so the JSX can index either way.
         row = {
             "name":              str(sheet_name),
+            "contractor_code":   contractor_code,
+            "contractor_name":   contractor_name,
+            "contractor":        contractor_name or str(sheet_name),
             "total":             total,
             "VSO":               vso,
             "VAO":               vao,
@@ -1213,7 +1290,13 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
 
     # Critical lots — top 5 by open_blocking_late desc (open_blocking_late > 0 only)
     critical_lots = [
-        {"name": r["name"], "open_late": r["open_blocking_late"]}
+        {
+            "name": r["contractor_name"] or r["name"],
+            "lot_name": r["name"],
+            "contractor_code": r.get("contractor_code", ""),
+            "contractor_name": r.get("contractor_name", ""),
+            "open_late": r["open_blocking_late"],
+        }
         for r in sorted(lots, key=lambda r: -r.get("open_blocking_late", 0))
         if r.get("open_blocking_late", 0) > 0
     ][:5]
@@ -1227,7 +1310,12 @@ def _build_bloc3(docs: pd.DataFrame, ctx: RunContext,
     refus_scored = [(r, p) for r, p in refus_scored if p >= 0]
     refus_scored.sort(key=lambda rp: -rp[1])
     refus_lots = [
-        [{"name": r["name"]}, p] for r, p in refus_scored[:5]
+        [{
+            "name": r["contractor_name"] or r["name"],
+            "lot_name": r["name"],
+            "contractor_code": r.get("contractor_code", ""),
+            "contractor_name": r.get("contractor_name", ""),
+        }, p] for r, p in refus_scored[:5]
     ]
 
     return {
@@ -1479,6 +1567,12 @@ def _empty_fiche(name: str, ctx: RunContext,
         "bloc2": {"labels": [], "s1_series": [], "s2_series": [], "s3_series": [],
                   "hm_series": [], "open_series": [], "totals": []},
         "bloc3": _empty_bloc3(s1, s2, s3),
+        "bloc1_title": "Activité mensuelle",
+        "bloc1_period_label": "Mois",
+        "blocking_legend": {
+            "blocking": "Bloquant = document/action qui bloque le cycle de visa ou attend une réponse critique.",
+            "non_blocking": "Non bloquant = activité suivie dans le périmètre mais sans blocage immédiat du cycle.",
+        },
         "non_saisi": None,
         "degraded_mode": True,
         "warnings": list(ctx.warnings or []) + (warnings or []),

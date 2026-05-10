@@ -55,6 +55,101 @@
 
 ---
 
+## Consultant fiche correction pass (2026-05-10)
+
+Scope: consultant fiche only.
+
+- ~~Rework note: `app.py::get_consultant_fiche` intentionally keeps the
+  pre-patch fiche-wide focus scope for header KPIs.~~ **SUPERSEDED 2026-05-10
+  (afternoon).** `get_consultant_fiche` now DOES apply Chain+Onion
+  live-operational narrowing in focus mode, matching `get_dashboard_data` and
+  `get_consultant_list`. KPI contract aligned: fiche `header.open_blocking` ==
+  consultant card focus_owned == `operational.moex_fresh` == 392 for MOEX
+  (focus=True, stale_days=90). Single source of truth =
+  `apply_focus_filter` + `_apply_live_narrowing` for any focus-mode "à traiter"
+  KPI. The prior fiche-wide scope (without narrowing) was inconsistent with the
+  consultant list/card and confused users — it has been retired.
+
+- **Fiche drilldown drawer name collision (root cause + final fix,
+  2026-05-10).** `fiche_base.jsx` and `overview.jsx` originally both
+  declared a top-level `function DrilldownDrawer(...)` with
+  **different prop contracts** (`{state}` vs `{drill}`). Each
+  `<script type="text/babel">` block executes in global scope, so each
+  declaration becomes a `window.*` property and the file loaded later
+  wins. Load order in `ui/jansa-connected.html` is fiche_base.jsx →
+  overview.jsx, so `window.DrilldownDrawer` was bound to the overview
+  drawer. fiche_page.jsx's `<window.DrilldownDrawer state={drilldown}>`
+  was hitting overview's `if (!drill) return null;` and silently
+  rendering nothing — that was the entire reason fiche drilldowns
+  appeared not to open. Final state:
+  - fiche_base.jsx exports the fiche drawer as both
+    `window.DrilldownDrawer` (legacy) and `window.FicheDrilldownDrawer`
+    (canonical, unambiguous).
+  - overview.jsx's component has been renamed `OverviewDrilldownDrawer`
+    and is no longer attached to a window key (only the local lexical
+    reference is used inside `OverviewPage`).
+  - fiche_page.jsx references `window.FicheDrilldownDrawer` and renders
+    via `ReactDOM.createPortal(..., document.body)` to escape ancestor
+    `transform` / `overflow:auto`.
+  Hard rule going forward: any drawer-style component declared at
+  `<script>`-top level MUST use a uniquely qualified name; if a
+  `window.*` alias is needed, prefix with the surface name (e.g.
+  `FicheDrilldownDrawer`, `OverviewDrilldownDrawer`,
+  `ContractorDrilldownDrawer`).
+- **Hybrid fiche payload in focus mode (2026-05-10 afternoon).** Earlier
+  iteration of the focus-mode fiche replaced the entire bloc1 dataframe with
+  `focused_docs`, which erased VSO / VAO / REF / HM and emptied the bloc2
+  cumulative chart. New contract: `_build_bloc1_weekly(docs, ..., focus_docs=)`
+  uses full-history `docs` for the status histogram (s1/s2/s3/hm, nvx,
+  doc_ferme, percentages) and uses `focus_docs` only for the weekly open
+  backlog band (open_ok/late, open_blocking_ok/late, open_nb). Card sparklines
+  in `HeroStats` (which read `data.bloc1.slice(-12)`) and the bloc2 evolution
+  graph (which composes from bloc1) therefore keep historical content. Header
+  override on `open_*` fields stays in place for backlog parity with the
+  consultant list. Verified live for MOEX focus=True/stale_days=90: header
+  open_blocking=392, bloc1 weekly s1/s2/s3/hm populated from history, bloc2
+  cumulative non-zero across the window.
+- In focus mode, `build_consultant_fiche` emits
+  `bloc1_title="Activité hebdomadaire"` and `bloc1_period_label="Semaine"`.
+  The weekly `bloc1` and cumulative `bloc2` bloquant / non-bloquant counts are
+  computed from the backend-owned focused scope. JSX does not classify or count
+  documents.
+- The fiche payload emits `blocking_legend.blocking` and
+  `blocking_legend.non_blocking` for the table explanation.
+- `bloc3` performance rows and side lists carry canonical contractor names from
+  `reporting.contractor_fiche.resolve_emetteur_name`, including critical late
+  lots and top-5 refusal-rate lists.
+- Fiche cell drilldowns route through
+  `data_bridge.js:loadFicheDrilldown` to `Api.get_doc_details(...)` with the
+  same `focus` and `stale_days` scope as the loaded fiche, plus optional
+  `period_label` for activity-table cells. Period filtering is backend-side in
+  `Api.get_doc_details`. Drilldown row click remains the existing DCC handoff:
+  `window.openDocumentCommandCenter(numero, indice)`.
+- UI-only formatting: cumulative chart weekly labels are compacted from
+  `YYYY-SWW` / `SWW-YYYY` to `SWW-YY`; tick font size is reduced slightly.
+
+Validation used for this pass:
+`python -m py_compile app.py src/reporting/consultant_fiche.py src/reporting/drilldown_builder.py`,
+`python -m pytest tests/test_consultant_fiche.py tests/test_ui_payload_full_surface.py -q`,
+backend payload diagnostic via `Api.get_fiche_for_ui` / `Api.get_doc_details`,
+and `_resolve_ui()` smoke confirming `ui/jansa-connected.html`.
+
+**2026-05-10 focus-reload fix (runtime — shell.jsx only):**
+Root cause identified: `setFocusMode` and `onStaleChange` in `shell.jsx` called
+`refreshForFocus` → `_loadCoreData` which only reloads OVERVIEW / CONSULTANTS /
+CONTRACTORS, leaving `window.FICHE_DATA` stale when the user is on the
+ConsultantFiche page. Fix: added `activeRef` + `selectedConsultantRef` (ref
+mirrors of the corresponding React state), and a `useEffect([focusMode,
+staleDays])` that calls `window.jansaBridge.loadFiche(apiName, focusMode,
+staleDays)` and then `setDataVersion(v => v+1)` whenever those values change
+while `activeRef.current === 'ConsultantFiche'`. Drilldown wiring in
+`fiche_page.jsx` / `fiche_base.jsx` / `data_bridge.js` is already correct;
+drilldowns route through `loadFicheDrilldown` → `Api.get_doc_details` (6-arg
+signature match confirmed). App restart required after app.py changes. Pipeline
+rerun not needed for UI/bridge changes.
+
+---
+
 ## Composed truth principle
 
 `context/guardrail.txt` states:

@@ -89,6 +89,14 @@ const tokFor = (code) => TOK[code] || TOK.HM;
 const fmt = (n) => (n ?? 0).toLocaleString("fr-FR").replace(/,/g, "\u202f");
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
 const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+const compactPeriodLabel = (label) => {
+  const raw = String(label || "");
+  let m = raw.match(/^(\d{4})-S(\d{1,2})$/i);
+  if (m) return `S${m[2].padStart(2, "0")}-${m[1].slice(-2)}`;
+  m = raw.match(/^S(\d{1,2})-(\d{4})$/i);
+  if (m) return `S${m[1].padStart(2, "0")}-${m[2].slice(-2)}`;
+  return raw;
+};
 
 // Typography stacks
 const FONT_UI = "'SF Pro Display','SF Pro Text','Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif";
@@ -456,13 +464,26 @@ const TD = {
 };
 
 // ── Bloc 1 ──────────────────────────────────────────────────────────────────
-function Bloc1({ data, t }) {
+function Bloc1({ data, t, onDrilldown }) {
   const rows = data.bloc1;
   const s1 = TOK.VSO, s2 = TOK.VAO, s3 = TOK.REF, hm = TOK.HM;
+  const legend = data.blocking_legend || {};
+  const periodCell = (row, filterKey, label, tone, extra = {}) => ({
+    style: {
+      ...TD,
+      color: tone,
+      cursor: onDrilldown ? "pointer" : "default",
+      textDecoration: onDrilldown ? "underline dotted rgba(156,163,175,.5)" : "none",
+      textUnderlineOffset: 3,
+      ...extra,
+    },
+    title: onDrilldown ? "Voir les documents" : undefined,
+    onClick: onDrilldown ? () => onDrilldown({ filterKey, label: `${compactPeriodLabel(row.label)} — ${label}`, periodLabel: row.label }) : undefined,
+  });
 
   return (
     <section style={{ marginTop: 64 }}>
-      <BlockHead num="01" title={t.b1}/>
+      <BlockHead num="01" title={data.bloc1_title || t.b1}/>
 
       <div style={{
         background: C.surf, border: `1px solid ${C.line}`,
@@ -481,7 +502,7 @@ function Bloc1({ data, t }) {
           </colgroup>
           <thead>
             <tr>
-              <th style={{...TH, textAlign:"left", paddingLeft:20}}>{t.month}</th>
+              <th style={{...TH, textAlign:"left", paddingLeft:20}}>{data.bloc1_period_label || t.month}</th>
               <th style={TH}>{t.opened}</th>
               <th style={TH}>{t.closed}</th>
               <th style={{...TH, color:s1.ink}} colSpan="2">{data.header.s1}</th>
@@ -503,31 +524,39 @@ function Bloc1({ data, t }) {
                     fontWeight: r.is_current ? 600 : 400,
                     color: r.is_current ? C.accent : C.text
                   }}>
-                    {r.label}
+                    {compactPeriodLabel(r.label)}
                   </td>
-                  <td style={{...TD, color: TOK.OPEN.ink}}>{r.nvx || <span style={{color:C.text3}}>·</span>}</td>
-                  <td style={{...TD, color: TOK.VSO.ink}}>{r.doc_ferme || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "period_opened", t.opened, TOK.OPEN.ink)}>{r.nvx || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "period_closed", t.closed, TOK.VSO.ink)}>{r.doc_ferme || <span style={{color:C.text3}}>·</span>}</td>
 
-                  <td style={{...TD, color:s1.ink, fontWeight:500}}>{r.s1 || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "s1", data.header.s1, s1.ink, {fontWeight:500})}>{r.s1 || <span style={{color:C.text3}}>·</span>}</td>
                   <td style={{...TD, color:C.text3, fontSize:11}}>{r.s1_pct != null ? `${r.s1_pct}%` : "—"}</td>
 
-                  <td style={{...TD, color:s2.ink, fontWeight:500}}>{r.s2 || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "s2", data.header.s2, s2.ink, {fontWeight:500})}>{r.s2 || <span style={{color:C.text3}}>·</span>}</td>
                   <td style={{...TD, color:C.text3, fontSize:11}}>{r.s2_pct != null ? `${r.s2_pct}%` : "—"}</td>
 
-                  <td style={{...TD, color:s3.ink, fontWeight:500}}>{r.s3 || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "s3", data.header.s3, s3.ink, {fontWeight:500})}>{r.s3 || <span style={{color:C.text3}}>·</span>}</td>
                   <td style={{...TD, color:C.text3, fontSize:11}}>{r.s3_pct != null ? `${r.s3_pct}%` : "—"}</td>
 
-                  <td style={{...TD, color:hm.ink}}>{r.hm || <span style={{color:C.text3}}>·</span>}</td>
+                  <td {...periodCell(r, "hm", "HM", hm.ink)}>{r.hm || <span style={{color:C.text3}}>·</span>}</td>
                   <td style={{...TD, color:C.text3, fontSize:11}}>{r.hm_pct != null ? `${r.hm_pct}%` : "—"}</td>
 
                   <td style={{...TD, textAlign:"left", paddingLeft:16}}>
                     <span style={{display:"inline-flex", gap:8, fontFamily:FONT_NUM, fontSize:11.5}}>
-                      <span style={{color:TOK.OPEN.ink}}>{r.open_blocking_ok ?? r.open_ok}</span>
+                      <span
+                        onClick={onDrilldown ? () => onDrilldown({ filterKey:"open_blocking_ok", label:`${compactPeriodLabel(r.label)} — bloquants dans les délais`, periodLabel:r.label }) : undefined}
+                        title={onDrilldown ? "Voir les documents" : undefined}
+                        style={{color:TOK.OPEN.ink, cursor:onDrilldown ? "pointer" : "default", textDecoration:onDrilldown ? "underline dotted rgba(156,163,175,.5)" : "none", textUnderlineOffset:3}}
+                      >{r.open_blocking_ok ?? r.open_ok}</span>
                       <span style={{color:C.text3}}>·</span>
-                      <span style={{color:TOK.REF.ink}}>{r.open_blocking_late ?? r.open_late}</span>
+                      <span
+                        onClick={onDrilldown ? () => onDrilldown({ filterKey:"open_blocking_late", label:`${compactPeriodLabel(r.label)} — bloquants en retard`, periodLabel:r.label }) : undefined}
+                        title={onDrilldown ? "Voir les documents" : undefined}
+                        style={{color:TOK.REF.ink, cursor:onDrilldown ? "pointer" : "default", textDecoration:onDrilldown ? "underline dotted rgba(156,163,175,.5)" : "none", textUnderlineOffset:3}}
+                      >{r.open_blocking_late ?? r.open_late}</span>
                     </span>
                   </td>
-                  <td style={{...TD, color:TOK.NB.ink, opacity:0.7}}>{r.open_nb ?? 0}</td>
+                  <td {...periodCell(r, "open_non_blocking", "non-bloquants", TOK.NB.ink, {opacity:0.7})}>{r.open_nb ?? 0}</td>
                 </tr>
               );
             })}
@@ -539,16 +568,25 @@ function Bloc1({ data, t }) {
         display:"flex", gap:24, marginTop:16, flexWrap:"wrap",
         fontFamily: FONT_UI, fontSize:11, color: C.text2
       }}>
-        <span style={{display:"inline-flex",gap:6,alignItems:"center"}}>
+        <span style={{display:"inline-flex",gap:6,alignItems:"center"}} title={legend.blocking || undefined}>
           <Dot c={TOK.OPEN.bar}/> bloquants dans les délais
         </span>
-        <span style={{display:"inline-flex",gap:6,alignItems:"center"}}>
+        <span style={{display:"inline-flex",gap:6,alignItems:"center"}} title={legend.blocking || undefined}>
           <Dot c={TOK.REF.bar}/> bloquants en retard
         </span>
-        <span style={{display:"inline-flex",gap:6,alignItems:"center"}}>
+        <span style={{display:"inline-flex",gap:6,alignItems:"center"}} title={legend.non_blocking || undefined}>
           <Dot c={TOK.NB.bar}/> non-bloquants
         </span>
       </div>
+      {(legend.blocking || legend.non_blocking) && (
+        <div style={{
+          marginTop: 10, fontFamily: FONT_UI, fontSize: 11.5,
+          color: C.text3, lineHeight: 1.55
+        }}>
+          {legend.blocking && <div>{legend.blocking}</div>}
+          {legend.non_blocking && <div>{legend.non_blocking}</div>}
+        </div>
+      )}
     </section>
   );
 }
@@ -633,8 +671,8 @@ function Bloc2({ data, t }) {
 
           {b2.labels.map((l, i) => (
             <text key={i} x={xOf(i)} y={H-pad.b+18} textAnchor="middle"
-                  fontFamily={FONT_NUM} fontSize="10" fill={C.text3}>
-              {l}
+                  fontFamily={FONT_NUM} fontSize="9.2" fill={C.text3}>
+              {compactPeriodLabel(l)}
             </text>
           ))}
 
@@ -1008,7 +1046,7 @@ function ConsultantFiche({ data, lang = "fr", onBack, onDrilldown }) {
       <Masthead data={data} t={t} onBack={onBack}/>
       <HeroStats data={data} t={t} onDrilldown={onDrilldown}/>
       <Narrative data={data} t={t} lang={lang}/>
-      <Bloc1 data={data} t={t}/>
+      <Bloc1 data={data} t={t} onDrilldown={onDrilldown}/>
       <Bloc2 data={data} t={t}/>
       <Bloc3 data={data} t={t} onDrilldown={onDrilldown}/>
       <Colophon data={data} t={t}/>
@@ -1243,4 +1281,16 @@ function DrilldownDrawer({ state, onClose, onExport }) {
   );
 }
 
-Object.assign(window, { ConsultantFiche, DrilldownDrawer });
+Object.assign(window, {
+  ConsultantFiche,
+  DrilldownDrawer,
+  // FicheDrilldownDrawer is the stable, unambiguous handle for the
+  // consultant-fiche drawer. Historically (before 2026-05-10) overview.jsx
+  // also declared a top-level `function DrilldownDrawer` with a different
+  // prop contract, which silently shadowed window.DrilldownDrawer because
+  // both files run as bare <script type="text/babel"> blocks. overview.jsx
+  // has since been renamed to OverviewDrilldownDrawer, but the explicit
+  // window.FicheDrilldownDrawer alias is kept so any future fiche-side
+  // consumer is immune to a similar bare-name collision recurring.
+  FicheDrilldownDrawer: DrilldownDrawer,
+});

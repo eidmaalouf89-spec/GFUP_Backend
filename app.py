@@ -679,7 +679,14 @@ class Api:
             return {"error": str(exc)}
 
     def get_consultant_fiche(self, consultant_name, focus=False, stale_days=90):
-        """Full fiche data for one consultant."""
+        """Full fiche data for one consultant.
+
+        2026-05-10 KPI alignment: in focus mode, applies _apply_live_narrowing
+        so that fiche header.open_blocking matches consultant_card.focus_owned
+        and dashboard MOEX 'à traiter <90j'. Single source of truth =
+        focus_filter + chain_onion live narrowing (same as get_dashboard_data
+        and get_consultant_list).
+        """
         import traceback
         try:
             from reporting.data_loader import load_run_context
@@ -689,6 +696,9 @@ class Api:
             canonical = resolve_consultant_name(consultant_name)
             focus_config = FocusConfig(enabled=bool(focus), stale_threshold_days=int(stale_days))
             focus_result = apply_focus_filter(ctx, focus_config)
+            if focus:
+                _live_numeros, _legacy_count = self._build_live_operational_numeros()
+                self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
             result = build_consultant_fiche(ctx, canonical, focus_result=focus_result)
             return _sanitize_for_json(result)
         except Exception as exc:
@@ -782,7 +792,7 @@ class Api:
             traceback.print_exc()
             return _sanitize_for_json({"success": False, "path": None, "error": str(exc)})
 
-    def get_doc_details(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90):
+    def get_doc_details(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90, period_label=None):
         """Return document-level detail for a specific consultant fiche KPI cell."""
         import traceback
         try:
@@ -839,6 +849,68 @@ class Api:
                     actual_filter = "total"
             if actual_lot:
                 docs = docs[docs["_gf_sheet"] == actual_lot]
+
+            def _period_bounds(label):
+                if not label:
+                    return None
+                from datetime import date as _date, timedelta as _td
+                raw = str(label).strip()
+                try:
+                    if len(raw) == 7 and raw[4] == "-":
+                        year = int(raw[:4])
+                        month = int(raw[5:7])
+                        start = _date(year, month, 1)
+                        if month == 12:
+                            end = _date(year + 1, 1, 1) - _td(days=1)
+                        else:
+                            end = _date(year, month + 1, 1) - _td(days=1)
+                        return start, end
+                    parts = raw.upper().split("-S", 1)
+                    if len(parts) == 2:
+                        year = int(parts[0])
+                        week = int(parts[1])
+                        return _date.fromisocalendar(year, week, 1), _date.fromisocalendar(year, week, 7)
+                    if raw.upper().startswith("S") and "-" in raw:
+                        week_s, year_s = raw.upper().split("-", 1)
+                        year = int(year_s) if len(year_s) == 4 else 2000 + int(year_s)
+                        week = int(week_s[1:])
+                        return _date.fromisocalendar(year, week, 1), _date.fromisocalendar(year, week, 7)
+                except Exception:
+                    return None
+                return None
+
+            def _as_date(value):
+                import pandas as _pd
+                if value is None or _pd.isna(value):
+                    return None
+                if hasattr(value, "date"):
+                    return value.date()
+                return value
+
+            def _date_between(series, start, end):
+                return series.map(lambda value: (lambda d: d is not None and start <= d <= end)(_as_date(value)))
+
+            period_bounds = _period_bounds(period_label)
+            if period_bounds:
+                period_start, period_end = period_bounds
+                if actual_filter == "period_opened":
+                    actual_filter = "total"
+                    docs = docs[_date_between(docs["_created_date"], period_start, period_end)]
+                elif actual_filter == "period_closed":
+                    actual_filter = "answered"
+                    docs = docs[_date_between(docs["_date_answered"], period_start, period_end)]
+                elif actual_filter in ("answered", "s1", "s2", "s3", "hm", "HM", s1, s2, s3):
+                    docs = docs[_date_between(docs["_date_answered"], period_start, period_end)]
+                elif actual_filter in (
+                    "open_count", "open_ok", "open_late",
+                    "open_blocking", "open_blocking_ok", "open_blocking_late",
+                    "open_non_blocking",
+                ):
+                    docs = docs[
+                        docs["_created_date"].map(lambda value: (lambda d: d is not None and d <= period_end)(_as_date(value)))
+                    ].copy()
+                    if not docs.empty:
+                        docs = docs[docs.apply(lambda row: row["_open_at_date"](period_end), axis=1)]
 
             if actual_filter == "total":
                 mask = docs.index == docs.index
@@ -923,6 +995,8 @@ class Api:
                 "docs": result_docs,
                 "count": len(result_docs),
                 "filter_key": filter_key,
+                "lot_name": lot_name,
+                "period_label": period_label,
                 "consultant": consultant_name,
             })
         except Exception as exc:
@@ -962,7 +1036,7 @@ class Api:
             traceback.print_exc()
             return _sanitize_for_json({"error": str(exc), "numero": numero})
 
-    def export_drilldown_xlsx(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90):
+    def export_drilldown_xlsx(self, consultant_name, filter_key, lot_name=None, focus=False, stale_days=90, period_label=None):
         """Export the currently filtered drilldown documents to an Excel file."""
         import inspect
         import tempfile
@@ -970,7 +1044,7 @@ class Api:
         try:
             sig = inspect.signature(self.get_doc_details)
             if "focus" in sig.parameters:
-                result = self.get_doc_details(consultant_name, filter_key, lot_name, focus, stale_days)
+                result = self.get_doc_details(consultant_name, filter_key, lot_name, focus, stale_days, period_label)
             else:
                 result = self.get_doc_details(consultant_name, filter_key, lot_name)
 

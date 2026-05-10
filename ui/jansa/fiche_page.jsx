@@ -58,11 +58,11 @@ function FicheExportButton() {
   );
 }
 
-function ConsultantFichePage({ consultant, onBack, focusMode }) {
+function ConsultantFichePage({ consultant, onBack, focusMode, staleDays }) {
   const base = window.FICHE_DATA;
 
   // ── Drilldown state ────────────────────────────────────────────────────────
-  // null = closed. Otherwise: { loading, error, docs, count, title, filterKey, lotName }
+  // null = closed. Otherwise: { loading, error, docs, count, title, filterKey, lotName, periodLabel }
   const [drilldown, setDrilldown] = React.useState(null);
   const drillGenRef = React.useRef(0);
 
@@ -70,7 +70,7 @@ function ConsultantFichePage({ consultant, onBack, focusMode }) {
   const consultantName = (consultant && (consultant.canonical_name || consultant.name)) || '';
 
   // handleDrilldown is called from inside ConsultantFiche when a clickable number is clicked
-  const handleDrilldown = async ({ filterKey, lotName, label }) => {
+  const handleDrilldown = async ({ filterKey, lotName, label, periodLabel }) => {
     if (!window.jansaBridge || !window.jansaBridge.api) return;
 
     // Claim a generation slot — any older request returning later will be discarded
@@ -84,14 +84,17 @@ function ConsultantFichePage({ consultant, onBack, focusMode }) {
       title: label || filterKey,
       filterKey,
       lotName: lotName || null,
+      periodLabel: periodLabel || null,
     });
 
     try {
-      const result = await window.jansaBridge.api.get_doc_details(
+      const result = await window.jansaBridge.loadFicheDrilldown(
         consultantName,
         filterKey,
         lotName || null,
-        !!focusMode
+        !!focusMode,
+        staleDays != null ? staleDays : 90,
+        periodLabel || null
       );
 
       if (gen !== drillGenRef.current) return; // stale — newer click happened
@@ -133,7 +136,9 @@ function ConsultantFichePage({ consultant, onBack, focusMode }) {
         consultantName,
         drilldown.filterKey,
         drilldown.lotName || null,
-        !!focusMode
+        !!focusMode,
+        staleDays != null ? staleDays : 90,
+        drilldown.periodLabel || null
       );
       if (!result || !result.success) {
         console.error("[export] Backend error:", result && result.error);
@@ -193,18 +198,27 @@ function ConsultantFichePage({ consultant, onBack, focusMode }) {
         onBack={onBack}
         onDrilldown={handleDrilldown}
       />
-      <window.DrilldownDrawer
-        state={drilldown ? {
-          ...drilldown,
-          onRowClick: (doc) => {
-            if (window.openDocumentCommandCenter) {
-              window.openDocumentCommandCenter(doc.numero, doc.indice);
-            }
-          },
-        } : null}
-        onClose={closeDrilldown}
-        onExport={handleExport}
-      />
+      {/* Drawer is portal-rendered to <body> so it escapes any ancestor
+          with `transform` (sets containing block) or `overflow:auto/hidden`
+          (can clip fixed children in some layout engines). FicheDrilldownDrawer
+          (not DrilldownDrawer) is required because overview.jsx exports a
+          different component under the bare name with prop contract `{drill}`
+          — see context/03_UI_FEED_MAP.md for the naming-collision record. */}
+      {ReactDOM.createPortal(
+        <window.FicheDrilldownDrawer
+          state={drilldown ? {
+            ...drilldown,
+            onRowClick: (doc) => {
+              if (window.openDocumentCommandCenter) {
+                window.openDocumentCommandCenter(doc.numero, doc.indice);
+              }
+            },
+          } : null}
+          onClose={closeDrilldown}
+          onExport={handleExport}
+        />,
+        document.body
+      )}
     </div>
   );
 }

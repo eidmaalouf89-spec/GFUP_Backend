@@ -117,6 +117,94 @@ Data sources:
   `_filter_for_consultant` + `_attach_derived` then matches `filter_key`
   against `_status_for_consultant`, `_is_open`, `_is_blocking`, `_on_time`.
 
+**2026-05-10 consultant fiche rework:** `Api.get_consultant_fiche` keeps the
+pre-patch fiche-wide focus scope for header KPIs. Do not apply
+Chain+Onion live-operational narrowing to this full fiche payload unless the KPI
+contract is explicitly changed. In focus mode the fiche payload emits
+`bloc1_title="Activité hebdomadaire"` and `bloc1_period_label="Semaine"`;
+`bloc1`/`bloc2` weekly bloquant and non-bloquant counts are built from the
+consultant-owned focused scope in `src/reporting/consultant_fiche.py`, not
+from JSX. The payload also emits `blocking_legend.{blocking,non_blocking}`.
+`fiche_page.jsx` calls `data_bridge.js:loadFicheDrilldown(...)`, which forwards
+`focus`, `stale_days`, and optional `period_label` to `Api.get_doc_details`.
+Activity-table numeric cells use backend period filtering; row click still
+opens the existing Document Command Center via
+`window.openDocumentCommandCenter(numero, indice)`. `bloc3.lots[*]`,
+`bloc3.critical_lots[*]`, and `bloc3.refus_lots[*]` carry backend-resolved
+canonical contractor names via `reporting.contractor_fiche.resolve_emetteur_name`;
+JSX renders those payload fields only. Cumulative chart week labels are
+cosmetically compacted in JSX from `YYYY-SWW` / `SWW-YYYY` to `SWW-YY`, and tick
+font size is slightly reduced.
+
+**2026-05-10 focus-reload fix:** `shell.jsx` now holds `activeRef` and
+`selectedConsultantRef` mirrors so that a `useEffect([focusMode, staleDays])`
+can call `window.jansaBridge.loadFiche(apiName, focusMode, staleDays)` whenever
+those values change **while the active page is `ConsultantFiche`**. This fires
+after `refreshForFocus` (which reloads OVERVIEW/CONSULTANTS/CONTRACTORS) and
+independently updates `window.FICHE_DATA` for the active consultant, then calls
+`setDataVersion` to trigger a re-render. Pipeline rerun is not required for this
+fix. App restart is required after any app.py change.
+
+**2026-05-10 KPI alignment fix (consultant fiche header):** `Api.get_consultant_fiche`
+in `app.py` now applies `_apply_live_narrowing` when `focus=True`, matching
+`get_dashboard_data` and `get_consultant_list`. Single source of truth for
+focus-mode "à traiter" KPIs across dashboard, consultant card, and fiche header
+is now `apply_focus_filter + _apply_live_narrowing`. Backend-verified: for
+"Maître d'Oeuvre EXE" with `focus=True, stale_days=90`, fiche
+`header.open_blocking == operational.moex_fresh == 392`. This **supersedes** the
+prior obsidian note (`05_REPORTING_AND_UI_ADAPTERS.md` "Consultant fiche correction
+pass") that said live narrowing should NOT be applied to the fiche.
+
+**2026-05-10 hybrid fiche payload (afternoon):** `consultant_fiche._build_bloc1_weekly`
+now accepts `(docs, data_date, s1, s2, s3, focus_docs=None)`. In focus mode,
+`build_consultant_fiche` calls it with `docs=all_docs` (full consultant history)
+and `focus_docs=focused_docs` (focus + live-narrowed scope). The full-history
+`docs` drives the status histogram (nvx, doc_ferme, s1/s2/s3/hm and their
+percentages) so VSO / VAO / REF / HM remain visible week by week, the card
+sparklines retain content, and the cumulative bloc2 evolution graph still
+shows historical statuses. The `focus_docs` scope drives only the open
+backlog columns (open_ok/late, open_blocking_ok/late, open_nb). Header KPIs
+still come from `_build_header(all_docs)` with focus-scope override on the
+`open_*` fields only — answered, s1_count, s2_count, s3_count, hm_count,
+total are full history. Net effect: focus mode shows the headline backlog
+under focused scope while preserving all historical response data on the
+fiche.
+
+**2026-05-10 fiche drilldown drawer hardening:** `fiche_page.jsx` renders
+the fiche drawer through `ReactDOM.createPortal(..., document.body)` so it
+escapes any ancestor `transform` (sets the containing block on `<main>`
+when focusMode is ON) or `overflow:auto` (inner-scroll wrapper) that
+could clip a `position:fixed` child. (Originally introduced together with
+a temporary "FICHE CLICK RECEIVED" debug badge; the badge was removed
+once the root cause — a name collision, recorded below — was fixed.
+The portal stays.)
+
+**2026-05-10 fiche drilldown drawer naming collision (root-cause fix +
+final cleanup):** Originally there were TWO components named
+`DrilldownDrawer` — `fiche_base.jsx:1059` (prop contract
+`{ state, onClose, onExport }`) and `overview.jsx:832` (prop contract
+`{ drill, focusMode, staleDays, onClose }`, returns null when `drill` is
+falsy). Each `<script type="text/babel">` runs in global script scope,
+so each top-level `function` declaration becomes a `window.*` property.
+Load order in `ui/jansa-connected.html` (`fiche_base.jsx` then
+`overview.jsx`) caused the overview declaration to silently overwrite
+`window.DrilldownDrawer`. fiche_page.jsx's
+`<window.DrilldownDrawer state={drilldown}>` was therefore hitting the
+overview component, which saw no `drill` prop and rendered null —
+explaining why the drawer never opened. Final state:
+- `fiche_base.jsx` exports the fiche drawer as both
+  `window.DrilldownDrawer` (legacy) and `window.FicheDrilldownDrawer`
+  (stable, unambiguous).
+- `overview.jsx`'s component has been **renamed**
+  `OverviewDrilldownDrawer`; it is no longer assigned to a window key
+  (it's used purely via the local lexical reference in `OverviewPage`).
+- `fiche_page.jsx` references `window.FicheDrilldownDrawer` so any
+  future bare-name collision cannot recur.
+Hard rule: any future drawer-style component declared at script-top
+level MUST use a uniquely qualified name; if a `window.*` export is
+needed, prefix with the surface name (e.g. `Fiche*`, `Overview*`,
+`Contractor*`).
+
 ### `RunsPage` (`ui/jansa/runs.jsx`)
 
 Calls `api.get_all_runs()` directly on mount → list of run dicts. Per-row

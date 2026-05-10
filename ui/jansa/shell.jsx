@@ -512,6 +512,12 @@ function App() {
   const focusModeRef = useRef(focusMode);
   useEffect(() => { focusModeRef.current = focusMode; }, [focusMode]);
 
+  const activeRef = useRef(active);
+  useEffect(() => { activeRef.current = active; }, [active]);
+
+  const selectedConsultantRef = useRef(selectedConsultant);
+  useEffect(() => { selectedConsultantRef.current = selectedConsultant; }, [selectedConsultant]);
+
   // Race-condition guard: only the latest toggle/stale request may apply its result
   const focusGenRef = useRef(0);
 
@@ -595,6 +601,18 @@ function App() {
       });
     }
   }, []);
+
+  // When focusMode or staleDays changes while ConsultantFiche is active, reload fiche payload
+  useEffect(() => {
+    if (!dataReady) return;
+    if (activeRef.current !== 'ConsultantFiche') return;
+    const c = selectedConsultantRef.current;
+    const apiName = (c && (c.canonical_name || c.name)) || '';
+    if (!apiName || !window.jansaBridge || !window.jansaBridge.api) return;
+    window.jansaBridge.loadFiche(apiName, focusMode, staleDays)
+      .then(() => setDataVersion(v => v + 1))
+      .catch(() => {});
+  }, [focusMode, staleDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const focusStats = (window.OVERVIEW && window.OVERVIEW.focus) || { focused: 0, p1_overdue: 0 };
 
@@ -687,7 +705,7 @@ function App() {
           {active === 'Overview'       && <OverviewPage focusMode={focusMode} onNavigate={navigateTo} onOpenConsultant={(c) => navigateTo('ConsultantFiche', c)} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
           {active === 'ActionMoex'     && <ActionMoexPage focusMode={focusMode}/>}
           {active === 'Consultants'    && <ConsultantsPage onOpen={(c) => navigateTo('ConsultantFiche', c)} focusMode={focusMode}/>}
-          {active === 'ConsultantFiche'&& <ConsultantFichePage consultant={selectedConsultant} onBack={() => navigateTo('Consultants')} focusMode={focusMode}/>}
+          {active === 'ConsultantFiche'&& <ConsultantFichePage consultant={selectedConsultant} onBack={() => navigateTo('Consultants')} focusMode={focusMode} staleDays={staleDays}/>}
           {active === 'Contractors'    && <ContractorsPage focusMode={focusMode} onOpenContractor={(c) => navigateTo('ContractorFiche', c)}/>}
           {active === 'ContractorFiche'&& <ContractorFichePage contractor={selectedContractor} onBack={() => navigateTo('Contractors')} focusMode={focusMode}/>}
           {active === 'Executer'       && <ExecuterPage onRunComplete={async () => {
