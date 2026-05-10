@@ -829,7 +829,13 @@ function QuickActions({ onNavigate }) {
 }
 
 /* ── Drilldown Drawer (local to Overview) ── */
-function DrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) {
+// Renamed 2026-05-10 from `DrilldownDrawer` to `OverviewDrilldownDrawer` to
+// stop shadowing window.DrilldownDrawer — fiche_base.jsx declares an
+// unrelated component with the same bare name. Each <script type="text/babel">
+// runs in global scope so the second declaration wins on window. The fiche
+// path now uses window.FicheDrilldownDrawer; this rename closes the
+// underlying footgun for any future bare-name reference.
+function OverviewDrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) {
   const [payload, setPayload] = useStateOv(null);
   const [loading, setLoading] = useStateOv(true);
   const [error, setError] = useStateOv(null);
@@ -1163,7 +1169,7 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
       </div>
 
       {/* Drilldown drawer */}
-      {drill && <DrilldownDrawer drill={drill} focusMode={focusMode} staleDays={90} onClose={closeDrill}/>}
+      {drill && <OverviewDrilldownDrawer drill={drill} focusMode={focusMode} staleDays={90} onClose={closeDrill}/>}
     </div>
   );
 }
