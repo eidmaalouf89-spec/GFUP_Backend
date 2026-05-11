@@ -117,6 +117,33 @@ function HeaderSection({ header, tags }) {
 }
 
 // ── Section 2: Latest status ─────────────────────────────────────────────────
+function DccPrintButton({ title }) {
+  function handlePrint() {
+    if (!window.JANSAPrint || !window.JANSAPrint.printTarget) return;
+    window.JANSAPrint.printTarget('dcc-document', {
+      title: title || 'Fiche document',
+    });
+  }
+
+  return (
+    <button
+      className="jansa-no-print"
+      data-jansa-no-print="true"
+      onClick={handlePrint}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        background: 'var(--bg-elev-2)', border: '1px solid var(--line)',
+        borderRadius: 99, padding: '5px 11px',
+        color: 'var(--text-2)', cursor: 'pointer',
+        fontFamily: window.JANSA_FONTS.ui, fontSize: 11,
+        marginBottom: 12,
+      }}
+    >
+      Imprimer la fiche document
+    </button>
+  );
+}
+
 function LatestStatusSection({ data }) {
   if (!data) return null;
   return (
@@ -427,8 +454,13 @@ function DocPayload({ numero, indice, focusMode, staleDays, onSearchClick }) {
     );
   }
 
+  var h = payload.header || {};
+  var printTitle = 'Fiche document - ' + [h.numero, h.indice_latest].filter(Boolean).join(' ');
+
   return (
     <div>
+      <DccPrintButton title={printTitle} />
+      <div data-jansa-print-target="dcc-document">
       <HeaderSection header={payload.header} tags={payload.tags} />
       <LatestStatusSection data={payload.latest_status} />
       <ResponsesSection data={payload.responses} />
@@ -436,6 +468,7 @@ function DocPayload({ numero, indice, focusMode, staleDays, onSearchClick }) {
       <RevisionHistorySection data={payload.revision_history} />
       <ChronologieSection data={payload.chronologie} />
       <TagsSection tags={payload.tags} />
+      </div>
     </div>
   );
 }

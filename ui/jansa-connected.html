@@ -13,6 +13,174 @@
     #root { width: 100%; height: 100%; }
     /* Preload font faces for Inter (optional — SF Pro available on macOS) */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+
+      html,
+      body,
+      #root,
+      #jansa-print-host {
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+      }
+
+      body[data-jansa-print-active] {
+        --bg: #ffffff !important;
+        --bg-elev: #ffffff !important;
+        --bg-elev-2: #f8fafc !important;
+        --bg-chip: #eef2f7 !important;
+        --line: rgba(17,24,39,0.14) !important;
+        --line-2: rgba(17,24,39,0.22) !important;
+        --line-3: rgba(17,24,39,0.30) !important;
+        --text: #111827 !important;
+        --text-2: #374151 !important;
+        --text-3: #6b7280 !important;
+        --accent: #0b63ce !important;
+        --accent-soft: rgba(11,99,206,0.10) !important;
+        --good: #166534 !important;
+        --good-soft: rgba(22,101,52,0.10) !important;
+        --warn: #92400e !important;
+        --warn-soft: rgba(146,64,14,0.10) !important;
+        --bad: #b91c1c !important;
+        --bad-soft: rgba(185,28,28,0.10) !important;
+        --neutral: #4b5563 !important;
+        --neutral-soft: rgba(75,85,99,0.10) !important;
+        --shadow-lg: none !important;
+        --blur-bg: #ffffff !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+      }
+
+      body[data-jansa-print-active] > *:not(#jansa-print-host) {
+        display: none !important;
+      }
+
+      #jansa-print-host {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+      }
+
+      #jansa-print-host * {
+        visibility: visible !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target {
+        position: static !important;
+        inset: auto !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target *,
+      #jansa-print-host .jansa-print-active-target *::before,
+      #jansa-print-host .jansa-print-active-target *::after {
+        max-width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        transform: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target,
+      #jansa-print-host .jansa-print-active-target article,
+      #jansa-print-host .jansa-print-active-target aside,
+      #jansa-print-host .jansa-print-active-target section,
+      #jansa-print-host .jansa-print-active-target header,
+      #jansa-print-host .jansa-print-active-target footer,
+      #jansa-print-host .jansa-print-active-target div {
+        background-color: #ffffff !important;
+        border-color: rgba(17,24,39,0.14) !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target article {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target [style*="position: fixed"],
+      #jansa-print-host .jansa-print-active-target [style*="position:fixed"],
+      #jansa-print-host .jansa-print-active-target [style*="position: sticky"],
+      #jansa-print-host .jansa-print-active-target [style*="position:sticky"] {
+        position: static !important;
+      }
+
+      #jansa-print-host .jansa-print-active-target [style*="background: linear-gradient"],
+      #jansa-print-host .jansa-print-active-target [style*="background-image"] {
+        background: transparent !important;
+        background-image: none !important;
+        -webkit-text-fill-color: #111827 !important;
+      }
+
+      #jansa-print-host table {
+        width: 100% !important;
+        table-layout: auto !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto !important;
+      }
+
+      #jansa-print-host svg,
+      #jansa-print-host canvas {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+
+      #jansa-print-host tr,
+      #jansa-print-host td,
+      #jansa-print-host th {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+      }
+
+      #jansa-print-host thead {
+        display: table-header-group !important;
+      }
+
+      #jansa-print-host section,
+      #jansa-print-host header,
+      #jansa-print-host footer,
+      #jansa-print-host table,
+      #jansa-print-host tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      #jansa-print-host button,
+      #jansa-print-host input,
+      #jansa-print-host nav,
+      #jansa-print-host [role="navigation"],
+      #jansa-print-host [data-jansa-no-print],
+      #jansa-print-host .jansa-no-print {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>

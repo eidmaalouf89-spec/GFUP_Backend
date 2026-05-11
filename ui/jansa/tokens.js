@@ -66,3 +66,77 @@ window.applyJansaTheme = function(name) {
   for (const k in t) root.style.setProperty(k, t[k]);
   root.setAttribute('data-theme', name);
 };
+
+(function () {
+  var activeTarget = null;
+  var printHost = null;
+  var cleanupTimer = null;
+  var originalTitle = null;
+
+  function escapeAttrValue(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  function cleanup() {
+    if (cleanupTimer) {
+      window.clearTimeout(cleanupTimer);
+      cleanupTimer = null;
+    }
+    if (activeTarget) {
+      activeTarget.classList.remove("jansa-print-active-target");
+      activeTarget = null;
+    }
+    if (printHost && printHost.parentNode) {
+      printHost.parentNode.removeChild(printHost);
+      printHost = null;
+    }
+    document.body.removeAttribute("data-jansa-print-active");
+    document.body.classList.remove("jansa-printing");
+    if (originalTitle !== null) {
+      document.title = originalTitle;
+      originalTitle = null;
+    }
+  }
+
+  window.addEventListener("afterprint", cleanup);
+
+  window.JANSAPrint = {
+    printTarget: function (targetId, options) {
+      options = options || {};
+      var id = String(targetId || "").trim();
+      if (!id) return false;
+
+      cleanup();
+
+      var selector = '[data-jansa-print-target="' + escapeAttrValue(id) + '"]';
+      var target = document.querySelector(selector);
+      if (!target) {
+        console.warn("[JANSAPrint] target not found:", id);
+        return false;
+      }
+
+      printHost = document.createElement("div");
+      printHost.id = "jansa-print-host";
+      printHost.setAttribute("aria-hidden", "true");
+      activeTarget = target.cloneNode(true);
+      activeTarget.classList.add("jansa-print-active-target");
+      printHost.appendChild(activeTarget);
+      document.body.appendChild(printHost);
+      document.body.setAttribute("data-jansa-print-active", id);
+      document.body.classList.add("jansa-printing");
+
+      if (options.title) {
+        originalTitle = document.title;
+        document.title = String(options.title);
+      }
+
+      cleanupTimer = window.setTimeout(cleanup, 3000);
+      window.print();
+      return true;
+    },
+    clear: cleanup,
+  };
+})();

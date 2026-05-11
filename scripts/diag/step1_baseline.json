@@ -1,0 +1,29 @@
+{
+  "frozen_at": "2026-05-11",
+  "source": "Action MOEX Step 1 + Step 2 closure",
+  "buckets": {
+    "FERMER_MAINTENANT": 687,
+    "DECISION_MOEX": 98,
+    "ENTREPRISE_A_RELANCER": 107,
+    "CONSULTANT_A_ATTAQUER": 146
+  },
+  "removed_buckets_must_be_zero": [
+    "MOEX_SHAME_INTERNAL",
+    "SECONDAIRE_EXPIRE",
+    "SUJET_REUNION"
+  ],
+  "terminal_states_excluded": [
+    "CLOSED_VAO",
+    "CLOSED_VSO",
+    "DEAD_AT_SAS_A",
+    "UNKNOWN_CHAIN_STATE"
+  ],
+  "terminal_states_admitted_into_action_moex": [
+    "VOID_CHAIN",
+    "ABANDONED_CHAIN"
+  ],
+  "filters": {
+    "days_late_gt_zero": true,
+    "latest_indice_only": true
+  }
+}

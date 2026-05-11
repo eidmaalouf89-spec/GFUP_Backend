@@ -669,11 +669,6 @@ for review but do not promote pending → answered.
 
 ## L. ACTION MOEX bucket gate predicates (Phase 6X.F2-bis, closed 2026-05-04)
 
-> **SUPERSEDED (2026-05-11).** The 7-bucket age-ladder model documented below
-> was replaced by a 4-bucket DCC `primary_tag` projection in Steps 1-6.
-> The predicate tree is kept verbatim for historical reference.
-> See **§L.2** for the current 4-bucket mapping.
-
 `_assign_bucket` in `src/reporting/counter_attack_builder.py` decides which
 of the 7 ACTION MOEX buckets a row lands in. The post-6X-bis routing tree is:
 
@@ -768,38 +763,6 @@ Final 2026-05-04 R3 distribution: FERMER_MAINTENANT 66, CONSULTANT_A_ATTAQUER
 210, ENTREPRISE_A_RELANCER 122, DECISION_MOEX 8, MOEX_SHAME_INTERNAL 989,
 SECONDAIRE_EXPIRE 129, SUJET_REUNION 0. Total 1524 rows on artifact (2026-04-10
 GED snapshot). See `docs/implementation/PHASE_6X_ACTION_MOEX_DATA_TRUTH_CORRECTION.md` §10.
-
----
-
-## L.2 ACTION MOEX 4-bucket DCC primary_tag projection (2026-05-11)
-
-Replaces the 7-bucket age-ladder model in §L above. `_assign_bucket` is now
-a 1:1 mapping from DCC `primary_tag` to Action MOEX bucket:
-
-| DCC `primary_tag` | Action MOEX bucket |
-|---|---|
-| `Att MOEX — Facile` | `FERMER_MAINTENANT` |
-| `Att MOEX — Arbitrage` | `DECISION_MOEX` |
-| `Att Entreprise — Hors délais` | `ENTREPRISE_A_RELANCER` |
-| `Att BET Primaire` | `CONSULTANT_A_ATTAQUER` |
-
-**Removed categories:** `MOEX_SHAME_INTERNAL`, `SECONDAIRE_EXPIRE`,
-`SUJET_REUNION` no longer exist as bucket categories.
-
-**Kept as warning tags:** `Secondaire expiré` (`secondary_wait_days > 10`)
-and `MOEX interne` (`moex_wait_days > 30`, subset of Secondaire expiré)
-remain as warning tags/chips in the `warning_tags` column — they are signals,
-not routing categories.
-
-**Pipeline filters (pre-bucket):**
-- `days_late > 0` gate (only late chains enter the bucket universe)
-- Latest-indice-only filter via `ctx.latest_chain_df`
-- `TERMINAL_STATES` exclusion: `CLOSED_VAO`, `CLOSED_VSO`, `DEAD_AT_SAS_A`,
-  `UNKNOWN_CHAIN_STATE` (note: `VOID_CHAIN` and `ABANDONED_CHAIN` now admitted)
-
-**Frozen baseline:** 687 / 98 / 107 / 146 = 1,038 total rows.
-Regression gate: `scripts/diag/step1_equality_check.py` vs
-`scripts/diag/step1_baseline.json`.
 
 ---
 

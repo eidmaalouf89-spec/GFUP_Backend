@@ -315,7 +315,7 @@
 
     /**
      * Phase 6B — Counter-Attack queue payload for a single bucket.
-     * @param {string}  bucket   one of FERMER_MAINTENANT / DECISION_MOEX / ENTREPRISE_A_RELANCER / CONSULTANT_A_ATTAQUER
+     * @param {string}  bucket   one of FERMER_MAINTENANT / SECONDAIRE_EXPIRE / ...
      * @param {number}  limit    max rows (default 500)
      * @returns {Promise<object>}  { available, bucket, bucket_label, count, rows }
      */
@@ -416,7 +416,7 @@
      * Step 5 — Export one ACTION MOEX bucket to xlsx.
      * On-demand: triggered by the "Exporter Excel" button on the bucket queue
      * panel. Resolves to the rich envelope; never rejects.
-     * @param {string}  bucket   one of FERMER_MAINTENANT / DECISION_MOEX / ENTREPRISE_A_RELANCER / CONSULTANT_A_ATTAQUER
+     * @param {string}  bucket   one of FERMER_MAINTENANT / SECONDAIRE_EXPIRE / ...
      * @returns {Promise<object>}  { success, path, filename, rows_exported, bucket, message, error }
      */
     exportActionMoexBucket: async function (bucket) {

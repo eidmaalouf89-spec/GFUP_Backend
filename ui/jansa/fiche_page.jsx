@@ -58,6 +58,42 @@ function FicheExportButton() {
   );
 }
 
+function FichePrintButton({ title }) {
+  const handlePrint = () => {
+    if (!window.JANSAPrint || !window.JANSAPrint.printTarget) return;
+    window.JANSAPrint.printTarget("consultant-fiche", {
+      title: title || "Fiche consultant",
+    });
+  };
+
+  return (
+    <button
+      className="jansa-no-print"
+      data-jansa-no-print="true"
+      onClick={handlePrint}
+      style={{
+        padding: '6px 14px', borderRadius: 8,
+        background: 'var(--bg-elev-2)',
+        border: '1px solid var(--line)',
+        color: 'var(--text-2)',
+        fontFamily: window.JANSA_FONTS.ui, fontSize: 12, fontWeight: 500,
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, color 0.15s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'var(--line-2)';
+        e.currentTarget.style.color = 'var(--text)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.color = 'var(--text-2)';
+      }}
+    >
+      Imprimer PDF
+    </button>
+  );
+}
+
 function ConsultantFichePage({ consultant, onBack, focusMode, staleDays }) {
   const base = window.FICHE_DATA;
 
@@ -182,6 +218,7 @@ function ConsultantFichePage({ consultant, onBack, focusMode, staleDays }) {
       slug: consultant.slug ?? base.consultant.slug,
     },
   } : base;
+  const printTitle = `Fiche consultant - ${data.consultant.display_name || data.consultant.name || consultantName || 'Consultant'}`;
 
   return (
     <div style={{ animation: 'fadeInUp 0.4s cubic-bezier(.4,0,.2,1)', position: 'relative' }}>
@@ -190,14 +227,17 @@ function ConsultantFichePage({ consultant, onBack, focusMode, staleDays }) {
         position: 'absolute', top: 14, right: 28, zIndex: 10,
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
+        <FichePrintButton title={printTitle}/>
         <FicheExportButton/>
       </div>
-      <window.ConsultantFiche
-        data={data}
-        lang="fr"
-        onBack={onBack}
-        onDrilldown={handleDrilldown}
-      />
+      <div data-jansa-print-target="consultant-fiche">
+        <window.ConsultantFiche
+          data={data}
+          lang="fr"
+          onBack={onBack}
+          onDrilldown={handleDrilldown}
+        />
+      </div>
       {/* Drawer is portal-rendered to <body> so it escapes any ancestor
           with `transform` (sets containing block) or `overflow:auto/hidden`
           (can clip fixed children in some layout engines). FicheDrilldownDrawer

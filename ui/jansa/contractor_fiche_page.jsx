@@ -643,6 +643,42 @@ function HeaderCard({ data, onBack }) {
 }
 
 // ── O. QualityErrorBanner ─────────────────────────────────────────────────────
+function ContractorPrintButton({ title }) {
+  const handlePrint = () => {
+    if (!window.JANSAPrint || !window.JANSAPrint.printTarget) return;
+    window.JANSAPrint.printTarget("contractor-fiche", {
+      title: title || "Fiche entreprise",
+    });
+  };
+
+  return (
+    <button
+      className="jansa-no-print"
+      data-jansa-no-print="true"
+      onClick={handlePrint}
+      style={{
+        padding: "6px 14px", borderRadius: 8,
+        background: C.surf2,
+        border: "1px solid " + C.line,
+        color: C.text2,
+        fontFamily: FONT_UI, fontSize: 12, fontWeight: 500,
+        cursor: "pointer",
+        transition: "border-color 0.15s, color 0.15s",
+      }}
+      onMouseEnter={function (e) {
+        e.currentTarget.style.borderColor = C.line2;
+        e.currentTarget.style.color = C.text;
+      }}
+      onMouseLeave={function (e) {
+        e.currentTarget.style.borderColor = C.line;
+        e.currentTarget.style.color = C.text2;
+      }}
+    >
+      Imprimer PDF
+    </button>
+  );
+}
+
 function QualityErrorBanner({ message }) {
   return (
     <div style={{
@@ -729,14 +765,23 @@ function ContractorFichePage({ contractor, onBack, focusMode }) {
 
   const q            = data.quality;
   const qualityError = !q || !!q.error;
+  const printTitle = "Fiche entreprise - " + (data.contractor_name || data.contractor_code || "Entreprise");
 
   return (
-    <article style={{
-      maxWidth: 1200, margin: "0 auto", padding: "0 56px 60px",
-      background: "transparent", color: C.text, fontFamily: FONT_UI,
-      animation: "fadeInUp 0.4s cubic-bezier(.4,0,.2,1)",
-    }}>
-      <HeaderCard data={data} onBack={onBack} />
+    <div style={{ position: "relative" }}>
+      <div style={{
+        position: "absolute", top: 14, right: 28, zIndex: 10,
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <ContractorPrintButton title={printTitle} />
+      </div>
+      <div data-jansa-print-target="contractor-fiche">
+        <article style={{
+          maxWidth: 1200, margin: "0 auto", padding: "0 56px 60px",
+          background: "transparent", color: C.text, fontFamily: FONT_UI,
+          animation: "fadeInUp 0.4s cubic-bezier(.4,0,.2,1)",
+        }}>
+          <HeaderCard data={data} onBack={onBack} />
 
       {qualityError && (
         <QualityErrorBanner message={q ? q.error : "Données indisponibles"} />
@@ -784,7 +829,9 @@ function ContractorFichePage({ contractor, onBack, focusMode }) {
           </DormantRow>
         </>
       )}
-    </article>
+        </article>
+      </div>
+    </div>
   );
 }
 

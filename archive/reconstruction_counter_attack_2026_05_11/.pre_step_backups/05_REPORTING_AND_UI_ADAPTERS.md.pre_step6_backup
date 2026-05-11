@@ -378,8 +378,8 @@ contract, locked baseline, and Phase 1 findings.
   reviewer list, reuses `plain_reason` verbatim, appends an empty
   `MOEX AVIS` column, atomic write.
 - New `Api.export_action_moex_bucket_xlsx(self, bucket)` in `app.py`.
-  Validates `bucket` against `BUCKET_DISPLAY_ORDER` (4-bucket enum from
-  `counter_attack_query`, post-2026-05-11). Returns rich envelope
+  Validates `bucket` against `BUCKET_DISPLAY_ORDER` (7-bucket enum from
+  `counter_attack_query`). Returns rich envelope
   `{success, path, filename, rows_exported, bucket, message, error}`.
 - New bridge wrapper `exportActionMoexBucket(bucket)` in
   `ui/jansa/data_bridge.js`.
@@ -425,14 +425,6 @@ the user after a bucket-count regression appeared on artifact rebuild.
 Files restored from `backups/step4_20260510_134214/`. Investigation is
 documented in `context/07_OPEN_ITEMS.md` and
 `obsidian_repo_mind/09_ACTION_MOEX_COUNTER_ATTACK.md`.
-
-> **Superseded 2026-05-11.** The SUJET_REUNION cascade and the 7-bucket
-> routing model are both superseded by the 4-bucket DCC `primary_tag`
-> projection (Steps 1--6, closed 2026-05-11). The OS-2026-05-10-01
-> baseline drift investigation is resolved: frozen baseline
-> 687/98/107/146 = 1,038 enforced by
-> `scripts/diag/step1_equality_check.py`. See
-> `obsidian_repo_mind/09_ACTION_MOEX_COUNTER_ATTACK.md` Step 6 closure.
 
 ---
 

@@ -10,6 +10,7 @@ Run:
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -294,6 +295,30 @@ def main() -> None:
         print(f"  G-LCV-3 BASELINE DRIFT: bucket=Total expected={total_baseline} got={total_actual}")
     else:
         print(f"  Total: {total_actual} (expected {total_baseline}) [OK]")
+
+    # --- Frozen baseline equality (loaded from step1_baseline.json) ---
+    baseline_path = Path(__file__).resolve().parent / "step1_baseline.json"
+    print()
+    print("-" * 70)
+    print("BASELINE EQUALITY (step1_baseline.json vs artifact):")
+    print("-" * 70)
+    if not baseline_path.exists():
+        all_pass = False
+        print(f"  FAIL: baseline file not found at {baseline_path}")
+    else:
+        with open(baseline_path, "r", encoding="utf-8") as f:
+            baseline = json.load(f)
+        for bucket, expected in baseline["buckets"].items():
+            actual = int((art_df["action_bucket"].map(_safe_str) == bucket).sum())
+            if actual != expected:
+                all_pass = False
+                print(
+                    f"  BASELINE DRIFT: {bucket} {expected} -> {actual}"
+                    f" -- Step 1 closure was modified silently."
+                    f" See {baseline_path}."
+                )
+            else:
+                print(f"  {bucket}: {actual} (baseline {expected}) [PASS]")
 
     print()
     print("=" * 70)

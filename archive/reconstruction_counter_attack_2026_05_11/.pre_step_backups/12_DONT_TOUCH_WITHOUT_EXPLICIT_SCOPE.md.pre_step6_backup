@@ -68,14 +68,6 @@ Specifically sensitive:
 
 **Why:** Reads `output/chain_onion/CHAIN_*.csv` + RunContext, applies the 10-day secondary cap (not enforced by chain_onion itself), produces DCC Chronologie data. Auto-refreshed at startup.
 
-### Action MOEX frozen baseline + regression gate (2026-05-11)
-
-Action MOEX category assignment is a 1:1 DCC `primary_tag` projection. Do NOT add a parallel ownership classifier. Do NOT re-introduce age-ladder routing, `MOEX_SHAME_INTERNAL`, `SECONDAIRE_EXPIRE`, or `SUJET_REUNION` as categories.
-
-`scripts/diag/step1_equality_check.py` is the regression gate for Action MOEX bucket counts. The BASELINE EQUALITY section (vs `scripts/diag/step1_baseline.json`) MUST pass before any merge that touches `src/reporting/counter_attack_builder.py`, `counter_attack_query.py`, `counter_attack_ai_pack.py`, `counter_attack_export.py`, `contractor_quality.py` (REF dormant invariant), or any chain artifact consumed by them. If you intentionally change the baseline, update the JSON file in the same commit and re-state the new counts in the commit message.
-
-Frozen baseline: FERMER_MAINTENANT = 687, DECISION_MOEX = 98, ENTREPRISE_A_RELANCER = 107, CONSULTANT_A_ATTAQUER = 146 (total 1,038).
-
 ---
 
 ## C. Persistent state

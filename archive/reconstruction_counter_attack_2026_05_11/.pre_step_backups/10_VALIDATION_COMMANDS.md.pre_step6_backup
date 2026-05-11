@@ -182,32 +182,6 @@ evidence only.
 
 ---
 
-## F.2 Action MOEX baseline regression gate
-
-```bash
-python scripts/diag/step1_equality_check.py
-```
-
-Runs the frozen-baseline equality check for Action MOEX bucket counts.
-Compares the current `output/intermediate/COUNTER_ATTACK_ITEMS.csv` bucket
-distribution against `scripts/diag/step1_baseline.json`.
-
-**Expected output (all gates PASS):**
-
-- BASELINE EQUALITY: `FERMER_MAINTENANT=687, DECISION_MOEX=98,
-  ENTREPRISE_A_RELANCER=107, CONSULTANT_A_ATTAQUER=146` (total 1,038)
-- DCC TAG PARITY: every bucket's rows match their expected `primary_tag`
-
-**When to run:** before any merge that touches `counter_attack_builder.py`,
-`counter_attack_query.py`, `counter_attack_ai_pack.py`,
-`counter_attack_export.py`, `contractor_quality.py` (REF dormant invariant),
-or any chain artifact consumed by them.
-
-If you intentionally change the baseline, update `step1_baseline.json` in
-the same commit and re-state the new counts in the commit message.
-
----
-
 ## G. Useful greps for inspection
 
 ```bash

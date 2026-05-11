@@ -61,7 +61,6 @@
 - **What:** `PHASE_6A_INTELLIGENCE_ARTIFACT.md`, `6B`, `6C`, `6D` are implemented (Counter-Attack/Action MOEX wired and live)
 - **The broader Phase 6 vision** (full Intelligence UI page surfacing chain narratives, scores, and Onion analytics) is listed in README as "the next killer module work-stream"
 - **What's NOT yet in the UI:** `CHAIN_NARRATIVES.csv`, full Onion score visualization, the 24+ unused `query_hooks.*` functions
-- **Action MOEX bucket design slice closed (Steps 1--6, 2026-05-11):** 4-bucket DCC `primary_tag` projection model with frozen baseline 687/98/107/146 enforced by `scripts/diag/step1_equality_check.py`. Counter-attack reconstruction copies archived to `archive/reconstruction_counter_attack_2026_05_11/`. Broader Phase 6 intelligence-layer work remains open.
 
 ---
 

@@ -286,9 +286,7 @@ encountering:
      (G-LCV-, G-DORM-, G-DCC-, G-AGG-, G-CONS-/G-DRL-/G-FOC-) covering
      the migration invariants.
    - `scripts/diag/step1_equality_check.py` — confirms
-     `compute_dcc_tags_bulk` row count, pollution gap, Decision-3 gap,
-     and BASELINE EQUALITY (frozen Action MOEX bucket counts
-     687/98/107/146 vs `scripts/diag/step1_baseline.json`).
+     `compute_dcc_tags_bulk` row count, pollution gap, Decision-3 gap.
    - `scripts/diag/step2_tag_check.py` — confirms tag-distribution
      identity vs pre-migration baseline.
 
