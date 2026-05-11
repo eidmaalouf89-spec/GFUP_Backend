@@ -689,3 +689,81 @@ Surfaces that intentionally continue to read `ctx.dernier_df` or
   `_focus_owner_tier` onto `ctx.dernier_df` in place).
 - `contractor_fiche` "Documents soumis" historical total field
   (`total_submitted` from `ctx.docs_df`, all-indices count).
+
+---
+
+## 2026-05-11 — Standalone HTML Snapshot (read-only frozen cockpit, full 1:1 parity)
+
+| UI surface | Bridge call | Backend Api method | Builder |
+|---|---|---|---|
+| Reports tab → "Exporter snapshot HTML" | `jansaBridge.exportStandaloneHtmlSnapshot()` (`ui/jansa/data_bridge.js`) | `Api.export_standalone_html_snapshot` (`app.py`) | `reporting.standalone_html_snapshot.write_standalone_html_snapshot(api, base_dir)` — gathers composed UI payloads for **both focus modes** (`focus_off` / `focus_on`) for overview, consultants, contractors, every consultant + contractor fiche; full-coverage `get_documents_drilldown` matrix for the dashboard drawers; full-coverage `get_doc_details` matrix for the fiche drawer (global + per-lot + per-period); full-coverage `get_document_command_center` + `get_chain_timeline` for every harvested numero (no cap); chain intel + Action MOEX home/queues/items. Writes one self-contained timestamped HTML under `output/exports/JANSA_STANDALONE_HTML__run_<NNNN>__<YYYY-MM-DD>_<HHMM>.html` (~80 MB; design ceiling 100 MB). Reuses tokens.js + the live (snapshot-aware) data_bridge.js + every `ui/jansa/*.jsx` component inlined verbatim — no parallel UI. |
+
+**Build time ~40–45 min** (dominated by per-period fiche drilldown
+pre-builds: ~15 000 `get_doc_details` calls at ~125 ms each).
+
+**Pre-built caches in `window.JANSA_SNAPSHOT_DATA`:**
+
+| Cache | Key shape | Source | Count (current run) |
+|---|---|---|---|
+| `overview` / `consultants` / `contractors` | `{focus_off, focus_on}` | `get_*_for_ui(focus, 90)` | 2 each |
+| `consultant_fiches[name]` / `contractor_fiches[code]` | `{focus_off, focus_on}` | `get_*_fiche_for_ui` | 16 / 29 |
+| `drilldowns` | `<kind>\|<paramsJSON sort_keys=true>\|<focus 0\|1>` | `get_documents_drilldown` for `submitted`, `pending_blocking`, `focus_priority {1..4}`, `operational_total/fresh/stale`, `operational_moex {scope?}`, `operational_consultants {tier?}`, `operational_enterprise_ref`, `operational_priority {1..4}`, `visa_segment {segment}` × 2 focus | 48 |
+| `fiche_drilldowns` | `<consultant>\|<filterKey>\|<lot or "">\|<focus 0\|1>[\|<period>]` | `get_doc_details` for global (`answered`, `open_count`, `open_blocking`, `s1/s2/s3/hm`, `open_ok/late`, `open_blocking_ok/late`, `open_non_blocking`) + per-lot (each `bloc3.lots[*].name`) + per-period (each `bloc1[*].label`: `period_opened/closed`, statuses, open_blocking_*) × 2 focus | 14 976 |
+| `dcc_panels` | `<numero>\|<indice or "">` | `get_document_command_center(numero, indice, False, 30)` for every numero harvested from chain intel + Action MOEX queues + items + every drilldown row | 2 553 |
+| `chain_timelines` | `<numero>` | `get_chain_timeline` | 2 553 |
+| `search_index` | flat list | derived from `dcc_panels` headers; offline `searchDocuments` substring-matches on numero, indice, titre, emetteur_code, emetteur_name, lot, status | 2 553 |
+| `counter_attack_home` / `counter_attack_queues` / `counter_attack_items` | verbatim | `get_counter_attack_home/queue/item` | 1 / 4 / 851 |
+| `chain_intel` | verbatim | `get_chain_onion_intel(50)` | 50 issues |
+
+**Snapshot mode in `data_bridge.js`** detects `window.JANSA_SNAPSHOT_DATA`
+or the `#jansa-snapshot-data` marker and swaps `bridge.api` to a Proxy
+that returns `{success:false, disabled:true, error:"…lecture seule…"}`
+for every mutating method (every `export_*_xlsx`,
+`generate_counter_attack_ai_audit_pack`, `run_pipeline_async`,
+`save_corrections`, `import_ged`, `import_reports`). Every read method
+is replaced with an embedded-JSON resolver:
+
+- `init(focus)`, `refreshForFocus(focus)`, `loadFiche(name, focus)`,
+  `loadContractorFiche(code, focus)` use a `_pickFocus(bundle, focus)`
+  helper that picks `focus_on` or `focus_off` with **opposite-focus
+  fallback** when one variant is missing/errored (relevant because the
+  pre-existing `consultant_fiche._build_bloc1` datetime bug at
+  `src/reporting/consultant_fiche.py:981` only fires on one focus side
+  for one consultant — the fallback recovers the other side).
+- `loadDrilldown(kind, params, focus)` looks up by the full key with
+  opposite-focus fallback.
+- `loadFicheDrilldown(name, filterKey, lotName, focus, _stale, periodLabel)`
+  looks up by `<name>|<filterKey>|<lot>|<focus>` with optional
+  `|<period>` suffix; falls back to opposite-focus, then to the
+  no-period variant.
+- `loadDocumentCommandCenter(numero, indice)` does
+  `numero|indice` → `numero|""` → `numero|*` fallback.
+
+A fixed yellow bottom banner is rendered at DOMContentLoaded
+(`"MODE SNAPSHOT HTML — LECTURE SEULE — run … — data … — généré …"`,
+with `data-jansa-no-print="1"`). Live mode is untouched when no
+snapshot data is present.
+
+`ui/jansa/shell.jsx::ReportsPage` reads `window.jansaBridge.isSnapshot`
+and dims/disables the two existing export cards (Tableau de Suivi VISA,
+Pack Audit IA) in snapshot mode. The new "Exporter snapshot HTML"
+button sits above them and is the only export available in snapshot
+mode (and even then disables itself with "Indisponible (snapshot)"
+because the live backend is the only source that can build a fresh
+snapshot).
+
+**Hard rules for future changes.**
+- New read endpoint in `data_bridge.js` → also add a snapshot resolver
+  inside the `IS_SNAPSHOT_MODE` branch.
+- New clickable cell in JSX → also add the corresponding entry to
+  `_DASHBOARD_DRILLDOWNS` / `_FICHE_FILTER_KEYS_*` in
+  `src/reporting/standalone_html_snapshot.py`.
+- New mutating action → also add it to the snapshot Proxy's
+  mutating-list and confirm the Reports/page card honors
+  `bridge.isSnapshot`.
+- Do NOT bake business logic into the snapshot bridge. The bridge
+  filters / slices / substring-matches only. KPI arithmetic, bucket
+  logic, latest-indice logic, DCC tags, Chain+Onion, pass rates stay on
+  the Python side and are baked into `data` at build time.
+- Snapshot file size budget: **100 MB**. New pre-built endpoints must
+  respect this.

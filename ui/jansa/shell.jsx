@@ -799,6 +799,31 @@ function ReportsPage() {
   const [exportResult, setExportResult] = React.useState(null);
   const [aiPacking, setAiPacking] = React.useState(false);
   const [aiPackResult, setAiPackResult] = React.useState(null);
+  const [snapping, setSnapping] = React.useState(false);
+  const [snapResult, setSnapResult] = React.useState(null);
+  const isSnapshot = !!(window.jansaBridge && window.jansaBridge.isSnapshot);
+
+  const handleSnapshotHtml = async () => {
+    if (!window.jansaBridge) return;
+    setSnapping(true);
+    setSnapResult(null);
+    try {
+      const res = await window.jansaBridge.exportStandaloneHtmlSnapshot();
+      if (res && res.success === true) {
+        setSnapResult({ ok: true, path: res.path });
+        if (window.jansaBridge.api && window.jansaBridge.api.open_file_in_explorer && res.path) {
+          window.jansaBridge.api.open_file_in_explorer(res.path);
+        }
+      } else {
+        setSnapResult({ ok: false, msg: (res && res.error) || 'Erreur export' });
+      }
+    } catch (e) {
+      setSnapResult({ ok: false, msg: String(e) });
+    } finally {
+      setSnapping(false);
+      setTimeout(() => setSnapResult(null), 4000);
+    }
+  };
 
   const handleExport = async () => {
     if (!window.jansaBridge || !window.jansaBridge.api) return;
@@ -854,11 +879,52 @@ function ReportsPage() {
         Générer et exporter les documents de suivi du projet.
       </p>
 
+      {/* Générer HTML autonome — read-only snapshot */}
+      <div style={{
+        background: 'var(--bg-elev)', border: '1px solid var(--line)',
+        borderRadius: 16, padding: 24, marginBottom: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+            Générer HTML autonome
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
+            Cockpit JANSA figé ouvrable dans Chrome sans backend —
+            {' '}<span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)' }}>
+              JANSA_STANDALONE_HTML__run_XXXX__YYYY-MM-DD_HHMM.html
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={handleSnapshotHtml}
+          disabled={snapping || isSnapshot}
+          title={isSnapshot ? 'Action désactivée en mode snapshot' : ''}
+          style={{
+            flexShrink: 0,
+            padding: '9px 18px', borderRadius: 9,
+            background: 'var(--accent-soft)',
+            border: '1px solid rgba(10,132,255,0.35)',
+            color: 'var(--accent)',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+            cursor: (snapping || isSnapshot) ? 'not-allowed' : 'pointer',
+            opacity: (snapping || isSnapshot) ? 0.5 : 1,
+            transition: 'opacity 0.15s',
+          }}
+        >
+          {isSnapshot ? 'Indisponible (snapshot)'
+            : snapping ? 'Export en cours…'
+            : snapResult ? (snapResult.ok ? '✓ Exporté' : '✗ Erreur')
+            : 'Exporter snapshot HTML'}
+        </button>
+      </div>
+
       {/* Tableau de Suivi VISA */}
       <div style={{
         background: 'var(--bg-elev)', border: '1px solid var(--line)',
         borderRadius: 16, padding: 24, marginBottom: 16,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
+        opacity: isSnapshot ? 0.55 : 1,
       }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
@@ -873,7 +939,8 @@ function ReportsPage() {
         </div>
         <button
           onClick={handleExport}
-          disabled={exporting}
+          disabled={exporting || isSnapshot}
+          title={isSnapshot ? 'Action désactivée en mode snapshot (lecture seule)' : ''}
           style={{
             flexShrink: 0,
             padding: '9px 18px', borderRadius: 9,
@@ -897,6 +964,7 @@ function ReportsPage() {
         background: 'var(--bg-elev)', border: '1px solid var(--line)',
         borderRadius: 16, padding: 24, marginBottom: 16,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
+        opacity: isSnapshot ? 0.55 : 1,
       }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
@@ -908,7 +976,8 @@ function ReportsPage() {
         </div>
         <button
           onClick={handleAiPack}
-          disabled={aiPacking}
+          disabled={aiPacking || isSnapshot}
+          title={isSnapshot ? 'Action désactivée en mode snapshot (lecture seule)' : ''}
           style={{
             flexShrink: 0,
             padding: '9px 18px', borderRadius: 9,

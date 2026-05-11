@@ -1600,6 +1600,35 @@ class Api:
                 "error": f"Api.generate_counter_attack_ai_audit_pack: {type(e).__name__}: {e}",
             }
 
+    # ── Standalone HTML Snapshot (read-only frozen cockpit) ─────
+    def export_standalone_html_snapshot(self) -> dict:
+        """Generate a self-contained read-only HTML snapshot of the current run.
+
+        Reuses the composed UI payloads (overview, consultants, contractors,
+        chain intel, action MOEX, consultant/contractor fiches, DCC panels) and
+        writes a single timestamped .html file under output/exports/. The
+        generated file does not require pywebview or any backend to render.
+
+        Returns the standard export envelope: {success, path, filename,
+        size_bytes, message?, error?}.
+        """
+        self._cache_ready.wait()
+        try:
+            from reporting.standalone_html_snapshot import write_standalone_html_snapshot
+            return _sanitize_for_json(
+                write_standalone_html_snapshot(api=self, base_dir=BASE_DIR)
+            )
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "success": False,
+                "path": None,
+                "filename": None,
+                "size_bytes": 0,
+                "error": f"Api.export_standalone_html_snapshot: {type(exc).__name__}: {exc}",
+            })
+
     # ── Step 5 — Per-bucket Excel export for ACTION MOEX ────────
     def export_action_moex_bucket_xlsx(self, bucket):
         """Step 5 — Export one ACTION MOEX bucket to xlsx.

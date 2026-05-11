@@ -558,3 +558,28 @@ If counts mismatch the dashboard, the helper extraction is broken (or
 the `op_broad` vs `op` choice for `operational_enterprise_ref` is wrong).
 The dashboard payload is byte-for-byte unchanged by the Step 2 helper
 refactor — any divergence here is a bug.
+
+---
+
+## Standalone HTML Snapshot — validation (2026-05-11)
+
+```
+# Import smoke
+python -c "import app; print('app_import_ok=True')"
+python -c "import sys; sys.path.insert(0,'src'); from reporting.standalone_html_snapshot import build_snapshot_payload, write_standalone_html_snapshot; print('snapshot_builder_import_ok=True')"
+
+# JS syntax (data_bridge.js)
+node --check ui/jansa/data_bridge.js
+
+# Generate
+python -c "import sys; sys.path.insert(0,'src'); from reporting.standalone_html_snapshot import write_standalone_html_snapshot; r=write_standalone_html_snapshot(); print(r)"
+
+# Inspect latest snapshot HTML
+python -c "from pathlib import Path; import glob; files=sorted(glob.glob('output/exports/JANSA_STANDALONE_HTML*.html')); p=files[-1] if files else None; print('latest=', p); s=Path(p).read_text(encoding='utf-8', errors='ignore') if p else ''; print('has_snapshot_data=', 'JANSA_SNAPSHOT_DATA' in s); print('has_readonly=', 'lecture seule' in s.lower()); print('size_kb=', len(s)//1024 if s else 0)"
+```
+
+Expected: `success=True`, file present under `output/exports/`,
+`has_snapshot_data=True`, `has_readonly=True`. Opening the file in Chrome
+without launching app.py must render the dashboard, with a yellow bottom
+banner ("MODE SNAPSHOT HTML — LECTURE SEULE …") and Reports cards
+"Tableau de Suivi VISA" / "Pack Audit IA" disabled.

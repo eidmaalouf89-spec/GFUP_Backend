@@ -456,6 +456,36 @@
       }
     },
 
+    /**
+     * Standalone HTML Snapshot — generate a read-only frozen cockpit HTML.
+     * On-demand from the ReportsPage. Always resolves to a {success, path,
+     * filename, size_bytes, message?, error?} envelope.
+     */
+    exportStandaloneHtmlSnapshot: async function () {
+      if (!bridge.api || typeof bridge.api.export_standalone_html_snapshot !== "function") {
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          size_bytes: 0,
+          error: "Bridge not ready: window.jansaBridge.api unavailable",
+        };
+      }
+      try {
+        var r = await bridge.api.export_standalone_html_snapshot();
+        return r || { success: false, error: "No response from backend" };
+      } catch (e) {
+        console.error("[data_bridge] exportStandaloneHtmlSnapshot exception:", e);
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          size_bytes: 0,
+          error: "Bridge.exportStandaloneHtmlSnapshot: " + (e && e.message ? e.message : String(e)),
+        };
+      }
+    },
+
     // ── Internal ──────────────────────────────────────────────────
 
     _loadCoreData: async function (focus, staleDays) {
@@ -518,4 +548,209 @@
   };
 
   window.jansaBridge = bridge;
+
+  // ── Snapshot mode (Standalone HTML Snapshot — read-only) ─────
+  // If window.JANSA_SNAPSHOT_DATA is present (set by the snapshot HTML
+  // exporter before this file runs), replace bridge methods with offline
+  // resolvers that read from the embedded payload. Mutating actions
+  // return a disabled-mode envelope. Live mode is untouched when no
+  // snapshot data is present.
+  var IS_SNAPSHOT_MODE = Boolean(window.JANSA_SNAPSHOT_DATA)
+    || Boolean(document.getElementById("jansa-snapshot-data"));
+  if (IS_SNAPSHOT_MODE) {
+    var SNAP = window.JANSA_SNAPSHOT_DATA || {};
+    var META = window.JANSA_SNAPSHOT_META || { mode: "snapshot" };
+    function _clone(o) { try { return JSON.parse(JSON.stringify(o)); } catch (e) { return o; } }
+    function _disabled(label) {
+      return Promise.resolve({
+        success: false,
+        error: "Action désactivée en mode snapshot (lecture seule).",
+        disabled: true,
+        label: label || null
+      });
+    }
+    function _panelKey(numero, indice) {
+      return String(numero == null ? "" : numero) + "|" + String(indice == null ? "" : indice);
+    }
+    function _findPanel(numero, indice) {
+      var panels = SNAP.dcc_panels || {};
+      var k = _panelKey(numero, indice);
+      if (panels[k]) return panels[k];
+      var nullKey = _panelKey(numero, null);
+      if (panels[nullKey]) return panels[nullKey];
+      var prefix = String(numero == null ? "" : numero) + "|";
+      for (var key in panels) {
+        if (panels.hasOwnProperty(key) && key.indexOf(prefix) === 0) return panels[key];
+      }
+      return null;
+    }
+    function _searchOffline(query, limit) {
+      var idx = SNAP.search_index || [];
+      var q = String(query || "").trim().toLowerCase();
+      if (!q) return idx.slice(0, limit || 50);
+      var out = [];
+      for (var i = 0; i < idx.length && out.length < (limit || 50); i++) {
+        var r = idx[i];
+        var hay = [r.numero, r.indice, r.titre, r.emetteur_code, r.emetteur_name, r.lot, r.status]
+          .filter(Boolean).join(" ").toLowerCase();
+        if (hay.indexOf(q) !== -1) out.push(r);
+      }
+      return out;
+    }
+    var _fakeApi = new Proxy({}, {
+      get: function (_t, prop) {
+        if (prop === "open_file_in_explorer") return function () { return Promise.resolve({ ok: false, disabled: true }); };
+        if (prop === "get_app_state") return function () { return Promise.resolve({ snapshot: true, meta: META }); };
+        if (prop === "get_all_runs") return function () { return Promise.resolve([]); };
+        if (prop === "get_pipeline_status") return function () { return Promise.resolve({ running: false, snapshot: true }); };
+        if (prop === "validate_inputs") return function () { return Promise.resolve({ ok: true, snapshot: true }); };
+        var mutating = ["export_team_version","export_drilldown_xlsx",
+          "export_documents_drilldown_xlsx","export_action_moex_bucket_xlsx",
+          "generate_counter_attack_ai_audit_pack","run_pipeline_async",
+          "save_corrections","import_ged","import_reports"];
+        if (mutating.indexOf(String(prop)) !== -1) {
+          return function () { return _disabled(String(prop)); };
+        }
+        return function () { return Promise.resolve(null); };
+      }
+    });
+    // ── Helpers for dual-focus payloads ──────────────────────────
+    function _pickFocus(bundle, focus) {
+      if (bundle == null) return null;
+      // Legacy single-payload (older snapshots without focus duality).
+      if (bundle.focus_off === undefined && bundle.focus_on === undefined) return bundle;
+      var pick = focus ? bundle.focus_on : bundle.focus_off;
+      // Fall back to the other variant if the requested one is missing/errored.
+      if (pick == null || (pick && pick.error)) {
+        pick = focus ? bundle.focus_off : bundle.focus_on;
+      }
+      return pick;
+    }
+    // Stable params-JSON key (must match Python json.dumps(sort_keys=True)).
+    function _paramsKey(params) {
+      if (params == null) return "";
+      var keys = Object.keys(params); if (!keys.length) return "";
+      keys.sort();
+      var pairs = [];
+      for (var i = 0; i < keys.length; i++) {
+        pairs.push(JSON.stringify(keys[i]) + ": " + JSON.stringify(params[keys[i]]));
+      }
+      return "{" + pairs.join(", ") + "}";
+    }
+
+    function _applyCorePayloads(focus) {
+      window.OVERVIEW = _clone(_pickFocus(SNAP.overview, focus)) || {};
+      window.CONSULTANTS = _clone(_pickFocus(SNAP.consultants, focus)) || [];
+      var ct = _clone(_pickFocus(SNAP.contractors, focus)) || {};
+      window.CONTRACTORS = ct.lookup || {};
+      window.CONTRACTORS_LIST = ct.list || [];
+      window.CHAIN_INTEL = _clone(SNAP.chain_intel) || { top_issues: [], summary: {} };
+    }
+
+    bridge.api = _fakeApi;
+    bridge.ready = true;
+    bridge.isSnapshot = true;
+    bridge._snapshotFocus = false;
+    bridge.init = function (focus) {
+      bridge._snapshotFocus = !!focus;
+      _applyCorePayloads(!!focus);
+      window.FICHE_DATA = null;
+      return Promise.resolve();
+    };
+    bridge.refreshForFocus = function (focus) {
+      bridge._snapshotFocus = !!focus;
+      _applyCorePayloads(!!focus);
+      return Promise.resolve();
+    };
+    bridge.loadFiche = function (name, focus) {
+      var bundle = (SNAP.consultant_fiches || {})[name];
+      window.FICHE_DATA = _clone(_pickFocus(bundle, !!focus)) || null;
+      return Promise.resolve();
+    };
+    bridge.loadContractorFiche = function (code, focus) {
+      var bundle = (SNAP.contractor_fiches || {})[String(code)];
+      window.CONTRACTOR_FICHE_DATA = _clone(_pickFocus(bundle, !!focus)) || null;
+      return Promise.resolve();
+    };
+    bridge.searchDocuments = function (query) {
+      return Promise.resolve(_searchOffline(query, 50));
+    };
+    bridge.loadDocumentCommandCenter = function (numero, indice) {
+      var panel = _findPanel(numero, indice);
+      if (panel) return Promise.resolve(_clone(panel));
+      return Promise.resolve({
+        error: "Document non disponible dans le snapshot.",
+        snapshot: true, numero: numero, indice: indice
+      });
+    };
+    bridge.loadDrilldown = function (kind, params, focus) {
+      var cache = SNAP.drilldowns || {};
+      var k = String(kind || "") + "|" + _paramsKey(params || {}) + "|" + (focus ? 1 : 0);
+      if (cache[k]) return Promise.resolve(_clone(cache[k]));
+      // Fallback to opposite focus variant before declaring missing.
+      var altK = String(kind || "") + "|" + _paramsKey(params || {}) + "|" + (focus ? 0 : 1);
+      if (cache[altK]) return Promise.resolve(_clone(cache[altK]));
+      return Promise.resolve({ rows: [], total_count: 0, truncated: false,
+        snapshot: true, kind: kind, params: params,
+        message: "Drilldown non disponible dans le snapshot." });
+    };
+    bridge.exportDocumentsDrilldown = function () { return _disabled("exportDocumentsDrilldown"); };
+    bridge.loadFicheDrilldown = function (name, filterKey, lotName, focus, _stale, periodLabel) {
+      var cache = SNAP.fiche_drilldowns || {};
+      var lotPart = lotName == null ? "" : String(lotName);
+      var f = focus ? 1 : 0;
+      var baseKey = String(name || "") + "|" + String(filterKey || "") + "|" + lotPart + "|" + f;
+      var k = periodLabel ? (baseKey + "|" + String(periodLabel)) : baseKey;
+      if (cache[k]) return Promise.resolve(_clone(cache[k]));
+      // Opposite-focus fallback
+      var altF = focus ? 0 : 1;
+      var altBase = String(name || "") + "|" + String(filterKey || "") + "|" + lotPart + "|" + altF;
+      var altK = periodLabel ? (altBase + "|" + String(periodLabel)) : altBase;
+      if (cache[altK]) return Promise.resolve(_clone(cache[altK]));
+      // If a period was requested and missing, fall back to the no-period variant
+      if (periodLabel && cache[baseKey]) return Promise.resolve(_clone(cache[baseKey]));
+      if (periodLabel && cache[altBase]) return Promise.resolve(_clone(cache[altBase]));
+      return Promise.resolve({ docs: [], count: 0,
+        snapshot: true, message: "Drilldown non disponible dans le snapshot." });
+    };
+    bridge.loadCounterAttackHome = function () {
+      return Promise.resolve(_clone(SNAP.counter_attack_home) || { available: false, summary: {}, buckets: [] });
+    };
+    bridge.loadCounterAttackQueue = function (bucket) {
+      var q = (SNAP.counter_attack_queues || {})[String(bucket)];
+      return Promise.resolve(_clone(q) || { available: false, bucket: bucket, rows: [] });
+    };
+    bridge.loadCounterAttackItem = function (itemId) {
+      var i = (SNAP.counter_attack_items || {})[String(itemId)];
+      return Promise.resolve(_clone(i) || { available: false, found: false });
+    };
+    bridge.generateAiAuditPack = function () { return _disabled("generateAiAuditPack"); };
+    bridge.exportActionMoexBucket = function () { return _disabled("exportActionMoexBucket"); };
+
+    // ── Read-only banner ─────────────────────────────────────────
+    function _showSnapshotBanner() {
+      if (document.getElementById("jansa-snapshot-banner")) return;
+      var bar = document.createElement("div");
+      bar.id = "jansa-snapshot-banner";
+      bar.setAttribute("data-jansa-no-print", "1");
+      bar.style.cssText = [
+        "position:fixed","left:0","right:0","bottom:0","z-index:9999",
+        "padding:6px 14px","font:500 12px/1.4 Inter,system-ui,sans-serif",
+        "color:#0b1220","background:#facc15",
+        "border-top:1px solid rgba(0,0,0,0.18)",
+        "letter-spacing:.02em","text-align:center",
+        "box-shadow:0 -2px 8px rgba(0,0,0,0.25)"
+      ].join(";");
+      var runTxt = META.run_number != null ? (" — run " + META.run_number) : "";
+      var dateTxt = META.data_date ? (" — data " + META.data_date) : "";
+      var genTxt = META.generated_at ? (" — généré " + META.generated_at) : "";
+      bar.textContent = "MODE SNAPSHOT HTML — LECTURE SEULE" + runTxt + dateTxt + genTxt;
+      document.body.appendChild(bar);
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", _showSnapshotBanner);
+    } else {
+      _showSnapshotBanner();
+    }
+  }
 })();

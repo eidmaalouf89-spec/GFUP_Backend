@@ -188,4 +188,151 @@ to a second name. Cross-reference: this section and the analogous note in
 
 ---
 
+## Standalone HTML Snapshot — read-only frozen cockpit (2026-05-11)
+
+**Goal.** A single self-contained timestamped `.html` under
+`output/exports/` that opens directly in Chrome and reproduces the JANSA
+cockpit with **1:1 parity** to the live software — no pywebview, no
+backend, no recomputation. Read-only by construction.
+
+**Trigger.** Reports tab → "Exporter snapshot HTML" →
+`window.jansaBridge.exportStandaloneHtmlSnapshot()` →
+`Api.export_standalone_html_snapshot()` →
+`src/reporting/standalone_html_snapshot.write_standalone_html_snapshot()`.
+
+**Output.** `JANSA_STANDALONE_HTML__run_<NNNN>__<YYYY-MM-DD>_<HHMM>.html`
+— ~80 MB at current run size (design ceiling 100 MB). Build time
+~40–45 min, dominated by per-period fiche drilldown pre-builds.
+
+### What gets baked into the file
+
+Every payload comes from existing composed `Api.*_for_ui` methods. **No
+business logic is recomputed** in the snapshot or the offline UI.
+
+| Slot | Source(s) | Per-focus duality |
+|---|---|---|
+| `overview` | `Api.get_overview_for_ui` | yes (`focus_off`/`focus_on`) |
+| `consultants` | `Api.get_consultants_for_ui` | yes |
+| `contractors` | `Api.get_contractors_for_ui` | yes |
+| `consultant_fiches[name]` | `Api.get_fiche_for_ui` | yes |
+| `contractor_fiches[code]` | `Api.get_contractor_fiche_for_ui` | yes |
+| `chain_intel` | `Api.get_chain_onion_intel(50)` | no (focus-invariant) |
+| `counter_attack_home` | `Api.get_counter_attack_home` | no |
+| `counter_attack_queues[bucket]` | `Api.get_counter_attack_queue(bucket, 500)` | no |
+| `counter_attack_items[item_id]` | `Api.get_counter_attack_item` | no |
+| `drilldowns[kind\|paramsJSON\|focus]` | `Api.get_documents_drilldown` | yes |
+| `fiche_drilldowns[name\|fk\|lot\|focus[\|period]]` | `Api.get_doc_details` | yes |
+| `dcc_panels[numero\|indice]` | `Api.get_document_command_center` | no (always focus=False, stale=30) |
+| `chain_timelines[numero]` | `Api.get_chain_timeline` | no |
+| `search_index` | derived from `dcc_panels` headers | no |
+
+**Dashboard drilldown matrix** (kind × params × focus — 48 entries):
+`submitted`, `pending_blocking`, `focus_priority {priority ∈ 1..4}`,
+`operational_total/fresh/stale`, `operational_moex {scope ∈ {fresh,stale}?}`,
+`operational_consultants {tier ∈ {PRIMARY,SECONDARY}?}`,
+`operational_enterprise_ref`, `operational_priority {priority ∈ 1..4}`,
+`visa_segment {segment}` (segments discovered dynamically from
+`overview.visa_flow` keys). All for both focus modes.
+
+**Fiche drilldown matrix** (per consultant × per focus mode):
+- Global keys: `answered`, `open_count`, `open_blocking`, `s1/s2/s3/hm`,
+  `open_ok`, `open_late`, `open_blocking_ok`, `open_blocking_late`,
+  `open_non_blocking`.
+- Per-lot keys (each `bloc3.lots[*].name`): `total`, `s1/s2/s3/hm`,
+  `open_blocking_ok/late`, `open_non_blocking`.
+- Per-period keys (each `bloc1[*].label`): `period_opened`,
+  `period_closed`, `s1/s2/s3/hm`, `open_blocking_ok/late`,
+  `open_non_blocking`.
+
+This is the full set used by [fiche_base.jsx](../ui/jansa/fiche_base.jsx)
+in `Bloc1::periodCell`, the bloc1 inline open-blocking spans, the bloc2
+status headers, and bloc3 lot rows.
+
+### Snapshot mode in data_bridge.js
+
+`data_bridge.js` detects snapshot mode at the bottom of its IIFE:
+
+```js
+var IS_SNAPSHOT_MODE = Boolean(window.JANSA_SNAPSHOT_DATA)
+  || Boolean(document.getElementById("jansa-snapshot-data"));
+```
+
+When true:
+- `bridge.api` becomes a `Proxy` that returns
+  `{success:false, disabled:true, error:"Action désactivée en mode snapshot (lecture seule)."}`
+  for every mutating method (every `export_*_xlsx`,
+  `generate_counter_attack_ai_audit_pack`, `run_pipeline_async`,
+  `save_corrections`, `import_ged`, `import_reports`).
+- `bridge.isSnapshot === true`. Reports cards read this flag to dim/
+  disable the live exports.
+- Every read method is replaced with an embedded-JSON resolver:
+  - `init(focus)`, `refreshForFocus(focus)`, `loadFiche(name, focus)`,
+    `loadContractorFiche(code, focus)` use `_pickFocus(bundle, focus)`
+    that picks `focus_on` or `focus_off` (with opposite-focus fallback
+    when one variant is missing or errored — relevant because the
+    pre-existing `consultant_fiche._build_bloc1` datetime bug only fires
+    on one focus side for one consultant).
+  - `loadDrilldown(kind, params, focus)` looks up by
+    `<kind>|<paramsJSON sort_keys=true>|<focus 0|1>` with opposite-
+    focus fallback.
+  - `loadFicheDrilldown(name, filterKey, lotName, focus, _stale, periodLabel)`
+    looks up by `<name>|<filterKey>|<lot>|<focus>` with optional
+    `|<period>` suffix; falls back to opposite-focus, then to the
+    no-period variant when an exact key misses.
+  - `loadDocumentCommandCenter(numero, indice)` does
+    `numero|indice` → `numero|""` → `numero|*` fallback.
+  - `searchDocuments(query)` substring-matches the offline
+    `search_index` (numero, indice, titre, emetteur_code, emetteur_name,
+    lot, status).
+  - Counter-Attack home/queue/item resolve from
+    `counter_attack_home/queues/items` verbatim.
+- A fixed yellow bottom banner is rendered at DOMContentLoaded:
+  `"MODE SNAPSHOT HTML — LECTURE SEULE — run … — data … — généré …"`,
+  with `data-jansa-no-print="1"` so it disappears in print preview.
+
+Live mode is untouched when no snapshot data is present (the snapshot
+branch only runs inside `if (IS_SNAPSHOT_MODE) { … }`).
+
+### HTML composer
+
+`src/reporting/standalone_html_snapshot.py::_compose_html` inlines:
+1. The production `<style>` block (verbatim from
+   `ui/jansa-connected.html`, incl. print CSS).
+2. React 18 + ReactDOM 18 + Babel-standalone from unpkg (same CDN as
+   live; needs internet on first open).
+3. `window.JANSA_SNAPSHOT_META` + `window.JANSA_SNAPSHOT_DATA` as
+   inline JS literals, defended against `</script>` and U+2028/U+2029.
+4. `ui/jansa/tokens.js` verbatim, then `applyJansaTheme('dark')`.
+5. `ui/jansa/data_bridge.js` verbatim — single source of truth; the
+   snapshot-mode branch lives there, NOT in a duplicate file.
+6. Every `ui/jansa/*.jsx` component verbatim, in the same order as
+   `jansa-connected.html`.
+7. `ReactDOM.createRoot(...).render(React.createElement(window.App))`.
+
+### Hard rules for future changes
+
+- **Add a new read endpoint to `data_bridge.js` → also add a snapshot
+  resolver inside `if (IS_SNAPSHOT_MODE)`.** The snapshot bridge is the
+  same file as the live bridge; new read methods must declare a
+  snapshot behavior or that surface will be silently empty offline.
+- **Add a new clickable cell in a fiche/overview JSX → also add the
+  corresponding `(kind, params)` or `(filterKey, lot, period)` entry
+  to `_DASHBOARD_DRILLDOWNS` / `_FICHE_FILTER_KEYS_*` in
+  `standalone_html_snapshot.py`.** Otherwise the snapshot returns
+  "non disponible" on that click.
+- **Add a new mutating action → also add it to the snapshot Proxy's
+  mutating-list and confirm the Reports/page card honors
+  `bridge.isSnapshot`.** Mutating actions must NOT silently no-op in
+  live mode — only in snapshot mode.
+- **Do NOT bake business logic into the snapshot bridge.** The bridge
+  only filters, slices, and substring-matches embedded payloads. KPI
+  arithmetic, bucket logic, latest-indice logic, DCC tags, Chain+Onion,
+  pass rates stay on the Python side and are baked into `data` at build
+  time.
+- **Snapshot file size budget: 100 MB.** Adding new pre-built endpoints
+  must respect this. If a new endpoint would push the file over the
+  limit, gate it behind a sampling/cap parameter in the builder.
+
+---
+
 *Back to [[00_START_HERE]]*

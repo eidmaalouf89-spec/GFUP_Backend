@@ -6,6 +6,76 @@ This repository is not a generic Excel updater. It is a single-project operation
 
 ---
 
+## Feature — Standalone HTML Snapshot (2026-05-11, full-parity)
+
+**Goal.** A single self-contained timestamped `.html` under
+`output/exports/` that opens directly in Chrome and reproduces the
+JANSA cockpit with **1:1 parity** to the live software — no backend,
+no pywebview, no recomputation. Read-only by construction.
+
+**Trigger.** Reports tab → "Exporter snapshot HTML" →
+`jansaBridge.exportStandaloneHtmlSnapshot()` →
+`Api.export_standalone_html_snapshot()` →
+`src/reporting/standalone_html_snapshot.write_standalone_html_snapshot()`.
+
+**Output.** `JANSA_STANDALONE_HTML__run_<NNNN>__<YYYY-MM-DD>_<HHMM>.html`
+— ~80 MB at current run size (design ceiling 100 MB). Build time
+~40–45 min.
+
+**Data baked in.** Every payload comes from existing composed
+`Api.*_for_ui` methods, captured for **both focus modes** where
+applicable. No business logic is recomputed.
+
+| Slot | Source | Per-focus |
+|---|---|---|
+| `overview` / `consultants` / `contractors` | `get_*_for_ui` | yes |
+| `consultant_fiches[name]` | `get_fiche_for_ui` | yes |
+| `contractor_fiches[code]` | `get_contractor_fiche_for_ui` | yes |
+| `chain_intel`, Action MOEX home/queues/items | `get_chain_onion_intel`, `get_counter_attack_*` | no |
+| `drilldowns[kind\|params\|focus]` | `get_documents_drilldown` (48 entries: operational tiles, priority, visa segments, focus priority, submitted, pending_blocking) | yes |
+| `fiche_drilldowns[name\|fk\|lot\|focus[\|period]]` | `get_doc_details` (~15k entries: every global / per-lot / per-period click site in `Bloc1`/`Bloc2`/`Bloc3`) | yes |
+| `dcc_panels[numero\|indice]` | `get_document_command_center` (every harvested numero, no cap) | no |
+| `chain_timelines[numero]` | `get_chain_timeline` | no |
+| `search_index` | derived from `dcc_panels` headers | no |
+
+**Snapshot mode.** `ui/jansa/data_bridge.js` detects
+`window.JANSA_SNAPSHOT_DATA` and swaps `bridge.api` to a Proxy that
+returns `{success:false, disabled:true, error:"…lecture seule…"}` for
+every mutating method (every `export_*_xlsx`,
+`generate_counter_attack_ai_audit_pack`, `run_pipeline_async`,
+`save_corrections`, `import_ged`, `import_reports`); replaces every
+read method with embedded-JSON resolvers (with opposite-focus and
+no-period fallbacks). The Reports cards "Tableau de Suivi VISA",
+"Pack Audit IA", and the snapshot button itself dim via
+`bridge.isSnapshot`. A fixed yellow bottom banner
+("MODE SNAPSHOT HTML — LECTURE SEULE — run … — data … — généré …")
+confirms read-only and is hidden from print preview.
+
+**Files.** New: `src/reporting/standalone_html_snapshot.py`. Modified:
+`app.py` (+`Api.export_standalone_html_snapshot`),
+`ui/jansa/data_bridge.js` (+snapshot branch + new bridge method +
+banner), `ui/jansa/shell.jsx` (+new ReportsPage button + `isSnapshot`
+guards on the two existing buttons). Backups under
+`backup/standalone_html_snapshot_<timestamp>/`.
+
+**Limitations.** One consultant fiche fails to build because of a
+pre-existing `consultant_fiche._build_bloc1` datetime comparison bug
+(see [src/reporting/consultant_fiche.py:981](src/reporting/consultant_fiche.py:981));
+the snapshot stores `{"error":…}` for that variant and the snapshot
+bridge's opposite-focus fallback recovers the other side. Live exports
+(xlsx, AI audit pack) are intentionally disabled in snapshot mode.
+
+**Hard rules for future contributors.** Any new clickable cell in
+overview/fiche JSX must also be wired into the snapshot pre-build
+matrices (`_DASHBOARD_DRILLDOWNS` / `_FICHE_FILTER_KEYS_*`). Any new
+read endpoint added to `data_bridge.js` must also implement a snapshot
+resolver inside the `IS_SNAPSHOT_MODE` branch. Any new mutating action
+must be added to the disabled-method list. See
+[obsidian_repo_mind/06_JANSA_UI_RUNTIME.md](obsidian_repo_mind/06_JANSA_UI_RUNTIME.md)
+"Standalone HTML Snapshot" for the full contract.
+
+---
+
 ## Phase 8 family — release status (2026-05-01)
 
 | Phase | Status |
