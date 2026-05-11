@@ -252,6 +252,49 @@ follow-up even though resolved.
 
 ---
 
+## Phase 9 hot debugging seams (2026-05-11)
+
+The `dernier_df` retirement / `latest_chain_df` adoption migration
+introduced four canonical seams that future debuggers will keep
+encountering:
+
+1. **F-1 numero format trap.** Any DataFrame join, dict lookup, or
+   strict equality against a backend table (`dernier_df`,
+   `latest_chain_df`, `responses_df`) MUST use canonical zero-padded
+   `numero`, not `numero_normalized` (display-only). The Phase 9 Step
+   5/5b dormant-queue regression (UTB numeros 50202, 50934, etc. failed
+   DCC click-through) was rooted in this trap. See
+   `context/06_EXCEPTIONS_AND_MAPPINGS.md` §F-1.
+2. **Decision-3 chain-vs-dernier asymmetry.** Pre-2026 documents in
+   `PENDING_LATE` SAS state are excluded from `dernier_df` by
+   `_apply_sas_filter_flat` but remain in `CHAIN_REGISTER`. Result:
+   `len(ctx.latest_chain_df) = 2,554`, `len(latest_enriched_view(ctx)) =
+   2,553` (N=1 gap for numero 253100, indice B). The asymmetry is
+   permanent steady-state, not a transient lag. See
+   `context/06_EXCEPTIONS_AND_MAPPINGS.md` §F-3 and
+   `context/11_TOOLING_HAZARDS.md` §H-9.
+3. **Mutator vs reader pattern.** `_precompute_focus_columns` (in
+   `data_loader.py`) and `compute_focus_ownership` (in
+   `focus_ownership.py`) mutate `ctx.dernier_df` in place by design —
+   they add `_visa_global`, `_focus_owner`, `_focus_owner_tier`,
+   `_focus_priority` columns. Readers MUST filter through
+   `latest_enriched_view(ctx)` to get latest-only rows WITH the
+   enrichments inherited via row intersection. Migrating the mutators
+   to `latest_chain_df` would break this contract.
+4. **Diagnostic suites.** Run-once gates for Phase 9 sanity:
+   - `scripts/diag/check_latest_chain_view.py` — five gate suites
+     (G-LCV-, G-DORM-, G-DCC-, G-AGG-, G-CONS-/G-DRL-/G-FOC-) covering
+     the migration invariants.
+   - `scripts/diag/step1_equality_check.py` — confirms
+     `compute_dcc_tags_bulk` row count, pollution gap, Decision-3 gap.
+   - `scripts/diag/step2_tag_check.py` — confirms tag-distribution
+     identity vs pre-migration baseline.
+
+See `README.md §Phase 9` and `reports/STEP1_DERNIER_DF_INVENTORY.md`
+for the full migration evidence.
+
+---
+
 ## General first-diagnostic protocol
 
 For any unexpected number in the UI:

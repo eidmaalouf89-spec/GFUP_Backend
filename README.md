@@ -21,6 +21,97 @@ The remaining Phase 8-family items (D-010 broad WorkflowEngine cleanup, Chain+On
 
 ---
 
+## Phase 9 — `dernier_df` retirement / `latest_chain_df` adoption (completed 2026-05-11)
+
+**Status:** ✅ Shipped. The reporting context now exposes
+`ctx.latest_chain_df` as the canonical one-row-per-chain view, and
+all HIGH/MEDIUM-risk operational consumers read through
+`latest_enriched_view(ctx)` instead of `ctx.dernier_df` directly.
+
+**What was broken before.** `ctx.dernier_df` in flat mode contained
+every `(numero, indice)` OPEN_DOC pair — ~4,360 rows for 2,554 chains
+— but the field's contract comment falsely said "dernier indice docs
+only". Every operational consumer that read it (Action MOEX bucket
+assignment, contractor REF dormants, DCC tag computation,
+per-consultant / per-contractor counts, drilldowns) was operating on
+1,806+ rows of polluted "stale indice" data. Step 1 of Phase 9
+inventoried 19 HIGH-risk and 4 MEDIUM-risk consumer sites across 8
+modules.
+
+**What's live now.**
+- **Canonical chain layer:** `output/chain_onion/CHAIN_REGISTER.csv`
+  (2,554 rows, one per chain).
+- **Loaded into RunContext:** `ctx.latest_chain_df` (built by
+  `reporting.latest_chain_view.build_latest_chain_view` during
+  context load; populated in both flat and legacy paths).
+- **Operational view helper:** `reporting.latest_chain_view.latest_enriched_view(ctx)`
+  returns `ctx.dernier_df` filtered to actual latest-chain rows
+  (~2,553 currently), preserving the `_precompute_focus_columns`
+  enrichments (`_visa_global`, `_focus_owner_tier`, etc.) by row
+  inheritance.
+- **All operational consumers migrated:** `aggregator.py`,
+  `consultant_fiche.py`, `contractor_fiche.py`,
+  `contractor_quality.py`, `document_command_center.py` (incl. duplicate
+  `compute_dcc_tags_bulk` removed), `focus_filter.py`,
+  `drilldown_builder.py`, `chain_timeline_attribution.py`,
+  `counter_attack_export.py`.
+- **Guardrails:** `RunContext.dernier_df` field comment, breadcrumb
+  `logger.info` on every context load, module-docstring contract in
+  `latest_chain_view.py`, hazard section `context/11_TOOLING_HAZARDS.md`
+  §H-9.
+- **UI label rename:** "Documents soumis" → "Chaînes" in
+  `ui/jansa/overview.jsx` (4 occurrences). Operational dashboard
+  terminology (Backlog opérationnel, MOEX à traiter, etc.) was
+  already chain-appropriate.
+
+**Mutators kept on `dernier_df`.** `_precompute_focus_columns` (in
+`data_loader.py`) and `compute_focus_ownership` (in
+`focus_ownership.py`) continue to mutate `ctx.dernier_df` in place by
+design. Their added columns propagate through `latest_enriched_view`
+via row intersection. Migrating these mutators would break the column
+inheritance contract.
+
+**Stable invariants (validated by `scripts/diag/check_latest_chain_view.py`
+and `scripts/diag/step1_equality_check.py`):**
+
+| Metric | Value |
+|---|---|
+| `len(ctx.dernier_df)` | 4,360 |
+| `len(ctx.latest_chain_df)` | 2,554 |
+| `len(latest_enriched_view(ctx))` | 2,553 |
+| Pollution gap (dernier − latest_enriched) | 1,807 |
+| Decision-3 gap (chain − latest_enriched) | 1 |
+| `compute_dcc_tags_bulk` rows | 2,553 |
+| Action MOEX buckets | 687 / 98 / 107 / 146 = 1,038 |
+| Dormant REF total | 107 |
+| Dormant SAS REF total | 162 |
+| CHAIN_REGISTER rows | 2,554 |
+| CHAIN_VERSIONS rows | 4,374 |
+
+**Decision-3 special case.** Numero 253100 has `latest_indice = B` in
+CHAIN_REGISTER but only indice A in `ctx.dernier_df`. This is by
+design: `stage_read_flat.py::_apply_sas_filter_flat` (Decision 3)
+drops pre-2026 `PENDING_LATE` SAS docs from `dernier_df`, while
+CHAIN_REGISTER is built without that filter. The `_resolve_doc_rows`
+existence guard in `document_command_center.py` handles the asymmetry
+by falling back to alphabetical-max + a `logger.warning`. This
+produces the permanent N=1 chain-vs-latest_enriched gap.
+
+**Inventory and migration evidence.**
+- `reports/STEP1_DERNIER_DF_INVENTORY.md` — the per-call-site
+  classification.
+- `reports/ACTION_MOEX_STEP1_STEP2_REPORT.md` — pre-Phase-9
+  historical patches that this migration superseded
+  (`_load_dormant_ref_from_artifact` is no longer a workaround; it's
+  now a canonical downstream consumer of Step 4's latest-chain-derived
+  Action MOEX artifact).
+
+**Outstanding test maintenance (not blocking).** 21 pre-existing
+pytest failures unrelated to the migration: see
+`context/07_OPEN_ITEMS.md` "Outstanding test baselines" section.
+
+---
+
 ## Phase 0 — Backend Data Audit (completed 2026-04-29)
 
 **Status:** ✅ Completed and signed-off 2026-04-29 by project owner. Phase 7 (contractor quality fiche) resumed and shipped 2026-05-01 — see next section. Audit harness (8 scripts under `scripts/audit/`) and findings (`docs/audit/DIVERGENCE_REPORT.md`, `TRIAGE.md`, `SIGN_OFF.md`) remain in repo for future re-runs.

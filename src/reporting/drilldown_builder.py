@@ -3,11 +3,21 @@ drilldown_builder.py — Backend-driven dashboard drilldowns
 Builds document lists for Overview KPI, chart, and visa-stage drilldowns.
 
 kind taxonomy:
-  • submitted:        All dernier docs
-  • pending_blocking: Docs with no terminal visa
-  • visa_segment:     Docs matching a specific VISA status or deadline state
-  • weekly:          Docs submitted in a specific ISO week
-  • focus_priority:   Focused docs at a specific priority tier (requires focus_result)
+  • submitted:                All dernier docs
+  • pending_blocking:         Docs with no terminal visa
+  • visa_segment:             Docs matching a specific VISA status or deadline state
+  • weekly:                   Docs submitted in a specific ISO week
+  • focus_priority:           Focused docs at a specific priority tier (requires focus_result)
+  • operational_total:        All rows in the operational universe (Step 2)
+  • operational_fresh:        Operational rows with last activity ≤ stale threshold
+  • operational_stale:        Operational rows with last activity > stale threshold
+  • operational_moex:         Operational rows with tier=="MOEX" (excl. MOEX SAS owner).
+                              Optional params.scope ∈ {"fresh","stale"} narrows.
+  • operational_consultants:  Operational rows with tier ∈ {"PRIMARY","SECONDARY"}.
+                              Optional params.tier ∈ {"PRIMARY","SECONDARY"} narrows.
+  • operational_enterprise_ref: REF/SAS REF rows in the broad operational bucket
+                              (mirrors aggregator.enterprise_ref_sas_candidates).
+  • operational_priority:     Operational rows by priority bucket (params.priority 1..4).
 """
 from typing import Optional
 import pandas as pd
@@ -16,6 +26,8 @@ from datetime import datetime
 
 from .data_loader import RunContext
 from .contractor_fiche import resolve_emetteur_name
+from .aggregator import compute_operational_universe, _OPERATIONAL_STALE_THRESHOLD
+from .latest_chain_view import latest_enriched_view
 
 if False:
     from .focus_filter import FocusResult
@@ -24,13 +36,19 @@ ROW_LIMIT = 1000
 
 
 def _to_iso(val):
-    """Convert pandas Timestamp/datetime/None to ISO 8601 date string (YYYY-MM-DD).
-    If null/NaT, return None."""
+    """Convert pandas Timestamp/datetime/date/None to ISO 8601 date string
+    (YYYY-MM-DD). If null/NaT, return None."""
     if val is None:
         return None
     if isinstance(val, float) and math.isnan(val):
         return None
     try:
+        # plain datetime.date does not have a .date() method; check first.
+        from datetime import date as _date_cls, datetime as _dt_cls
+        if isinstance(val, _dt_cls):
+            return val.date().isoformat()
+        if isinstance(val, _date_cls):
+            return val.isoformat()
         if hasattr(val, 'date'):
             return val.date().isoformat()
         if isinstance(val, str):
@@ -54,22 +72,61 @@ def _primary_owner(row):
 
 
 def _row_to_payload(row, latest_status, primary_owner, code=None) -> dict:
-    """Convert a dernier_df row + computed values to drilldown row shape."""
+    """Convert a dernier_df row + computed values to drilldown row shape.
+
+    Adds the columns required by ui/jansa/fiche_base.jsx::DrilldownDrawer
+    (date_soumission, date_limite, remaining_days, status, emetteur)
+    so the dashboard drilldowns can render via the same drawer as the
+    consultant fiche. Existing keys (last_action_date, latest_status,
+    emetteur_code, emetteur_name, primary_owner) are preserved.
+    """
     if code is None:
         code = (row.get("emetteur") or "").strip()
+    emetteur_name = resolve_emetteur_name(code)
+    # Earliest pending-response deadline (post 30d-fallback) and days-to-deadline
+    # are pre-computed on dernier_df by data_loader._precompute_focus_columns.
+    date_limite_iso = _to_iso(row.get("_earliest_deadline"))
+    rd = row.get("_days_to_deadline")
+    if rd is None or (isinstance(rd, float) and math.isnan(rd)):
+        remaining_days = None
+    else:
+        try:
+            remaining_days = int(rd)
+        except Exception:
+            remaining_days = None
+    # dernier_df carries `libelle_du_document` (FLAT_GED column) rather than
+    # `titre`; mirror app.py::get_doc_details (which reads
+    # libelle_du_document) so the row title is non-empty in the drawer.
+    titre_val = row.get("titre") or row.get("libelle_du_document")
+    # dernier_df carries `created_at` (from FLAT_GED `cree_le`) rather than
+    # `submittal_date`; mirror app.py::get_doc_details which reads
+    # `created_at` for the soumission date.
+    soumission_val = (
+        row.get("submittal_date")
+        or row.get("created_at")
+        or row.get("cree_le")
+    )
     return {
         "numero": row.get("numero"),
         "indice": row.get("indice"),
-        "titre": row.get("titre"),
+        "titre": titre_val,
         "emetteur_code": code,
-        "emetteur_name": resolve_emetteur_name(code),
+        "emetteur_name": emetteur_name,
+        # Drawer reads `emetteur` directly; surface the canonical name there.
+        "emetteur": emetteur_name or code,
         "lot": row.get("lot_normalized") or row.get("lot"),
         "last_action_date": _to_iso(
             row.get("last_real_activity_date") or
             row.get("response_date") or
-            row.get("submittal_date")
+            row.get("submittal_date") or
+            row.get("created_at")
         ),
+        "date_soumission": _to_iso(soumission_val),
+        "date_limite": date_limite_iso,
+        "remaining_days": remaining_days,
         "latest_status": latest_status,
+        # Drawer reads `status`; mirror latest_status (kept for back-compat).
+        "status": latest_status,
         "primary_owner": primary_owner,
     }
 
@@ -128,7 +185,7 @@ def build_drilldown(ctx: RunContext, kind: str, params: Optional[dict] = None,
     if ctx.dernier_df is None or ctx.workflow_engine is None:
         return {"rows": [], "total_count": 0, "truncated": False, "kind": kind, "params": params}
 
-    df = ctx.dernier_df
+    df = latest_enriched_view(ctx)
     we = ctx.workflow_engine
     selected = []
 
@@ -243,6 +300,77 @@ def build_drilldown(ctx: RunContext, kind: str, params: Optional[dict] = None,
                 owner = _primary_owner(row)
                 code = (row.get("emetteur") or "").strip()
                 selected.append(_row_to_payload(row, latest_status, owner, code))
+
+    elif kind in (
+        "operational_total",
+        "operational_fresh",
+        "operational_stale",
+        "operational_moex",
+        "operational_consultants",
+        "operational_enterprise_ref",
+        "operational_priority",
+    ):
+        # Reuse the exact aggregator masking — no recomputation.
+        op_broad, op = compute_operational_universe(ctx)
+
+        def _emit(sub_df):
+            for _, row in sub_df.iterrows():
+                visa_global = row.get("_visa_global")
+                if visa_global is None or (isinstance(visa_global, float) and pd.isna(visa_global)):
+                    latest_status = "En attente"
+                else:
+                    latest_status = str(visa_global)
+                owner = _primary_owner(row)
+                code = (row.get("emetteur") or "").strip()
+                selected.append(_row_to_payload(row, latest_status, owner, code))
+
+        if kind == "operational_total":
+            _emit(op)
+
+        elif kind == "operational_fresh":
+            _emit(op[op["_days_since_last_activity"] <= _OPERATIONAL_STALE_THRESHOLD])
+
+        elif kind == "operational_stale":
+            _emit(op[op["_days_since_last_activity"] > _OPERATIONAL_STALE_THRESHOLD])
+
+        elif kind == "operational_moex":
+            # Normal Maître d'Œuvre EXE only; excludes owner ["MOEX SAS"].
+            # Mirrors compute_operational_dashboard moex_mask.
+            def _is_moex_sas(owner_val):
+                try:
+                    return isinstance(owner_val, list) and owner_val == ["MOEX SAS"]
+                except Exception:
+                    return False
+            tier_mask = op["_focus_owner_tier"] == "MOEX"
+            sas_mask = op["_focus_owner"].apply(_is_moex_sas)
+            sub = op[tier_mask & (~sas_mask)]
+            scope = params.get("scope")
+            if scope == "fresh":
+                sub = sub[sub["_days_since_last_activity"] <= _OPERATIONAL_STALE_THRESHOLD]
+            elif scope == "stale":
+                sub = sub[sub["_days_since_last_activity"] > _OPERATIONAL_STALE_THRESHOLD]
+            _emit(sub)
+
+        elif kind == "operational_consultants":
+            tier_param = params.get("tier")
+            if tier_param == "PRIMARY":
+                sub = op[op["_focus_owner_tier"] == "PRIMARY"]
+            elif tier_param == "SECONDARY":
+                sub = op[op["_focus_owner_tier"] == "SECONDARY"]
+            else:
+                sub = op[op["_focus_owner_tier"].isin(["PRIMARY", "SECONDARY"])]
+            _emit(sub)
+
+        elif kind == "operational_enterprise_ref":
+            # Mirrors aggregator.enterprise_ref_sas_candidates: REF/SAS REF over
+            # the BROAD bucket (op_broad), not the narrowed op.
+            _emit(op_broad[op_broad["_visa_global"].isin(["REF", "SAS REF"])])
+
+        elif kind == "operational_priority":
+            priority = params.get("priority")
+            if priority not in (1, 2, 3, 4):
+                return {"error": f"invalid priority: {priority}", "rows": [], "total_count": 0, "truncated": False, "kind": kind, "params": params}
+            _emit(op[op["_focus_priority"] == priority])
 
     else:
         return {"error": "unknown kind", "rows": [], "total_count": 0, "truncated": False, "kind": kind, "params": params}

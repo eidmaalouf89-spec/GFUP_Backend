@@ -1165,6 +1165,136 @@ class Api:
                 "truncated": False,
             })
 
+    def export_documents_drilldown_xlsx(self, kind, params=None, focus=False, stale_days=90):
+        """Export the dashboard drilldown rows (same payload as
+        get_documents_drilldown) to an Excel file. Mirrors the workbook
+        style of Api.export_drilldown_xlsx (consultant lane). Step 1.5."""
+        import tempfile
+        import traceback
+        try:
+            from reporting.data_loader import load_run_context
+            from reporting.drilldown_builder import build_drilldown
+            ctx = load_run_context(BASE_DIR)
+            focus_result = None
+            if focus:
+                from reporting.focus_filter import apply_focus_filter, FocusConfig
+                focus_config = FocusConfig(enabled=True, stale_threshold_days=int(stale_days))
+                focus_result = apply_focus_filter(ctx, focus_config)
+                _live_numeros, _legacy_count = self._build_live_operational_numeros()
+                self._apply_live_narrowing(focus_result, _live_numeros, _legacy_count)
+            payload = build_drilldown(
+                ctx,
+                str(kind or ""),
+                params or {},
+                focus_result=focus_result,
+            )
+            docs = payload.get("rows", []) if isinstance(payload, dict) else []
+
+            from openpyxl import Workbook
+            from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Drilldown"
+
+            headers = [
+                "Numero", "Indice", "Emetteur", "Titre", "Lot",
+                "Date Soumission", "Date Echeance", "Jours Restants", "Statut",
+            ]
+            keys = [
+                "numero", "indice", "emetteur", "titre", "lot",
+                "date_soumission", "date_limite", "remaining_days", "status",
+            ]
+
+            header_font = Font(name="Calibri", bold=True, size=11, color="FFFFFF")
+            header_fill = PatternFill(start_color="2B579A", end_color="2B579A", fill_type="solid")
+            header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            thin_border = Border(
+                left=Side(style="thin", color="D9D9D9"),
+                right=Side(style="thin", color="D9D9D9"),
+                top=Side(style="thin", color="D9D9D9"),
+                bottom=Side(style="thin", color="D9D9D9"),
+            )
+
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_align
+                cell.border = thin_border
+
+            late_fill = PatternFill(start_color="FFF0F0", end_color="FFF0F0", fill_type="solid")
+            # Identity dtype: numero/indice are strings to preserve leading zeros.
+            _string_keys = {"numero", "indice"}
+            for row_idx, doc in enumerate(docs, 2):
+                is_late = doc.get("remaining_days") is not None and doc["remaining_days"] < 0
+                for col_idx, key in enumerate(keys, 1):
+                    value = doc.get(key)
+                    if value is None:
+                        value = ""
+                    elif key in _string_keys:
+                        value = str(value)
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = thin_border
+                    cell.font = Font(name="Calibri", size=10)
+                    if is_late:
+                        cell.fill = late_fill
+
+            widths = [16, 6, 14, 50, 16, 14, 14, 12, 10]
+            for col_idx, width in enumerate(widths, 1):
+                ws.column_dimensions[chr(64 + col_idx)].width = width
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = f"A1:{chr(64 + len(headers))}{len(docs) + 1}"
+
+            ws_meta = wb.create_sheet("Info")
+            ws_meta["A1"] = "Drilldown"
+            ws_meta["B1"] = str(kind or "")
+            ws_meta["A2"] = "Parametres"
+            ws_meta["B2"] = str(params or {})
+            ws_meta["A3"] = "Documents"
+            ws_meta["B3"] = len(docs)
+            for row_idx in range(1, 4):
+                ws_meta.cell(row=row_idx, column=1).font = Font(bold=True)
+
+            def _safe_filename(value):
+                return "".join(c if c.isalnum() or c in " _-" else "_" for c in str(value)).strip()
+
+            # Build a short summary for the filename from the params dict.
+            def _params_summary(k, p):
+                if not isinstance(p, dict) or not p:
+                    return ""
+                if k == "visa_segment":
+                    return _safe_filename(p.get("segment") or "")
+                if k == "weekly":
+                    return _safe_filename(p.get("week_label") or "")
+                if k == "focus_priority":
+                    pr = p.get("priority")
+                    return f"P{pr}" if pr is not None else ""
+                # Fallback: join values
+                return _safe_filename("_".join(str(v) for v in p.values()))
+
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            safe_kind = _safe_filename(str(kind or "")).lower().replace(" ", "_")
+            safe_params = _params_summary(str(kind or ""), params or {})
+            ts = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+            stem = f"Drilldown_dashboard_{safe_kind}"
+            if safe_params:
+                stem = f"{stem}_{safe_params}"
+            stem = f"{stem}_{ts}"
+            dest = OUTPUT_DIR / f"{stem}.xlsx"
+
+            with tempfile.NamedTemporaryFile(dir=str(OUTPUT_DIR), suffix=".xlsx", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            wb.save(str(tmp_path))
+            if dest.exists():
+                dest.unlink()
+            tmp_path.rename(dest)
+
+            return _sanitize_for_json({"success": True, "path": str(dest), "count": len(docs)})
+        except Exception as exc:
+            traceback.print_exc()
+            return _sanitize_for_json({"success": False, "error": str(exc)})
+
     def validate_inputs(self, run_mode, ged_path=None, gf_path=None,
                         reports_dir=None):
         """
@@ -1469,6 +1599,39 @@ class Api:
                 "missing_optional_files": [],
                 "error": f"Api.generate_counter_attack_ai_audit_pack: {type(e).__name__}: {e}",
             }
+
+    # ── Step 5 — Per-bucket Excel export for ACTION MOEX ────────
+    def export_action_moex_bucket_xlsx(self, bucket):
+        """Step 5 — Export one ACTION MOEX bucket to xlsx.
+
+        Reads output/intermediate/COUNTER_ATTACK_ITEMS.csv (already produced
+        by scripts/build_counter_attack.py), filters to the requested bucket,
+        composes per-item rows using the same DCC composed-truth reviewer
+        helper, and writes ACTION_MOEX_<bucket>_<ts>.xlsx under
+        output/exports/. No business logic is recomputed.
+
+        Returns the rich envelope:
+            {success, path, filename, rows_exported, bucket, message, error}
+        """
+        try:
+            from reporting.data_loader import load_run_context
+            from reporting.counter_attack_export import build_action_moex_bucket_xlsx
+            ctx = load_run_context(BASE_DIR)
+            output_dir = OUTPUT_DIR / "exports"
+            result = build_action_moex_bucket_xlsx(ctx, str(bucket or ""), output_dir)
+            return _sanitize_for_json(result)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return _sanitize_for_json({
+                "success": False,
+                "path": None,
+                "filename": None,
+                "rows_exported": 0,
+                "bucket": str(bucket or ""),
+                "message": None,
+                "error": f"Api.export_action_moex_bucket_xlsx: {type(e).__name__}: {e}",
+            })
 
 # ── Main ─────────────────────────────────────────────────────
 def main():

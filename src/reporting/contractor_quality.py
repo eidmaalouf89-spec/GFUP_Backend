@@ -251,14 +251,56 @@ def _polar_histogram(delays: list) -> dict:
     }
 
 
+def _latest_enriched_for_contractor(ctx, contractor_code: str) -> pd.DataFrame:
+    """Return the latest-indice view for one contractor.
+
+    Combines ctx.latest_chain_df (canonical row-set) with ctx.dernier_df
+    (precomputed _visa_global etc.). Falls back to ctx.dernier_df if
+    ctx.latest_chain_df is unavailable (legacy mode).
+    """
+    if ctx.dernier_df is None or ctx.dernier_df.empty:
+        return pd.DataFrame()
+
+    lc = getattr(ctx, "latest_chain_df", None)
+    if lc is None or lc.empty:
+        out = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code]
+        out = _apply_legacy_filter(out, contractor_code)
+        return out.copy()
+
+    lc_num = lc["numero"].astype(str).str.strip()
+    lc_ind = lc["latest_indice"].astype(str).str.strip()
+    lc_keys = set(zip(lc_num, lc_ind))
+
+    dd = ctx.dernier_df
+    dd_num = dd["numero"].astype(str).str.strip()
+    dd_ind = dd["indice"].astype(str).str.strip()
+    mask = pd.Series(
+        [k in lc_keys for k in zip(dd_num, dd_ind)],
+        index=dd.index,
+    )
+    out = dd[mask & (dd["emetteur"] == contractor_code)]
+    out = _apply_legacy_filter(out, contractor_code)
+    return out.copy()
+
+
 def _dormant_list(emetteur_dernier: pd.DataFrame, visa_value: str,
                   ref_today: date) -> list:
-    """Return sorted list of dormant docs with the given visa_global value."""
+    """Return sorted list of dormant docs with the given visa_global value.
+
+    Only the actual latest indice per numero is considered (dernier_df may
+    contain multiple indices all marked is_dernier_indice=True).
+    """
     if emetteur_dernier.empty:
         return []
-    vcol = _visa_col(emetteur_dernier)
-    date_col = _visa_date_col(emetteur_dernier)
-    subset = emetteur_dernier[emetteur_dernier[vcol] == visa_value].copy()
+    # Keep only the actual latest indice per numero
+    num_col = "numero_normalized" if "numero_normalized" in emetteur_dernier.columns else "numero"
+    df = emetteur_dernier.copy()
+    df["_ind_upper"] = df["indice"].astype(str).str.strip().str.upper()
+    latest = df.groupby(num_col)["_ind_upper"].transform("max")
+    df = df[df["_ind_upper"] == latest].drop(columns=["_ind_upper"])
+    vcol = _visa_col(df)
+    date_col = _visa_date_col(df)
+    subset = df[df[vcol] == visa_value].copy()
     if subset.empty:
         return []
     subset["_days_dormant"] = (
@@ -269,7 +311,7 @@ def _dormant_list(emetteur_dernier: pd.DataFrame, visa_value: str,
     result = []
     for _, r in subset.iterrows():
         result.append({
-            "numero": str(r.get("numero_normalized") or r.get("numero") or "?"),
+            "numero": str(r.get("numero") or r.get("numero_normalized") or "?"),
             "indice": str(r.get("indice", "?")),
             "titre": str(
                 r.get("libelle_du_document")
@@ -281,6 +323,44 @@ def _dormant_list(emetteur_dernier: pd.DataFrame, visa_value: str,
             "days_dormant": int(r["_days_dormant"]),
             "lot_normalized": str(r.get("lot_normalized", "")),
         })
+    return result
+
+
+_COUNTER_ATTACK_ARTIFACT = Path(__file__).resolve().parent.parent.parent / "output" / "intermediate" / "COUNTER_ATTACK_ITEMS.csv"
+
+
+def _load_dormant_ref_from_artifact(contractor_code: str) -> list:
+    """Load ENTREPRISE_A_RELANCER items for one contractor from the
+    counter-attack artifact (deadline-filtered dormant REF).
+    """
+    if not _COUNTER_ATTACK_ARTIFACT.exists():
+        return []
+    try:
+        art = pd.read_csv(
+            _COUNTER_ATTACK_ARTIFACT,
+            dtype={"item_id": "string", "numero": "string", "indice": "string",
+                   "family_key": "string", "emetteur_code": "string"},
+            keep_default_na=False,
+        )
+    except Exception:
+        return []
+    sub = art[
+        (art["action_bucket"] == "ENTREPRISE_A_RELANCER")
+        & (art["emetteur_code"].str.strip() == contractor_code)
+    ]
+    if sub.empty:
+        return []
+    result = []
+    for _, r in sub.iterrows():
+        result.append({
+            "numero": str(r.get("numero", "?")),
+            "indice": str(r.get("indice", "?")),
+            "titre": str(r.get("subject_label", "?")),
+            "date_visa": "",
+            "days_dormant": int(r.get("days_late", 0) or 0),
+            "lot_normalized": "",
+        })
+    result.sort(key=lambda x: x["days_dormant"], reverse=True)
     return result
 
 
@@ -338,23 +418,16 @@ def build_contractor_quality_peer_stats(ctx, chain_timelines: dict | None = None
             ctx.docs_df[ctx.docs_df["emetteur"] == code]
             if ctx.docs_df is not None else pd.DataFrame()
         )
-        emetteur_dernier = (
-            ctx.dernier_df[ctx.dernier_df["emetteur"] == code]
-            if ctx.dernier_df is not None else pd.DataFrame()
-        )
+        emetteur_latest = _latest_enriched_for_contractor(ctx, code)
         # ── BENTIN_OLD legacy exception (context/06 §D/§E) ─────────────
         emetteur_docs = _apply_legacy_filter(emetteur_docs, code)
-        emetteur_dernier = _apply_legacy_filter(emetteur_dernier, code)
 
         # SAS refusal rate (historical: all docs_df indices, not just dernier)
         sas_rates.append(_sas_refusal_rate(ctx, emetteur_docs))
 
-        # Dormant REF count
-        if not emetteur_dernier.empty:
-            vcol = _visa_col(emetteur_dernier)
-            ref_counts.append(int((emetteur_dernier[vcol] == "REF").sum()))
-        else:
-            ref_counts.append(0)
+        # Dormant REF count — from artifact (deadline-filtered)
+        dorm_ref = _load_dormant_ref_from_artifact(code)
+        ref_counts.append(len(dorm_ref))
 
         # Chain metrics
         chains = _chains_for_contractor(emetteur_docs, chain_timelines)
@@ -364,8 +437,8 @@ def build_contractor_quality_peer_stats(ctx, chain_timelines: dict | None = None
 
         # Build dormant delay map for this contractor (REF + SAS REF sitting idle)
         dormant_days_by_numero: dict = {}
-        for d in _dormant_list(emetteur_dernier, "REF", ref_today) + \
-                 _dormant_list(emetteur_dernier, "SAS REF", ref_today):
+        for d in dorm_ref + \
+                 _dormant_list(emetteur_latest, "SAS REF", ref_today):
             nm = str(d.get("numero", "")).strip()
             if nm:
                 dormant_days_by_numero[nm] = max(
@@ -426,23 +499,19 @@ def build_contractor_quality(ctx, contractor_code: str,
 
     canonical = resolve_emetteur_name(contractor_code)
 
-    # Filter docs and dernier for this contractor
+    # Filter docs and latest-enriched view for this contractor
     emetteur_docs = (
         ctx.docs_df[ctx.docs_df["emetteur"] == contractor_code]
         if ctx.docs_df is not None else pd.DataFrame()
     )
-    emetteur_dernier = (
-        ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code]
-        if ctx.dernier_df is not None else pd.DataFrame()
-    )
+    emetteur_latest = _latest_enriched_for_contractor(ctx, contractor_code)
     # ── BENTIN_OLD legacy exception (context/06 §D/§E) ─────────────────────
     emetteur_docs = _apply_legacy_filter(emetteur_docs, contractor_code)
-    emetteur_dernier = _apply_legacy_filter(emetteur_dernier, contractor_code)
 
     # ── Open / finished ───────────────────────────────────────────────────────
-    if not emetteur_dernier.empty:
-        vcol = _visa_col(emetteur_dernier)
-        is_finished = emetteur_dernier[vcol].isin(_TERMINAL_VISAS)
+    if not emetteur_latest.empty:
+        vcol = _visa_col(emetteur_latest)
+        is_finished = emetteur_latest[vcol].isin(_TERMINAL_VISAS)
         open_count = int((~is_finished).sum())
         finished_count = int(is_finished.sum())
     else:
@@ -460,8 +529,8 @@ def build_contractor_quality(ctx, contractor_code: str,
             "build_contractor_quality(); ctx.data_date is None"
         )
     ref_today = ctx.data_date
-    dormant_ref = _dormant_list(emetteur_dernier, "REF", ref_today)
-    dormant_sas_ref = _dormant_list(emetteur_dernier, "SAS REF", ref_today)
+    dormant_ref = _load_dormant_ref_from_artifact(contractor_code)
+    dormant_sas_ref = _dormant_list(emetteur_latest, "SAS REF", ref_today)
 
     # Build numero → days_dormant map for delay extension
     dormant_days_by_numero: dict = {}

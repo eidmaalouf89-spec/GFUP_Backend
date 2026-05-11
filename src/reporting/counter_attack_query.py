@@ -49,12 +49,9 @@ def _artifact_path() -> Path:
 # ── Bucket display order (home cockpit; not the 6A assignment order) ──
 BUCKET_DISPLAY_ORDER: List[str] = [
     "FERMER_MAINTENANT",
-    "SECONDAIRE_EXPIRE",
     "DECISION_MOEX",
     "ENTREPRISE_A_RELANCER",
     "CONSULTANT_A_ATTAQUER",
-    "SUJET_REUNION",
-    "MOEX_SHAME_INTERNAL",
 ]
 
 # Plain-French short labels for the home cards. The artifact already
@@ -62,22 +59,16 @@ BUCKET_DISPLAY_ORDER: List[str] = [
 # payload (where no row exists yet) to describe the bucket itself.
 BUCKET_LABEL: Dict[str, str] = {
     "FERMER_MAINTENANT": "À fermer maintenant",
-    "SECONDAIRE_EXPIRE": "Secondaire expiré — décision MOEX requise",
     "DECISION_MOEX": "Décision MOEX — arbitrage requis",
     "ENTREPRISE_A_RELANCER": "Entreprise à relancer",
     "CONSULTANT_A_ATTAQUER": "Consultant à attaquer",
-    "SUJET_REUNION": "Sujet réunion critique",
-    "MOEX_SHAME_INTERNAL": "MOEX interne — exposition à traiter",
 }
 
 BUCKET_DESCRIPTION: Dict[str, str] = {
     "FERMER_MAINTENANT": "Tous les avis sont disponibles, MOEX doit émettre le visa.",
-    "SECONDAIRE_EXPIRE": "Le BET secondaire n'a pas répondu dans la fenêtre — MOEX doit reprendre la main.",
     "DECISION_MOEX": "Plusieurs avis bloquants sur l'indice courant — MOEX doit arbitrer.",
     "ENTREPRISE_A_RELANCER": "L'entreprise doit resoumettre après refus MOEX.",
     "CONSULTANT_A_ATTAQUER": "Un consultant tarde à répondre — relance / escalade.",
-    "SUJET_REUNION": "Sujet à porter à l'ordre du jour de la prochaine réunion de chantier.",
-    "MOEX_SHAME_INTERNAL": "Cette chaîne expose MOEX en interne — décision interne à traiter.",
 }
 
 EMPTY_MESSAGE: str = "Le module Contre-attaque n'est pas encore généré."
@@ -196,6 +187,7 @@ def _row_to_queue_row(row: pd.Series) -> Dict[str, Any]:
         "risk_level": _safe_str(row.get("risk_level")),
         "days_open": _safe_int(row.get("days_open")),
         "days_late": _safe_int(row.get("days_late")),
+        "warning_tags": _safe_str(row.get("warning_tags")),
         "open_dcc_ref": {"numero": numero, "indice": indice},
     }
 
@@ -444,6 +436,7 @@ def get_counter_attack_item(item_id: str) -> Dict[str, Any]:
         "why_here": _build_why_here(row),
         "recommended_action": _safe_str(row.get("recommended_action")),
         "evidence": _build_evidence(row),
+        "warning_tags": _safe_str(row.get("warning_tags")),
         "timeline": [],
         "open_dcc_ref": {"numero": numero, "indice": indice},
     }

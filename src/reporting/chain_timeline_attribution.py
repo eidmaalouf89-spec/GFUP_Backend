@@ -24,6 +24,8 @@ from typing import Optional
 
 import pandas as pd
 
+from .latest_chain_view import latest_enriched_view
+
 logger = logging.getLogger(__name__)
 
 CYCLE_REVIEW_DAYS = 30
@@ -450,7 +452,7 @@ def compute_chain_timeline(
     """Return per-chain timeline payload for one family_key."""
     # Data date and focus owner lookup from ctx
     data_date: Optional[date] = getattr(ctx, "data_date", None)
-    dernier_df = getattr(ctx, "dernier_df", None)
+    dernier_df = latest_enriched_view(ctx) if getattr(ctx, "dernier_df", None) is not None else None
 
     # Register row for this chain
     reg_row = chain_register_df[chain_register_df["family_key"] == family_key]

@@ -18,6 +18,7 @@ from typing import Any
 import pandas as pd
 
 from .data_loader import RunContext
+from .latest_chain_view import latest_enriched_view
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DEFINITIVE PROJECT REFERENCE — P17&CO Tranche 2
@@ -101,20 +102,20 @@ CONTRACTOR_REFERENCE = {
     "AXI":  {"name": "Axima",              "lots": ["41"]},
     "UTB":  {"name": "UTB",                "lots": ["42"]},
     "DUV":  {"name": "Duval",              "lots": ["08", "13A"]},
-    "LAC":  {"name": "Lacroix",            "lots": ["12", "12A"]},
+    "LAC":  {"name": "LAC",                "lots": ["12", "12A"]},
     "AMP":  {"name": "AMP / CLD",          "lots": ["11", "16A"]},
     "AAI":  {"name": "AAI",                "lots": ["43"]},
     "SMA":  {"name": "SMAC",               "lots": ["04", "06B"]},
     "ICM":  {"name": "ICM",                "lots": ["05"]},
     "FRS":  {"name": "France Sols",         "lots": ["18", "19"]},
-    "API":  {"name": "Apilog / Schneider",  "lots": ["35"]},
-    "FER":  {"name": "Fermeté",            "lots": ["06", "13", "14"]},
+    "API":  {"name": "API",                 "lots": ["35"]},
+    "FER":  {"name": "FER",                "lots": ["06", "13", "14"]},
     "CMF":  {"name": "CMF BAT",            "lots": ["18"]},
     "SPA":  {"name": "SEPA",               "lots": ["61", "62"]},
     "SCH":  {"name": "Schindler",          "lots": ["51"]},
     "LIN":  {"name": "Lindner",            "lots": ["16B"]},
     "IST":  {"name": "IST",                "lots": ["11", "16", "12B"]},
-    "CHV":  {"name": "Atchouel",           "lots": ["13"]},
+    "CHV":  {"name": "CHV",                "lots": ["13"]},
     "VAL":  {"name": "Vallée",             "lots": ["19"]},
     "CPL":  {"name": "CPLC",               "lots": ["12B"]},
     "VTP":  {"name": "VTP",                "lots": ["01"]},
@@ -335,7 +336,7 @@ def build_sas_fiche(ctx: RunContext, focus_result=None) -> dict[str, Any]:
 
     data_date = _resolve_data_date(ctx)
     resp = ctx.responses_df
-    docs = ctx.dernier_df
+    docs = latest_enriched_view(ctx)
 
     # ── Filter to 0-SAS approver rows only ──────────────────────────────
     sas_resp = resp[
@@ -1379,7 +1380,7 @@ def _filter_for_consultant(ctx: RunContext, name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     resp = ctx.responses_df
-    docs = ctx.dernier_df
+    docs = latest_enriched_view(ctx)
 
     if name == "MOEX SAS":
         # SAS fiche: only 0-SAS approver rows

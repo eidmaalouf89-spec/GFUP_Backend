@@ -122,7 +122,7 @@ function KpiRow({ data, onNavigate, onOpenConsultant, onOpenContractor, onDrill 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
       <HeroKpi
-        eyebrow="Documents soumis"
+        eyebrow="Chaînes"
         value={ovFmt(data.total_docs)}
         delta={data.total_docs_delta}
         sub={`Semaine ${data.week_num} · run #${data.run_number}`}
@@ -259,7 +259,7 @@ function VisaFlow({ data, onDrill }) {
         <div>
           <OvEyebrow>Flux de visa · depuis R0</OvEyebrow>
           <div style={{ fontSize: 15, fontWeight: 600, color:'var(--text)', marginTop: 4 }}>
-            Où vont les {ovFmt(total)} documents soumis
+            Où vont les {ovFmt(total)} chaînes
           </div>
         </div>
       </div>
@@ -603,7 +603,7 @@ function FocusByConsultant({ items, onNavigate, onOpenConsultant }) {
 }
 
 /* ── Operational Dashboard — Tiles A–F (Phase 4) ── */
-function OperationalDashboard({ operational }) {
+function OperationalDashboard({ operational, onDrill }) {
   const v = (n) => n == null ? '—' : ovFmt(n);
 
   const staleSub = (
@@ -635,14 +635,20 @@ function OperationalDashboard({ operational }) {
     <div style={{ marginBottom: 20 }}>
       <OvEyebrow style={{ marginBottom: 12 }}>Tableau de bord opérationnel</OvEyebrow>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 14 }}>
-        <HeroKpi eyebrow="Backlog opérationnel" value={v(operational.operational_total)} accent="var(--accent)" />
-        <HeroKpi eyebrow="Flux frais (≤90j)" value={v(operational.fresh_total)} accent="#30D158" />
-        <HeroKpi eyebrow="Vieille dette opérationnelle (>90j)" value={v(operational.stale_total)} accent="#FF9F0A" sub={staleSub} />
+        <HeroKpi eyebrow="Backlog opérationnel" value={v(operational.operational_total)} accent="var(--accent)"
+          onClick={onDrill ? () => onDrill('operational_total') : undefined} />
+        <HeroKpi eyebrow="Flux frais (≤90j)" value={v(operational.fresh_total)} accent="#30D158"
+          onClick={onDrill ? () => onDrill('operational_fresh') : undefined} />
+        <HeroKpi eyebrow="Vieille dette opérationnelle (>90j)" value={v(operational.stale_total)} accent="#FF9F0A" sub={staleSub}
+          onClick={onDrill ? () => onDrill('operational_stale') : undefined} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <HeroKpi eyebrow="MOEX à traiter" value={v(operational.moex_total)} accent="#FF453A" sub={moexSub} />
-        <HeroKpi eyebrow="Consultants à relancer" value={v(operational.consultants_total)} accent="#BF5AF2" sub={consultantsSub} />
-        <HeroKpi eyebrow="Entreprises à relancer (REF/SAS REF)" value={v(operational.enterprise_ref_sas_candidates)} accent="#FF9F0A" sub={enterpriseSub} />
+        <HeroKpi eyebrow="MOEX à traiter" value={v(operational.moex_total)} accent="#FF453A" sub={moexSub}
+          onClick={onDrill ? () => onDrill('operational_moex') : undefined} />
+        <HeroKpi eyebrow="Consultants à relancer" value={v(operational.consultants_total)} accent="#BF5AF2" sub={consultantsSub}
+          onClick={onDrill ? () => onDrill('operational_consultants') : undefined} />
+        <HeroKpi eyebrow="Entreprises à relancer (REF/SAS REF)" value={v(operational.enterprise_ref_sas_candidates)} accent="#FF9F0A" sub={enterpriseSub}
+          onClick={onDrill ? () => onDrill('operational_enterprise_ref') : undefined} />
       </div>
     </div>
   );
@@ -652,20 +658,31 @@ function OperationalDashboard({ operational }) {
    P5 removed 2026-05-09: global workflow is 30 days (business rule A);
    "no deadline" is no longer a valid operational state. Backend collapses
    missing-deadline rows into P1 via a 30-day fallback. */
-function OperationalPriorityRow({ operational }) {
+function OperationalPriorityRow({ operational, onDrill }) {
   const v = (n) => n == null ? '—' : ovFmt(n);
   const cells = [
-    { label: 'P1', value: operational.priority_p1, color: '#FF453A' },
-    { label: 'P2', value: operational.priority_p2, color: '#FF9F0A' },
-    { label: 'P3', value: operational.priority_p3, color: '#FFD60A' },
-    { label: 'P4', value: operational.priority_p4, color: '#30D158' },
+    { label: 'P1', value: operational.priority_p1, color: '#FF453A', priority: 1 },
+    { label: 'P2', value: operational.priority_p2, color: '#FF9F0A', priority: 2 },
+    { label: 'P3', value: operational.priority_p3, color: '#FFD60A', priority: 3 },
+    { label: 'P4', value: operational.priority_p4, color: '#30D158', priority: 4 },
   ];
   return (
     <OvCard style={{ marginBottom: 20 }}>
       <OvEyebrow style={{ marginBottom: 14 }}>Priorités opérationnelles</OvEyebrow>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         {cells.map(c => (
-          <div key={c.label} style={{ textAlign: 'center' }}>
+          <div key={c.label}
+            onClick={onDrill ? () => onDrill('operational_priority', { priority: c.priority }) : undefined}
+            style={{
+              textAlign: 'center',
+              cursor: onDrill ? 'pointer' : 'default',
+              borderRadius: 8,
+              padding: 4,
+              transition: 'background-color 0.15s',
+            }}
+            onMouseEnter={onDrill ? (e) => e.currentTarget.style.backgroundColor = 'var(--bg-chip)' : undefined}
+            onMouseLeave={onDrill ? (e) => e.currentTarget.style.backgroundColor = 'transparent' : undefined}
+          >
             <div style={{
               fontFamily: ovFonts.ui, fontSize: 40, fontWeight: 300,
               color: c.color, letterSpacing: '-.03em', lineHeight: 1.1,
@@ -842,7 +859,7 @@ function OverviewDrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) 
 
   // Header copy mapping per kind
   const headerMap = {
-    submitted: "Tous les documents soumis",
+    submitted: "Toutes les chaînes",
     pending_blocking: "Bloquants en attente",
     visa_segment: {
       VSO: "Documents en VSO",
@@ -1102,6 +1119,135 @@ function OverviewDrilldownDrawer({ drill, focusMode, staleDays = 90, onClose }) 
   );
 }
 
+/* ── Adapter: render dashboard drilldowns via the consultant-fiche drawer
+   (window.FicheDrilldownDrawer). Step 1 UX-parity wiring (2026-05-10).
+   - Reuses the same drawer/portal pattern as fiche_page.jsx so the drawer
+     escapes ancestor `transform` / `overflow:auto` and renders the 9-column
+     row contract (numéro / indice / émetteur / titre / lot / soumission /
+     échéance / jours / statut).
+   - Backend response: {rows, total_count, truncated, kind, params} →
+     drawer state: {loading, error, docs, count, title, onRowClick}.
+   - No JSX-side computation of row values; drilldown_builder._row_to_payload
+     supplies date_soumission / date_limite / remaining_days / status. */
+const _OV_DRILL_HEADERS = {
+  submitted: "Chaînes",
+  pending_blocking: "Bloquants en attente",
+  visa_segment: {
+    VSO: "Documents VSO",
+    VAO: "Documents VAO",
+    REF: "Documents REF",
+    SAS_REF: "Documents SAS REF",
+    HM: "Documents Hors Marché",
+    PENDING_ON_TIME: "En attente · dans les délais",
+    PENDING_LATE: "En attente · en retard",
+  },
+  operational_total: "Backlog opérationnel",
+  operational_fresh: "Flux frais (≤90j)",
+  operational_stale: "Vieille dette opérationnelle (>90j)",
+  operational_moex: "MOEX à traiter",
+  operational_consultants: "Consultants à relancer",
+  operational_enterprise_ref: "Entreprises à relancer (REF/SAS REF)",
+};
+
+function _ovDrillTitle(drill) {
+  if (!drill) return "—";
+  const k = drill.kind;
+  const p = drill.params || {};
+  if (k === "submitted") return _OV_DRILL_HEADERS.submitted;
+  if (k === "pending_blocking") return _OV_DRILL_HEADERS.pending_blocking;
+  if (k === "visa_segment") return _OV_DRILL_HEADERS.visa_segment[p.segment] || `Segment ${p.segment}`;
+  if (k === "weekly") return `Semaine ${p.week_label || ""}`.trim();
+  if (k === "focus_priority") return `Focus · P${p.priority}`;
+  if (k === "operational_total") return _OV_DRILL_HEADERS.operational_total;
+  if (k === "operational_fresh") return _OV_DRILL_HEADERS.operational_fresh;
+  if (k === "operational_stale") return _OV_DRILL_HEADERS.operational_stale;
+  if (k === "operational_moex") {
+    if (p.scope === "fresh") return "MOEX à traiter · Frais (≤90j)";
+    if (p.scope === "stale") return "MOEX à traiter · Stale (>90j)";
+    return _OV_DRILL_HEADERS.operational_moex;
+  }
+  if (k === "operational_consultants") {
+    if (p.tier === "PRIMARY") return "Consultants à relancer · Primaire";
+    if (p.tier === "SECONDARY") return "Consultants à relancer · Secondaire";
+    return _OV_DRILL_HEADERS.operational_consultants;
+  }
+  if (k === "operational_enterprise_ref") return _OV_DRILL_HEADERS.operational_enterprise_ref;
+  if (k === "operational_priority") return `Priorité opérationnelle · P${p.priority}`;
+  return "—";
+}
+
+function OverviewFicheDrawerHost({ drill, focusMode, staleDays = 90, onClose }) {
+  const [state, setState] = useStateOv(null);
+  const genRef = React.useRef(0);
+
+  useEffectOv(() => {
+    if (!drill) { setState(null); return; }
+    const gen = ++genRef.current;
+    const title = _ovDrillTitle(drill);
+    setState({ loading: true, error: null, docs: [], count: 0, title });
+    (async () => {
+      try {
+        const result = await window.jansaBridge.loadDrilldown(
+          drill.kind, drill.params || {}, !!focusMode, staleDays
+        );
+        if (gen !== genRef.current) return;
+        if (result && result.error) {
+          setState({ loading: false, error: result.error, docs: [], count: 0, title });
+        } else {
+          const docs = (result && Array.isArray(result.rows)) ? result.rows : [];
+          const count = (result && result.total_count) || docs.length;
+          setState({ loading: false, error: null, docs, count, title });
+        }
+      } catch (e) {
+        if (gen !== genRef.current) return;
+        setState({ loading: false, error: String(e && e.message || e), docs: [], count: 0, title });
+      }
+    })();
+  }, [drill, focusMode, staleDays]);
+
+  const handleClose = () => { genRef.current++; setState(null); onClose && onClose(); };
+
+  // Step 1.5 — wire the drawer's existing "Exporter Excel" button to the
+  // dashboard drilldown export. The handler forwards kind/params/focus/stale
+  // to the bridge; no JSX-side computation.
+  const handleExport = async () => {
+    if (!drill) return;
+    try {
+      const res = await window.jansaBridge.exportDocumentsDrilldown(
+        drill.kind, drill.params || {}, !!focusMode, staleDays
+      );
+      if (res && res.success && res.path && window.pywebview && window.pywebview.api && window.pywebview.api.open_file_in_explorer) {
+        await window.pywebview.api.open_file_in_explorer(res.path);
+      } else if (!res || !res.success) {
+        console.warn("[overview] export failed", res);
+      }
+    } catch (e) {
+      console.error("[overview] export error", e);
+    }
+  };
+
+  if (!window.FicheDrilldownDrawer) {
+    if (drill) console.warn("[overview] window.FicheDrilldownDrawer unavailable; drilldown not shown");
+    return null;
+  }
+
+  return ReactDOM.createPortal(
+    <window.FicheDrilldownDrawer
+      state={state ? {
+        ...state,
+        onRowClick: (doc) => {
+          if (window.openDocumentCommandCenter) {
+            window.openDocumentCommandCenter(doc.numero, doc.indice);
+          }
+        },
+      } : null}
+      onClose={handleClose}
+      onExport={handleExport}
+    />,
+    document.body
+  );
+}
+
 /* ── Page ── */
 function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContractor }) {
   const data = window.OVERVIEW;
@@ -1130,10 +1276,10 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
       </div>
 
       {/* Operational dashboard tiles A–F — always visible, not gated by focusMode (R2 option a) */}
-      <OperationalDashboard operational={operational}/>
+      <OperationalDashboard operational={operational} onDrill={openDrill}/>
 
       {/* Operational priority row P1–P4 (P5 removed 2026-05-09) */}
-      <OperationalPriorityRow operational={operational}/>
+      <OperationalPriorityRow operational={operational} onDrill={openDrill}/>
 
       {/* KPI row */}
       <KpiRow data={data} onNavigate={onNavigate} onOpenConsultant={onOpenConsultant} onOpenContractor={onOpenContractor} onDrill={openDrill}/>
@@ -1168,8 +1314,11 @@ function OverviewPage({ focusMode, onNavigate, onOpenConsultant, onOpenContracto
         <SystemStatusCard status={data.system_status}/>
       </div>
 
-      {/* Drilldown drawer */}
-      {drill && <OverviewDrilldownDrawer drill={drill} focusMode={focusMode} staleDays={90} onClose={closeDrill}/>}
+      {/* Drilldown drawer — Step 1 (2026-05-10): rendered via the consultant-fiche
+          drawer (window.FicheDrilldownDrawer) for UX parity. The legacy
+          OverviewDrilldownDrawer definition stays in this file as a safety
+          backstop but is no longer mounted. */}
+      <OverviewFicheDrawerHost drill={drill} focusMode={focusMode} staleDays={90} onClose={closeDrill}/>
     </div>
   );
 }

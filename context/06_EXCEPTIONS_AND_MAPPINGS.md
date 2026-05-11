@@ -214,20 +214,20 @@ mode.
 "AXI":  Axima                 [41]
 "UTB":  UTB                   [42]
 "DUV":  Duval                 [08, 13A]
-"LAC":  Lacroix               [12, 12A]
+"LAC":  LAC                   [12, 12A]
 "AMP":  AMP / CLD             [11, 16A]
 "AAI":  AAI                   [43]
 "SMA":  SMAC                  [04, 06B]
 "ICM":  ICM                   [05]
 "FRS":  France Sols           [18, 19]
-"API":  Apilog / Schneider    [35]
-"FER":  Fermeté               [06, 13, 14]
+"API":  API                   [35]
+"FER":  FER                   [06, 13, 14]
 "CMF":  CMF BAT               [18]
 "SPA":  SEPA                  [61, 62]
 "SCH":  Schindler             [51]
 "LIN":  Lindner               [16B]
 "IST":  IST                   [11, 16, 12B]
-"CHV":  Atchouel              [13]
+"CHV":  CHV                   [13]
 "VAL":  Vallée                [19]
 "CPL":  CPLC                  [12B]
 "VTP":  VTP                   [01]
@@ -239,6 +239,22 @@ mode.
 "DBH":  DBH                   [20]
 "HVA":  HVA Concept           [22]
 ```
+
+**2026-05-10 (Step 3) — canonical display normalization for LAC / API / FER / CHV.**
+The four `name` values for `LAC`, `API`, `FER`, `CHV` were collapsed to the
+3-letter code itself (display rows above). All ~10 consumer call sites of
+`reporting.contractor_fiche.resolve_emetteur_name` automatically inherit
+the new display. SCH (`"Schindler"`) was deliberately left unchanged —
+verified separate from API by inspection of
+`output/intermediate/COUNTER_ATTACK_ITEMS.csv`: API rows are lot 35 GTB /
+building automation, SCH rows are lot 51 elevators ("ascenseur",
+"BILAN DE PUISSANCE" for elevator banks AA1/AH1/MCH1). Two precomputed
+artifacts retain the old names until rebuild:
+`output/intermediate/COUNTER_ATTACK_ITEMS.csv` (rebuild via
+`python scripts/build_counter_attack.py`) and
+`output/chain_onion/top_issues.json` (rebuild via
+`python run_chain_onion.py`). See
+`obsidian_repo_mind/05_REPORTING_AND_UI_ADAPTERS.md` Phase 7 Step 3.
 
 ### C.2 — Sheet → allowed emetteur codes (`src/config_loader.py:SHEET_EMETTEUR_FILTER`)
 
@@ -819,3 +835,115 @@ P1 (treated as overdue/anomaly).
 - `moex_sas_total` — count of `MOEX` tier rows whose owner is `["MOEX SAS"]`
 - `contractor_total` — count of `CONTRACTOR` tier rows in `op`
 - `priority_p5` — **REMOVED**
+
+---
+
+## F-1 — `numero` is zero-padded canonical; `numero_normalized` is display-only
+
+**Issue surfaced.** Phase 9 Step 5/5b. Dormant queue rows for UTB
+numeros (50202, 50934, 50942, 50945, 50946) failed DCC click-through
+with `"Document numero '50202' not found in dernier_df"` because
+`_dormant_list` was emitting `numero_normalized` (stripped: "50202")
+while `dernier_df.numero` is canonical zero-padded ("050202").
+
+**Rule.** For any DataFrame join, dict lookup, set membership test,
+or strict equality check against backend tables (`dernier_df`,
+`latest_chain_df`, `responses_df`, etc.), use the canonical `numero`
+form. `numero_normalized` is a leading-zero-stripped derivative
+intended for **display only** (UI text, log messages where the user
+prefers the short form).
+
+**Implementation.** `_dormant_list` in `contractor_quality.py:314`
+emits `r.get("numero") or r.get("numero_normalized") or "?"` —
+canonical form first, stripped only as fallback.
+
+**Guardrail.** `scripts/diag/check_latest_chain_view.py` gate G-DORM-3
+verifies every emitted dormant numero exists as-is (no normalization)
+in `ctx.dernier_df.numero`. Regressions are caught at diagnostic time.
+
+**Affected counters.** ~1,236 dernier_df rows where
+`numero != numero_normalized` (zero-padded 5-digit numeros). The
+canonical form is what every other view in the system uses.
+
+---
+
+## F-2 — `_load_dormant_ref_from_artifact` is a canonical production consumer (post-Phase-9)
+
+**History.** Pre-Phase-9, `contractor_quality.py::_load_dormant_ref_from_artifact`
+was introduced as a **workaround** because `ctx.dernier_df` was
+polluted: REF dormants computed directly from `dernier_df` included
+old-indice REFs even when the latest indice had VAO. The function read
+the Counter-Attack artifact (`output/intermediate/COUNTER_ATTACK_ITEMS.csv`)
+and filtered to `action_bucket == "ENTREPRISE_A_RELANCER"` per
+contractor, producing 107 rows total.
+
+**Phase 9 Step 5 attempted to remove it.** The migration replaced the
+function call with `_dormant_list(emetteur_latest, "REF", ref_today)`
+on the new latest-enriched view. This produced 111 items (a +4 delta)
+because the new computation included REF-on-latest-indice items that
+were still within deadline (`days_late ≤ 0`).
+
+**Phase 9 Step 5b restored the function.** The user clarified the
+business definition: "dormant REF" means past-deadline REF, not just
+"current latest indice is REF". After Step 4 the Counter-Attack
+artifact is itself built from canonical latest-chain truth, so reading
+`ENTREPRISE_A_RELANCER` from it is **the correct architecture**, not a
+workaround. The function's docstring was updated to reflect production
+status.
+
+**Current contract.**
+- `dormant_ref` in `build_contractor_quality` and
+  `build_contractor_quality_peer_stats` is sourced from
+  `_load_dormant_ref_from_artifact(code)`.
+- `dormant_sas_ref` is sourced from
+  `_dormant_list(emetteur_latest, "SAS REF", ref_today)` (SAS REF has
+  no deadline component in its definition — it's "any SAS REF on
+  latest indice").
+- Total dormant REF across all contractors: **107** (= artifact
+  `ENTREPRISE_A_RELANCER` count, by construction).
+- Total dormant SAS REF: **162**.
+
+**Why both totals are independently meaningful.** Action MOEX
+`ENTREPRISE_A_RELANCER` (107) answers "which chains is the contractor
+late on resubmitting?" — deadline-aware. Contractor fiche
+`dormant_sas_ref` (per-contractor SAS REF count) answers "which of
+this contractor's latest submittals are stuck in SAS REF?" —
+administrative state, no deadline. The two queries serve different
+business questions and should not be conflated.
+
+---
+
+## F-3 — Decision-3 SAS filter (`_apply_sas_filter_flat`)
+
+**Filter location.** `src/pipeline/stages/stage_read_flat.py::_apply_sas_filter_flat`.
+
+**Rule.** Documents where the SAS step is `PENDING_LATE` AND the
+submission year is < 2026 are EXCLUDED from `dernier_df` (and
+downstream `docs_df`). They remain in `CHAIN_REGISTER` (chain_onion
+artifacts are built without the SAS filter).
+
+**Concrete example.** Numero `253100`:
+- CHAIN_REGISTER: `latest_indice = "B"` (chain truth).
+- `dernier_df`: only indice "A" present (B's RAW_FLAT row has SAS
+  step `PENDING_LATE` and `submittal_date` = 2025-09-30 → year < 2026
+  → dropped by Decision-3).
+- `_resolve_doc_rows(ctx, "253100", None)`: candidate "B" not in
+  dernier_df subset → fallback to alphabetical-max "A" + logger.warning.
+
+**Consequence.** `len(ctx.latest_chain_df)` = chain count (2,554).
+`len(latest_enriched_view(ctx))` = chain count minus Decision-3
+victims (2,553 currently). The N≈1 gap is permanent steady-state, not
+a transient awaiting pipeline refresh.
+
+**Why this rule exists.** Pre-2026 documents stuck in unresolved SAS
+gates are considered out-of-scope for the active operational
+portfolio. They are still visible in chain_onion intelligence
+(`CHAIN_REGISTER`, `top_issues.json`) but excluded from the
+operational reporting view.
+
+**Diagnostic.** `scripts/diag/check_latest_chain_view.py` G-DCC-1
+documents the gap as "1 chain unjoinable due to 253100 GED-extract
+lag" — the wording is conservative (lag is a possible cause for other
+hypothetical numeros) but the canonical cause for the current single
+case is Decision-3. See `context/11_TOOLING_HAZARDS.md` §H-9 for the
+full hazard description.

@@ -266,6 +266,109 @@ For every hit, classify: is it inside a JS string literal (single/double/backtic
 
 ---
 
+## H-8 — Edit tool silently rewrites ASCII quotes to curly Unicode quotes
+
+**What it looks like.** A targeted Edit on lines that contain Python or JSX string literals — especially in regions whose surrounding bytes already include non-ASCII content (cp1252-mojibake em-dashes such as `â€"`, real curly punctuation, or accented French copy) — emits replacement text in which ASCII U+0022 double-quote is rewritten to U+201C / U+201D, and ASCII U+0027 apostrophe is rewritten to U+2018 / U+2019. The transformation is silent. `python -m py_compile` fails on the next run with `SyntaxError: invalid character`; JSX fails to parse. File appears visually correct in casual diff inspection because curly quotes look almost identical to ASCII quotes in many fonts.
+
+**Discovery (Action MOEX Step 1, 2026-05-10).** A targeted Edit on the CONTRACTOR_TAGS / CONTRACTOR_OVERDUE_TAGS list literals in `src/reporting/counter_attack_builder.py` — a region whose tag strings contain the cp1252-mojibake form of em-dash (`â€"`) — rewrote 16 ASCII double-quote delimiters to U+201C/U+201D. A parallel Edit on the CONSULTANT_A_ATTAQUER preset entry in `ui/jansa/counter_attack.jsx` rewrote 8 ASCII apostrophe delimiters around JS string literals to U+2018/U+2019. py_compile flagged the corruption. Recovery required a PowerShell `Copy-Item` of a verified canonical buffer (which bypasses the Edit-tool conversion path) plus a controlled `chr(0x201C)` → `chr(0x201D)` pass to restore the genuinely-curly content bytes (the cp1252-decoded em-dash byte 0x94 is itself U+201D in content position and must remain — only the delimiters needed to be ASCII).
+
+**Root cause hypothesis.** The Edit tool's diff-application path appears to apply prose-quote normalization to lines it touches when the file or the touched region contains pre-existing non-ASCII curly punctuation. Pure-ASCII regions are unaffected. The exact trigger heuristic is not documented externally; treat any quote-heavy edit near non-ASCII bytes as at risk.
+
+**Operational rules.**
+
+1. **For quote-heavy edits, prefer the Write tool with a verified canonical full-file buffer over targeted Edit.** Write does not appear to share the same rewrite path. Edit is safe only on pure-ASCII regions far from non-ASCII content.
+
+2. **Backup before editing a quote-sensitive file.** Use PowerShell `Copy-Item` or `cp` to create `<name>.pre_<step>_backup`. PowerShell `Copy-Item` does not re-encode bytes and is the canonical restore path observed during Action MOEX Step 1.
+
+3. **Curly-quote audit after every Edit on a Python or JSX file.** Detection grep:
+
+   ```
+   grep -nP "[\x{201C}\x{201D}\x{2018}\x{2019}]" <path>
+   ```
+
+   Classify each hit: legitimate CONTENT (inside a string literal, intended mojibake, French apostrophe rendered as U+2019) versus DELIMITER (around a string literal). A delimiter curly quote is a syntax error; a content curly quote is usually intended. If any new delimiter hits appear inside your edited region versus the pre-edit baseline, revert from the backup and retry via Write.
+
+4. **The `.pre_stepN_backup` discipline established in H-1.1 applies here too.** If the post-Edit audit shows delimiter contamination, restore the backup with `Copy-Item` and switch to Write.
+
+**Recovery if you've already shipped a corrupted file.** Re-Read via the Read tool, identify which curly-quote occurrences are delimiters versus content, restore the canonical bytes via PowerShell `Copy-Item` of a known-good source (git HEAD, a backup, or a regenerated buffer), and run py_compile to confirm. Note the incident in this file's change log.
+
+---
+
+## H-9 — `ctx.dernier_df` is NOT one row per chain in flat mode
+
+**What it looks like.** Code that reads `ctx.dernier_df` to count
+documents, list per-contractor backlog, drive routing decisions, or
+compute operational KPIs produces inflated values. A function reading
+`ctx.dernier_df[emetteur == "SNI"]` and assuming one row per chain
+silently breaks because flat mode emits one row per
+`(numero, indice)`. For 2,554 chains, that yields ~4,360 rows
+(pollution gap ~1,806).
+
+**Root cause.** `data_loader._load_from_flat_artifacts` stamps every
+docs_df row `is_dernier_indice = True` and copies the whole
+dataframe into `dernier_df`. Every `(numero, indice)` pair from
+`OPEN_DOC` rows in FLAT_GED ends up in dernier_df. The
+`is_dernier_indice` flag is therefore informationally useless in
+flat mode — it's True on every row.
+
+**Two correct sources of truth.**
+
+| Need | Use | Source |
+|---|---|---|
+| Chain identity + register metadata only | `ctx.latest_chain_df` | CHAIN_REGISTER.csv |
+| Precomputed columns + latest filter | `latest_enriched_view(ctx)` | dernier_df ∩ latest_chain_df keys |
+| History view across all indices | `ctx.dernier_df` directly | — |
+| Full-corpus search | `ctx.dernier_df` directly | — |
+| Revision inspection | `ctx.dernier_df` directly | — |
+
+**Operational rules.**
+
+1. **NEVER** use `ctx.dernier_df` for counts, KPIs, dormants, DCC
+   operational tags, Action MOEX routing, per-emetteur stats. Use
+   `latest_enriched_view(ctx)` instead. The function lives in
+   `src/reporting/latest_chain_view.py`.
+2. **The mutators stay on dernier_df.** `_precompute_focus_columns`
+   (in `data_loader.py`) and `compute_focus_ownership` (in
+   `focus_ownership.py`) MUST continue to mutate `dernier_df` in
+   place. Their added columns (`_visa_global`, `_focus_owner_tier`,
+   `_focus_priority`, etc.) propagate through
+   `latest_enriched_view(ctx)` via row inheritance. Migrating these
+   mutators would break the column propagation contract.
+3. **Decision-3 SAS filter** in
+   `src/pipeline/stages/stage_read_flat.py::_apply_sas_filter_flat`
+   drops pre-2026 `PENDING_LATE` SAS docs from `dernier_df` while
+   CHAIN_REGISTER retains them. This creates a permanent N~=1
+   discrepancy between `len(ctx.latest_chain_df)` (e.g. 2,554) and
+   `len(latest_enriched_view(ctx))` (e.g. 2,553). Don't try to
+   "fix" this asymmetry — it is intentional. The `_resolve_doc_rows`
+   defensive guard in `document_command_center.py` handles the
+   chain-without-dernier-row case by falling back to the
+   alphabetical-max dernier_df indice.
+4. **Numero format.** `dernier_df.numero` is zero-padded canonical
+   form (e.g. `"050202"`). `numero_normalized` is a stripped
+   derivative (e.g. `"50202"`). For ANY DataFrame join, dict lookup,
+   or strict equality check, use the canonical `numero` form.
+   `numero_normalized` is display-only.
+
+**Migration history.** Steps 2-7 (2026-05-11) migrated all HIGH/
+MEDIUM-risk operational consumers from `ctx.dernier_df` to
+`latest_enriched_view(ctx)`. See
+`reports/STEP1_DERNIER_DF_INVENTORY.md` for the per-call-site
+classification and `context/02_DATA_FLOW.md` for the current data flow.
+
+**Stable invariants (validated by `scripts/diag/check_latest_chain_view.py`
+and `scripts/diag/step1_equality_check.py`):**
+
+- `len(ctx.dernier_df)` ~= 4,360 (one row per active `(numero, indice)`)
+- `len(ctx.latest_chain_df)` = 2,554 (one row per chain)
+- `len(latest_enriched_view(ctx))` ~= 2,553 (chains minus Decision-3 victims)
+- Action MOEX bucket counts: 687 / 98 / 107 / 146 = 1,038
+- Dormant REF total: 107
+- Dormant SAS REF total: 162
+- `compute_dcc_tags_bulk` rows: 2,553
+
+---
+
 ## Change log
 
 | Date | Note |
@@ -280,3 +383,7 @@ For every hit, classify: is it inside a JS string literal (single/double/backtic
 | 2026-05-05 | H-6 added during Final_Polish_P1: JSX text content does not decode `\uXXXX` escape sequences; `<div>Chargement des données…</div>` rendered the literal six-character escape on the loading screen. Fixed by replacing 15 broken JSX-text occurrences in `ui/jansa/shell.jsx` + `ui/jansa/overview.jsx` with real UTF-8 characters. JS string literals and JSX attribute values were already correct (Babel decodes both). Plan + closure: `docs/implementation/FINAL_POLISH_P1.md`. |
 | 2026-05-05 | H-1 re-occurred during Cowork-side P1-A review: `python3 -m py_compile app.py` from sandbox bash failed with `IndentationError: expected an indented block after 'except' statement on line 1279`, and `wc -l app.py` reported 1279 lines. Read tool against the same file showed the file intact through line 1300+ with the `except` body present and `def main()` defined; project owner's `python app.py` smoke confirmed runtime works. False truncation alarm retracted. Lesson reinforced (yet again): for "is this file complete?" questions, the Read tool is authoritative; sandbox bash file-state inspection is not. |
 | 2026-05-06 | H-7 added during Phase 9A Cycle B and C closures: sandbox-side `sqlite3.connect(...)` against `data/run_memory.db` and `data/report_memory.db` returned `database disk image is malformed` for every query, including `PRAGMA integrity_check`, even after copying the DB to `/tmp` first. Production UI's `data_loader._query_db` immutable-mode fallback (`file:...?mode=ro&immutable=1`) read the same DBs correctly on Windows. False corruption alarm; lesson: snapshot/diagnostic tools that read SQLite from sandbox must mirror the immutable-mode fallback or rely on Windows-side verification. WAL → DELETE journal mode also landed in `src/run_memory.py` as defensive hardening (Phase 9A.6). |
+| 2026-05-10 | H-1 / H-5 recurrent during Steps 1, 1.5, 2, 5 of the orchestration session (dashboard drilldown unification + Action MOEX per-bucket export). Sandbox `wc -l` and `python -m py_compile` against Windows-mounted source files (`app.py`, `src/reporting/drilldown_builder.py`, `src/reporting/counter_attack_export.py`, `ui/jansa/overview.jsx`) repeatedly reported phantom truncation / SyntaxError after Edit-tool patches succeeded; Read tool was authoritative every time. Validation pattern that worked: pure-helper unit tests via `/tmp` mirror; defer end-to-end import + runtime smoke (`python -c "import app"`, full bridge call) to a Windows shell. NO `sed -i` / cat-redirect / Python in-place rewrite was attempted (avoided H-1.1 corruption). Lesson reinforced: when sandbox bash gives surprising results on freshly-edited files, defer to Windows shell rather than try to "force a refresh" from the Linux side. |
+| 2026-05-11 | H-9 added during latest_chain migration Step 8 (guardrails): documents the `ctx.dernier_df` is-not-one-row-per-chain hazard in flat mode, the two correct sources of truth (`ctx.latest_chain_df` and `latest_enriched_view(ctx)`), the Decision-3 N~=1 discrepancy, and stable invariants. |
+| 2026-05-11 | H-8 added after Action MOEX Step 1 (2026-05-10): targeted Edits on quote-heavy regions of `src/reporting/counter_attack_builder.py` and `ui/jansa/counter_attack.jsx` silently rewrote 16 ASCII double-quote delimiters to U+201C/U+201D (CONTRACTOR_TAGS / CONTRACTOR_OVERDUE_TAGS lists, adjacent to cp1252-mojibake em-dash content) and 8 ASCII apostrophe delimiters to U+2018/U+2019 (CONSULTANT_A_ATTAQUER preset block). py_compile flagged the corruption. Recovery via PowerShell `Copy-Item` of a canonical buffer plus a controlled `chr(0x201C)` → `chr(0x201D)` pass to restore intended mojibake content. Lesson: Edit is unsafe on quote-heavy / mojibake-adjacent regions; prefer Write with a known-good buffer and an explicit `.pre-step` backup. |
+| 2026-05-11 | Phase 9 `dernier_df` → `latest_enriched_view` migration closed. H-9 section (added 2026-05-11 by Step 8) is the canonical hazard reference; see `README.md §Phase 9`, `context/07_OPEN_ITEMS.md` Phase 9 closure entry, `context/06_EXCEPTIONS_AND_MAPPINGS.md` §F-1/F-2/F-3, and `reports/STEP1_DERNIER_DF_INVENTORY.md`. Stable invariants: `len(ctx.latest_chain_df)=2,554`, `len(latest_enriched_view(ctx))=2,553`, Action MOEX 687/98/107/146=1,038, dormant REF=107, dormant SAS REF=162. |

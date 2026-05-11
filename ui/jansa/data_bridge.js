@@ -229,6 +229,27 @@
     },
 
     /**
+     * Step 1.5 — Export the dashboard drilldown rows to xlsx. Uses the same
+     * payload as loadDrilldown (server-side build_drilldown). Returns the
+     * backend response verbatim: {success, path, count} or {success:false, error}.
+     */
+    exportDocumentsDrilldown: async function (kind, params, focusMode, staleDays) {
+      if (!bridge.api) return { success: false, error: "Backend not connected." };
+      try {
+        var r = await bridge.api.export_documents_drilldown_xlsx(
+          String(kind),
+          params || {},
+          !!focusMode,
+          staleDays != null ? staleDays : 90
+        );
+        return r;
+      } catch (e) {
+        console.error("[data_bridge] export drilldown exception:", e);
+        return { success: false, error: e.message || "Backend exception." };
+      }
+    },
+
+    /**
      * Load consultant fiche cell drilldown rows.
      * @param {string} consultantName
      * @param {string} filterKey
@@ -387,6 +408,50 @@
           included_files: [],
           missing_optional_files: [],
           error: "Bridge.generateAiAuditPack: " + e.name + ": " + e.message,
+        };
+      }
+    },
+
+    /**
+     * Step 5 — Export one ACTION MOEX bucket to xlsx.
+     * On-demand: triggered by the "Exporter Excel" button on the bucket queue
+     * panel. Resolves to the rich envelope; never rejects.
+     * @param {string}  bucket   one of FERMER_MAINTENANT / SECONDAIRE_EXPIRE / ...
+     * @returns {Promise<object>}  { success, path, filename, rows_exported, bucket, message, error }
+     */
+    exportActionMoexBucket: async function (bucket) {
+      if (!bridge.api || typeof bridge.api.export_action_moex_bucket_xlsx !== "function") {
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          rows_exported: 0,
+          bucket: String(bucket || ""),
+          message: null,
+          error: "Bridge not ready: window.jansaBridge.api unavailable",
+        };
+      }
+      try {
+        var r = await bridge.api.export_action_moex_bucket_xlsx(String(bucket || ""));
+        return r || {
+          success: false,
+          path: null,
+          filename: null,
+          rows_exported: 0,
+          bucket: String(bucket || ""),
+          message: null,
+          error: "No response from backend",
+        };
+      } catch (e) {
+        console.error("[data_bridge] exportActionMoexBucket exception:", e);
+        return {
+          success: false,
+          path: null,
+          filename: null,
+          rows_exported: 0,
+          bucket: String(bucket || ""),
+          message: null,
+          error: "Bridge.exportActionMoexBucket: " + (e && e.message ? e.message : String(e)),
         };
       }
     },

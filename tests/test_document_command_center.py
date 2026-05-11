@@ -24,7 +24,7 @@ _SRC_DIR = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
-from reporting.document_command_center import compute_dcc_tags_bulk, MOEX_CANONICAL, _compute_primary_tag
+from reporting.document_command_center import compute_dcc_tags_bulk, MOEX_CANONICAL, _compute_primary_tag, _resolve_doc_rows
 from reporting.data_loader import RunContext
 
 
@@ -243,3 +243,23 @@ class TestMoexTechnicalArbitration:
             {"reviewer": MOEX_CANONICAL, "tier": "MOEX", "status": ""},
         ]
         assert _compute_primary_tag("MOEX", responses, None) == "Att MOEX — Facile"
+
+
+def test_resolve_doc_rows_falls_back_when_chain_register_indice_absent(caplog):
+    """253100 scenario: chain_register says latest_indice=B but dernier_df only has A."""
+    dernier = pd.DataFrame([_doc_row(doc_id="D-253100-A", numero="253100", indice="A")])
+    latest_chain = pd.DataFrame([{"numero": "253100", "latest_indice": "B"}])
+    ctx = RunContext(
+        run_number=1, run_status="SUCCESS", run_date="2026-04-10",
+        summary_json={}, gf_artifact_path=None, ged_available=True,
+        degraded_mode=False, data_date=date(2026, 4, 10),
+        docs_df=dernier, responses_df=pd.DataFrame(), dernier_df=dernier,
+        latest_chain_df=latest_chain,
+    )
+
+    with caplog.at_level("WARNING", logger="reporting.document_command_center"):
+        row, ind = _resolve_doc_rows(ctx, "253100", None)
+
+    assert ind == "A", f"Expected fallback to 'A', got {ind!r}"
+    assert row["numero"] == "253100"
+    assert any("falling back to alphabetical max" in m for m in caplog.messages)

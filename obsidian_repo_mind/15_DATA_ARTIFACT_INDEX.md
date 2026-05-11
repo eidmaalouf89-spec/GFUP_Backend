@@ -32,7 +32,7 @@
 | `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv` | `src/flat_ged/source_exclusions.py` | BENTIN/LGD source-exclusion canary; manual audit | Source-level document exception ledger. Current code: `BENTIN_SOURCE_OLD_NOT_LISTED` | Missing ledger hides document-level source exclusions |
 | `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json` | `src/reporting/chain_timeline_attribution.py` | DCC Chronologie section; `app.py::get_chain_timeline` | Per-chain timing | DCC Chronologie shows wrong/missing timing |
 | `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.csv` | same | (tabular form) | Same | Same |
-| `output/intermediate/COUNTER_ATTACK_ITEMS.csv` | `src/reporting/counter_attack_builder.py` (via `scripts/build_counter_attack.py`) | `counter_attack_query.py`; Action MOEX UI | Action MOEX item list | Action MOEX shows outdated priorities |
+| `output/intermediate/COUNTER_ATTACK_ITEMS.csv` | `src/reporting/counter_attack_builder.py` (via `scripts/build_counter_attack.py`); Phase 9 Step 4 — builder now filters merged rows by `ctx.latest_chain_df` before bucket assignment | `counter_attack_query.py`; Action MOEX UI; `contractor_quality._load_dormant_ref_from_artifact` (canonical post-Phase-9 — §F-2) | Action MOEX item list (stable counts 687/98/107/146 = 1,038) | Action MOEX shows outdated priorities; contractor fiche `dormant_ref` desyncs |
 
 ---
 
@@ -42,7 +42,7 @@ Not registered in `run_memory.db`. Coupled to "most recent run that wrote `outpu
 
 | Artifact | Producer | Consumer | Source-of-truth role | Risk if stale |
 |---|---|---|---|---|
-| `output/chain_onion/CHAIN_REGISTER.csv` | `chain_onion/exporter.py` | `query_hooks.py`, `chain_timeline_attribution.py`, Focus narrowing | One-row-per-family chain registry | Focus shows wrong chains; DCC Chronologie wrong |
+| `output/chain_onion/CHAIN_REGISTER.csv` | `chain_onion/exporter.py` | `query_hooks.py`, `chain_timeline_attribution.py`, Focus narrowing; Phase 9 (2026-05-11) — `reporting.latest_chain_view.build_latest_chain_view` → `ctx.latest_chain_df` (~2,554 rows) | One-row-per-family chain registry | Focus shows wrong chains; DCC Chronologie wrong; `latest_enriched_view` desyncs from on-disk truth |
 | `output/chain_onion/CHAIN_VERSIONS.csv` | same | `chain_timeline_attribution.py` | All document versions | DCC Chronologie missing versions |
 | `output/chain_onion/CHAIN_EVENTS.csv` | same | `chain_timeline_attribution.py` | Full event timeline | DCC Chronologie wrong timing |
 | `output/chain_onion/CHAIN_METRICS.csv` | same | `query_hooks.py` | Pressure + staleness metrics | Stale metrics in query results |
@@ -52,6 +52,17 @@ Not registered in `run_memory.db`. Coupled to "most recent run that wrote `outpu
 | `output/chain_onion/dashboard_summary.json` | same | `app.py::get_chain_onion_intel` → `window.CHAIN_INTEL` | Portfolio KPI snapshot | ChainOnionPanel summary wrong |
 | `output/chain_onion/top_issues.json` | same | `app.py::get_chain_onion_intel` → `window.CHAIN_INTEL` | Top 20 chains by priority | ChainOnionPanel priority table wrong |
 | `output/chain_onion/CHAIN_ONION_SUMMARY.xlsx` | same | (manual review / distribution) | 11-sheet management workbook | Stale intel distributed |
+
+---
+
+## In-memory derived views (NOT persisted, Phase 9, 2026-05-11)
+
+| View | Producer | Consumer | Role | Notes |
+|---|---|---|---|---|
+| `ctx.latest_chain_df` | `reporting.latest_chain_view.build_latest_chain_view(base_dir, docs_df)` at context load | every operational reporting module | Canonical one-row-per-chain DataFrame (~2,554 rows) | Built from `CHAIN_REGISTER.csv` × `docs_df`; recomputed every context build, never written to disk |
+| `latest_enriched_view(ctx)` | `reporting.latest_chain_view.latest_enriched_view(ctx)` on demand | every operational reporting module | Operational view (~2,553 rows): `ctx.dernier_df` intersected with `ctx.latest_chain_df.(numero, latest_indice)`, inheriting `_precompute_focus_columns` + `compute_focus_ownership` enrichments | Materialised per call; never written to disk. Decision-3 N≈1 gap vs chain count is by design (numero 253100; §F-3) |
+
+See `README.md §Phase 9`, `context/11_TOOLING_HAZARDS.md` §H-9.
 
 ---
 

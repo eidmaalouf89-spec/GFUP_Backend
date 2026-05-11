@@ -28,6 +28,7 @@ from workflow_engine import WorkflowEngine, compute_responsible_party, compute_m
 # UI now consumes effective_responses_df composed by the pipeline composition engine.
 # from reporting.bet_report_merger import merge_bet_reports  # DO NOT RESTORE
 from reporting.focus_ownership import compute_focus_ownership
+from reporting.latest_chain_view import build_latest_chain_view
 from report_memory import load_persisted_report_responses
 from effective_responses import build_effective_responses
 
@@ -44,7 +45,25 @@ class RunContext:
     docs_df: Optional[pd.DataFrame] = None
     responses_df: Optional[pd.DataFrame] = None
     approver_names: Optional[list] = None
-    dernier_df: Optional[pd.DataFrame] = None          # dernier indice docs only
+    # ── dernier_df ────────────────────────────────────────────────────
+    # Active-version compatibility view. In flat mode contains EVERY
+    # (numero, indice) pair from OPEN_DOC rows — NOT one row per chain
+    # (~4,360 rows for ~2,554 chains on current data). The mutator
+    # functions _precompute_focus_columns (this file) and
+    # compute_focus_ownership (focus_ownership.py) add their
+    # operational columns (_visa_global, _focus_owner_tier, etc.) to
+    # THIS dataframe in place.
+    #
+    # For OPERATIONAL reads (counts, KPIs, dormants, DCC tags, Action
+    # MOEX routing, fiches, drilldowns), use ctx.latest_chain_df
+    # (canonical one row per chain) or latest_enriched_view(ctx) from
+    # reporting.latest_chain_view (intersection that preserves the
+    # mutator-added columns). See context/11_TOOLING_HAZARDS.md §H-9
+    # for the full hazard description.
+    #
+    # Use dernier_df DIRECTLY only for history views, full-corpus
+    # search, and revision inspection.
+    dernier_df: Optional[pd.DataFrame] = None
     workflow_engine: Optional[WorkflowEngine] = None
     responsible_parties: Optional[dict] = None          # {doc_id: responsible_party}
     gf_sheets: dict = field(default_factory=dict)       # {sheet_name: {lots, contractor}}
@@ -55,6 +74,7 @@ class RunContext:
     bet_merge_stats: dict = field(default_factory=dict)  # from BET report merger
     moex_countdown: dict = field(default_factory=dict)   # {doc_id: countdown_info}
     flat_ged_doc_meta: dict = field(default_factory=dict)  # {doc_id: {"visa_global": ..., ...}} — flat mode only; empty in legacy fallback
+    latest_chain_df: Optional[pd.DataFrame] = None  # canonical one-row-per-chain view
 
 
 # Module-level cache
@@ -467,6 +487,31 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
         docs_df["is_dernier_indice"] = True
         dernier_df = docs_df.copy()
 
+        # Build latest_chain_df from Chain+Onion artifacts (sub-second via docs_df)
+        latest_chain_df = None
+        try:
+            latest_chain_df = build_latest_chain_view(base_dir=base_dir, docs_df=docs_df)
+            chain_reg_path = base_dir / "output" / "chain_onion" / "CHAIN_REGISTER.csv"
+            if chain_reg_path.exists():
+                expected = len(pd.read_csv(chain_reg_path, usecols=["family_key"]))
+                if len(latest_chain_df) != expected:
+                    logger.warning(
+                        "[FLAT_ARTIFACT] latest_chain_df row count %d != CHAIN_REGISTER %d",
+                        len(latest_chain_df), expected,
+                    )
+            logger.info(
+                "[FLAT_ARTIFACT] latest_chain_df loaded: %d rows. "
+                "Operational consumers: use ctx.latest_chain_df or "
+                "latest_enriched_view(ctx) — see latest_chain_view.py.",
+                len(latest_chain_df),
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning(
+                "[FLAT_ARTIFACT] latest_chain_df unavailable (%s: %s) — field set to None",
+                type(exc).__name__, exc,
+            )
+            latest_chain_df = None
+
         # WorkflowEngine + responsible parties
         workflow_engine = WorkflowEngine(responses_df)
         dernier_ids = dernier_df["doc_id"].tolist()
@@ -576,6 +621,7 @@ def _load_from_flat_artifacts(base_dir: Path, db_path: str, run_number: int,
             bet_merge_stats={},
             moex_countdown=moex_countdown,
             flat_ged_doc_meta=flat_doc_meta or {},
+            latest_chain_df=latest_chain_df,
         )
 
     except Exception as e:
@@ -953,6 +999,17 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
             docs_df = None
             responses_df = None
 
+    # Best-effort latest_chain_df in legacy path
+    latest_chain_df = None
+    try:
+        latest_chain_df = build_latest_chain_view(base_dir=base_dir)
+        logger.info("[LEGACY] latest_chain_df loaded: %d rows", len(latest_chain_df))
+    except Exception as exc:
+        logger.warning(
+            "[LEGACY] latest_chain_df unavailable (%s: %s) — field set to None",
+            type(exc).__name__, exc,
+        )
+
     ctx = RunContext(
         run_number=run_number,
         run_status=run_meta["status"],
@@ -974,6 +1031,7 @@ def load_run_context(base_dir: Path, run_number: int = None) -> RunContext:
         ged_status_labels={},
         bet_merge_stats=bet_merge_stats,
         moex_countdown=moex_countdown,
+        latest_chain_df=latest_chain_df,
     )
 
     # Cache it

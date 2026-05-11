@@ -162,4 +162,37 @@ delete the backup files after confirming patch stability.
 
 **Related:** [[11_DEBUGGING_SEAMS]] · [[13_SAFE_DEBUGGING_PROTOCOL]] · [[09_ACTION_MOEX_COUNTER_ATTACK]]
 
+---
+
+## Phase 9 closure (2026-05-11)
+
+`dernier_df` → `latest_enriched_view` migration complete. See
+`README.md §Phase 9`, `context/07_OPEN_ITEMS.md`, and `reports/STEP1_DERNIER_DF_INVENTORY.md`.
+
+Canonical invariants (current data): `len(ctx.latest_chain_df) = 2,554`,
+`len(latest_enriched_view(ctx)) = 2,553`, Action MOEX
+`687 / 98 / 107 / 146 = 1,038`, dormant REF `107`, dormant SAS REF `162`.
+
+Remaining items (non-blocking):
+
+1. **`_resolve_doc_rows` warning text** — currently reads "Suggests
+   flat-GED export lag". For 253100 specifically the cause is the SAS
+   filter (Decision-3, see `context/06_EXCEPTIONS_AND_MAPPINGS.md`
+   §F-3). Wording is conservative — lag remains a possible cause for
+   other hypothetical fallback cases. Either accept the conservative
+   wording or update to mention both possibilities in a future code
+   touch.
+2. **21 pre-existing pytest failures** (test_audit_counts_lineage,
+   test_cache_meta_v2, test_extract_flat_ged_trace, test_query_hooks,
+   test_validation_harness D19, test_build_flat_ged_batch_smoke). See
+   `context/07_OPEN_ITEMS.md` "Outstanding test baselines" table for
+   per-file symptom and likely cause. Recommend one-batch refresh.
+3. **Operational dashboard ↔ legacy focus dashboard.** The
+   operational dashboard (Backlog opérationnel / MOEX / Consultants /
+   Entreprises tiles) is the default view since 2026-05-07. The legacy
+   focus dashboard with "Documents soumis" KPI is still in code,
+   reachable via Focus toggle. Phase 9 Step 7c renamed "Documents
+   soumis" → "Chaînes" in the legacy view; the operational dashboard
+   already uses chain-appropriate terms. No further label work needed.
+
 *Back to [[00_START_HERE]]*

@@ -1,0 +1,254 @@
+"""
+Diagnostic: verify build_latest_chain_view against live Chain+Onion artifacts.
+Exit 0 + ALL GATES PASSED if every invariant holds. Exit 1 + GATE FAILED otherwise.
+"""
+import sys
+from pathlib import Path
+
+# Ensure src/ is importable
+repo_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(repo_root / "src"))
+
+import pandas as pd
+from reporting.latest_chain_view import build_latest_chain_view
+
+
+def main():
+    base = repo_root
+    register_path = base / "output" / "chain_onion" / "CHAIN_REGISTER.csv"
+    versions_path = base / "output" / "chain_onion" / "CHAIN_VERSIONS.csv"
+
+    register_df = pd.read_csv(register_path, dtype={"family_key": str, "numero": str})
+    versions_df = pd.read_csv(versions_path, dtype={"family_key": str, "version_key": str})
+
+    try:
+        df = build_latest_chain_view(base)
+    except Exception as exc:
+        print(f"GATE FAILED: build_latest_chain_view raised {type(exc).__name__}: {exc}")
+        sys.exit(1)
+
+    # Counts table
+    families_with_multi = (
+        versions_df.groupby("family_key").size().pipe(lambda s: (s > 1).sum())
+    )
+    print(f"latest_chain_df rows:            {len(df)}")
+    print(f"latest_chain_df unique family_key: {df['family_key'].nunique()}")
+    print(f"latest_chain_df unique numero:     {df['numero'].nunique()}")
+    print(f"CHAIN_REGISTER rows:             {len(register_df)}")
+    print(f"CHAIN_VERSIONS rows:             {len(versions_df)}")
+    print(f"families with >1 version:        {families_with_multi}")
+
+    # Report present / deferred columns
+    present_cols = list(df.columns)
+    deferred = []
+    for col in ["emetteur_name", "visa_global", "days_late"]:
+        deferred.append(col)
+    optional_present = [c for c in ["emetteur", "titre"] if c in df.columns]
+    optional_missing = [c for c in ["emetteur", "titre"] if c not in df.columns]
+
+    print(f"columns present:                 {present_cols}")
+    if optional_present:
+        print(f"optional enrichment included:    {optional_present}")
+    if optional_missing:
+        print(f"optional enrichment omitted:     {optional_missing}")
+    print(f"deferred to later steps:         {deferred}")
+
+    # Gate checks
+    gate_ok = True
+
+    if len(df) != len(register_df):
+        print(f"GATE FAILED: row count {len(df)} != CHAIN_REGISTER {len(register_df)}")
+        gate_ok = False
+
+    if not df["family_key"].is_unique:
+        print("GATE FAILED: family_key not unique")
+        gate_ok = False
+
+    if not df["numero"].is_unique:
+        print("GATE FAILED: numero not unique")
+        gate_ok = False
+
+    if not df["version_key"].equals(df["latest_version_key"]):
+        print("GATE FAILED: version_key != latest_version_key")
+        gate_ok = False
+
+    if not df["indice"].equals(df["latest_indice"]):
+        print("GATE FAILED: indice != latest_indice")
+        gate_ok = False
+
+    if gate_ok:
+        print("ALL GATES PASSED")
+    else:
+        sys.exit(1)
+
+    # --- Loader smoke (Step 3) ---
+    try:
+        from reporting.data_loader import load_run_context, clear_cache
+        clear_cache()
+        ctx = load_run_context(repo_root)
+        dn = ctx.dernier_df
+        lc = ctx.latest_chain_df
+        print()
+        print("=== Loader smoke ===")
+        print(f"ctx.dernier_df rows                : {len(dn) if dn is not None else 'None'}")
+        print(f"ctx.dernier_df unique numero       : {dn['numero'].astype(str).nunique() if dn is not None else 'None'}")
+        print(f"ctx.latest_chain_df rows           : {len(lc) if lc is not None else 'None'}")
+        print(f"ctx.latest_chain_df unique numero  : {lc['numero'].astype(str).nunique() if lc is not None else 'None'}")
+        print(f"CHAIN_REGISTER rows                : {len(register_df)}")
+        print(f"Pollution gap (dernier - latest)   : {len(dn) - len(lc) if dn is not None and lc is not None else 'N/A'}")
+    except Exception as exc:
+        print(f"Loader smoke FAILED: {type(exc).__name__}: {exc}")
+        sys.exit(0)
+
+    # --- Step 5 — Contractor Quality / Action MOEX cross-check ---
+    try:
+        from reporting.consultant_fiche import CONTRACTOR_REFERENCE
+        from reporting.contractor_quality import (
+            _latest_enriched_for_contractor,
+            _dormant_list,
+            _load_dormant_ref_from_artifact,
+        )
+
+        ref_today = ctx.data_date
+        if ref_today is None:
+            print("[SKIP] Step 5 gates: ctx.data_date is None")
+            sys.exit(0)
+
+        print()
+        print("=== Step 5 — Contractor Quality / Action MOEX cross-check ===")
+
+        # Compute totals across all contractors
+        total_dorm_ref = 0
+        total_dorm_sas_ref = 0
+        per_emetteur = []
+
+        for code in CONTRACTOR_REFERENCE:
+            emetteur_latest = _latest_enriched_for_contractor(ctx, code)
+            dorm_ref = _load_dormant_ref_from_artifact(code)
+            dorm_sas_ref = _dormant_list(emetteur_latest, "SAS REF", ref_today)
+            total_dorm_ref += len(dorm_ref)
+            total_dorm_sas_ref += len(dorm_sas_ref)
+
+            # Artifact cross-check
+            art_ref = _load_dormant_ref_from_artifact(code)
+            per_emetteur.append({
+                "code": code,
+                "new_ref": len(dorm_ref),
+                "art_ref": len(art_ref),
+                "delta": len(dorm_ref) - len(art_ref),
+                "dorm_ref_items": dorm_ref,
+                "dorm_sas_ref_items": dorm_sas_ref,
+            })
+
+        # ENTREPRISE_A_RELANCER count from artifact
+        art_path = repo_root / "output" / "intermediate" / "COUNTER_ATTACK_ITEMS.csv"
+        art_ear_count = 0
+        if art_path.exists():
+            art_df = pd.read_csv(art_path, dtype=str, keep_default_na=False)
+            art_ear_count = int((art_df["action_bucket"] == "ENTREPRISE_A_RELANCER").sum())
+
+        print(f"contractor_quality dormant REF (total)      : {total_dorm_ref}")
+        print(f"Action MOEX ENTREPRISE_A_RELANCER (artifact): {art_ear_count}")
+        print(f"delta                                       : {total_dorm_ref - art_ear_count}")
+        print(f"contractor_quality dormant SAS REF (total)  : {total_dorm_sas_ref}")
+
+        # Per-emetteur table (top 5 by |delta|)
+        per_emetteur.sort(key=lambda x: abs(x["delta"]), reverse=True)
+        print()
+        print("Top 5 contributors to delta:")
+        print(f"  {'code':<10} {'new_ref':>8} {'art_ref':>8} {'delta':>8}")
+        for row in per_emetteur[:5]:
+            print(f"  {row['code']:<10} {row['new_ref']:>8} {row['art_ref']:>8} {row['delta']:>8}")
+
+        # Gate G-DORM-1: no old-indice REF
+        # Build lookup with both raw and leading-zero-stripped numero keys
+        # (dernier_df has numero_normalized which strips leading zeros;
+        # latest_chain_df.numero may be zero-padded)
+        lc = ctx.latest_chain_df
+        if lc is not None and not lc.empty:
+            lc_keys = set()
+            for num_raw, ind in zip(
+                lc["numero"].astype(str).str.strip(),
+                lc["latest_indice"].astype(str).str.strip().str.upper(),
+            ):
+                lc_keys.add((num_raw, ind))
+                lc_keys.add((num_raw.lstrip("0") or "0", ind))
+        else:
+            lc_keys = set()
+
+        g_dorm1_offenders = []
+        g_dorm2_offenders = []
+
+        for row in per_emetteur:
+            for item in row["dorm_ref_items"]:
+                num = str(item["numero"]).strip()
+                ind = str(item["indice"]).strip().upper()
+                if lc_keys and (num, ind) not in lc_keys and (num.lstrip("0") or "0", ind) not in lc_keys:
+                    g_dorm1_offenders.append((row["code"], item["numero"], item["indice"]))
+            for item in row["dorm_sas_ref_items"]:
+                num = str(item["numero"]).strip()
+                ind = str(item["indice"]).strip().upper()
+                if lc_keys and (num, ind) not in lc_keys and (num.lstrip("0") or "0", ind) not in lc_keys:
+                    g_dorm2_offenders.append((row["code"], item["numero"], item["indice"]))
+
+        print()
+        if not g_dorm1_offenders:
+            print("G-DORM-1 (no old-indice REF):     PASS (0 offenders)")
+        else:
+            print(f"G-DORM-1 (no old-indice REF):     FAIL ({len(g_dorm1_offenders)} offenders)")
+            for off in g_dorm1_offenders[:10]:
+                print(f"  emetteur={off[0]}  numero={off[1]}  indice={off[2]}")
+            gate_ok = False
+
+        if not g_dorm2_offenders:
+            print("G-DORM-2 (no old-indice SAS REF): PASS (0 offenders)")
+        else:
+            print(f"G-DORM-2 (no old-indice SAS REF): FAIL ({len(g_dorm2_offenders)} offenders)")
+            for off in g_dorm2_offenders[:10]:
+                print(f"  emetteur={off[0]}  numero={off[1]}  indice={off[2]}")
+            gate_ok = False
+
+        # Gate G-DORM-3: every emitted dormant numero exists as-is in dernier_df
+        dd_numeros = set(ctx.dernier_df["numero"].astype(str).str.strip()) if ctx.dernier_df is not None else set()
+        g_dorm3_offenders = []
+        for row in per_emetteur:
+            for item in row["dorm_ref_items"]:
+                num = str(item["numero"]).strip()
+                if num and num != "?" and num not in dd_numeros:
+                    g_dorm3_offenders.append((row["code"], num))
+            for item in row["dorm_sas_ref_items"]:
+                num = str(item["numero"]).strip()
+                if num and num != "?" and num not in dd_numeros:
+                    g_dorm3_offenders.append((row["code"], num))
+
+        if not g_dorm3_offenders:
+            print("G-DORM-3 (numero in dernier_df):  PASS (0 offenders)")
+        else:
+            print(f"G-DORM-3 (numero in dernier_df):  FAIL ({len(g_dorm3_offenders)} offenders)")
+            for off in g_dorm3_offenders[:10]:
+                print(f"  emetteur={off[0]}  numero={off[1]}")
+            gate_ok = False
+
+        # Hard gate: dormant_ref total must equal artifact ENTREPRISE_A_RELANCER
+        if total_dorm_ref != art_ear_count:
+            print(f"G-DORM-4 (REF == artifact EAR):   FAIL ({total_dorm_ref} != {art_ear_count})")
+            gate_ok = False
+        else:
+            print(f"G-DORM-4 (REF == artifact EAR):   PASS ({total_dorm_ref} == {art_ear_count})")
+
+    except Exception as exc:
+        print(f"Step 5 gates FAILED: {type(exc).__name__}: {exc}")
+        import traceback; traceback.print_exc()
+        gate_ok = False
+
+    if gate_ok:
+        print()
+        print("ALL GATES PASSED")
+    else:
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

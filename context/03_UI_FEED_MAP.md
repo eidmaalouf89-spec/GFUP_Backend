@@ -563,3 +563,129 @@ New backend fields on `data.operational`:
 
 The JSX continues to read `operational.priority_p1..p4`; no other UI
 changes are required.
+
+---
+
+## 2026-05-10 — Dashboard drilldown unification (Step 1) + drilldown export (Step 1.5) + coverage extension (Step 2)
+
+### Drawer reuse (Step 1)
+
+`OverviewPage` in `ui/jansa/overview.jsx` now mounts a new
+`OverviewFicheDrawerHost` adapter (~85 lines) that renders the canonical
+`window.FicheDrilldownDrawer` (defined in `fiche_base.jsx`) via
+`ReactDOM.createPortal(..., document.body)`. The legacy
+`OverviewDrilldownDrawer` is left defined but unmounted (kept as a safety
+net per scope; no `window.OverviewDrilldownDrawer` assignment is
+introduced). The fiche_base aliases (`DrilldownDrawer`,
+`FicheDrilldownDrawer`) are untouched.
+
+`reporting.drilldown_builder._row_to_payload` was widened so the dashboard
+drawer receives the same shape the fiche drawer expects. Existing keys
+preserved (`numero, indice, titre, emetteur_code, lot, last_action_date,
+latest_status, primary_owner`); new keys added: `emetteur, emetteur_name,
+date_soumission, date_limite, remaining_days, status`. Fallbacks: `titre`
+→ `libelle_du_document`; `date_soumission` → `created_at` / `cree_le`.
+`_to_iso` now handles plain `datetime.date`.
+
+### Drilldown Excel export (Step 1.5)
+
+| UI surface | Bridge call | Backend Api method | Builder |
+|---|---|---|---|
+| Drilldown export (dashboard) | `jansaBridge.exportDocumentsDrilldown(kind, params, focusMode, staleDays)` (`ui/jansa/data_bridge.js` lines 231–250) | `Api.export_documents_drilldown_xlsx` (`app.py` lines 1168–1296) | inline in `app.py`; mirrors `Api.export_drilldown_xlsx`: same column set, header_font/header_fill, `freeze_panes="A2"`, `auto_filter`, late-row pink fill, atomic temp+rename, identity dtype preservation on `numero` / `indice`. Filename pattern `Drilldown_dashboard_{safe_kind}_{safe_params}_{YYYYMMDD_HHMMSS}.xlsx` under `output/`. `safe_params` extracts `segment` for `visa_segment`, `week_label` for `weekly`, `P{n}` for `focus_priority`. |
+
+`OverviewFicheDrawerHost` wires `onExport` to the bridge; on success the
+file is opened via `pywebview.api.open_file_in_explorer(res.path)`.
+
+### Drilldown coverage extension (Step 2)
+
+`reporting.aggregator.compute_operational_universe(ctx) -> (op_broad, op)`
+is a new public helper extracted from the first 26 lines of
+`compute_operational_dashboard`. The dashboard function delegates to it;
+no behavior change in the dashboard dict (byte-for-byte identical
+output). The helper is the single source of truth for the operational
+mask, used by both `compute_operational_dashboard` and
+`drilldown_builder`.
+
+`reporting.drilldown_builder.build_drilldown` now dispatches 7 new kinds
+(all funnel through `_row_to_payload` and inherit the export workbook):
+
+| Kind | Params | Source mask |
+|---|---|---|
+| `operational_total` | — | all `op` rows |
+| `operational_fresh` | — | `op[_days_since_last_activity <= 90]` |
+| `operational_stale` | — | `op[_days_since_last_activity > 90]` |
+| `operational_moex` | optional `scope ∈ {fresh, stale}` | `op[tier=="MOEX" & ~(_focus_owner == ["MOEX SAS"])]` (excludes MOEX SAS by design — counts match `moex_total`) |
+| `operational_consultants` | optional `tier ∈ {PRIMARY, SECONDARY}` | `op[tier ∈ {PRIMARY, SECONDARY}]` |
+| `operational_enterprise_ref` | — | `op_broad[_visa_global ∈ {REF, SAS REF}]` (uses `op_broad` — pre-visa-exclusion mask, mirrors `enterprise_ref_sas_candidates` per Seam 14) |
+| `operational_priority` | `priority ∈ {1..4}` | `op[_focus_priority == n]` |
+
+`OperationalDashboard` and `OperationalPriorityRow` accept `onDrill`;
+clicks wired on 6 operational tiles (T1–T6) + 4 priority cells (P1–P4).
+`_OV_DRILL_HEADERS` and `_ovDrillTitle` extended with branches for the 7
+new kinds. Best Consultant + Best Entreprise unchanged (kept as fiche
+navigation). T4/T5 sub-row clicks NOT wired — backend supports
+`scope` / `tier` params, UI follow-up.
+
+---
+
+## 2026-05-10 — Action MOEX per-bucket Excel export (Step 5)
+
+| UI surface | Bridge call | Backend Api method | Builder |
+|---|---|---|---|
+| Action MOEX bucket export | `jansaBridge.exportActionMoexBucket(bucket)` (`ui/jansa/data_bridge.js`) | `Api.export_action_moex_bucket_xlsx(bucket)` (`app.py`) | `reporting.counter_attack_export.build_action_moex_bucket_xlsx(ctx, bucket, dest_dir)` (new module, ~330 lines). Filters `output/intermediate/COUNTER_ATTACK_ITEMS.csv` by bucket; joins to `dernier_df` for `titre` + reception date; calls private `_get_latest_responses_for_doc` from `document_command_center.py` for the reviewer list; reuses CSV `plain_reason` verbatim; appends empty `MOEX AVIS` column; atomic temp+rename. Filename `ACTION_MOEX_{bucket}_{YYYYMMDD_HHMMSS}.xlsx` under `output/exports/`. Bucket validated against `BUCKET_DISPLAY_ORDER` (7-bucket enum from `counter_attack_query`). Returns `{success, path, filename, rows_exported, bucket, message, error}`. Empty bucket: header-only workbook with `success=True, message="Bucket vide..."`. |
+
+`ui/jansa/counter_attack.jsx` adds an "Exporter Excel" button on each
+queue panel header (state pair `exportingBucket` / `exportNotice`). On
+success the file is opened via
+`pywebview.api.open_file_in_explorer(res.path)`.
+
+Workbook contract (Layout Y, 12 columns, French headers, real UTF-8) —
+see `obsidian_repo_mind/09_ACTION_MOEX_COUNTER_ATTACK.md` Phase 6E.
+
+Date contractuelle decision: `dernier_df` does NOT carry `date_limite`
+(per `src/normalize.py:431`, `date_limite` is per-response, only on
+`responses_df`); the export computes `created_at + 30 days` directly,
+matching the documented 30-day workflow rule.
+
+Residual coupling (logged in `context/07_OPEN_ITEMS.md`):
+`_get_latest_responses_for_doc` is a private DCC symbol; imported because
+protected-zone rules forbid modifying DCC. If DCC renames or repackages
+the helper, the export breaks.
+
+---
+
+## 2026-05-11 — Phase 9 source-of-truth migration (operational metrics now read `latest_enriched_view`)
+
+Every operational reporting feed below is now sourced (in backend) from
+`reporting.latest_chain_view.latest_enriched_view(ctx)` — a one-row-per-
+chain intersection of `ctx.dernier_df` and `ctx.latest_chain_df`
+(~2,553 rows currently). The UI payload shapes are unchanged; only the
+backend substrate moved. See `README.md §Phase 9` and
+`reports/STEP1_DERNIER_DF_INVENTORY.md` for the per-call-site inventory.
+
+| Feed | Backend reads | Notes |
+|---|---|---|
+| `window.OVERVIEW.operational.*` (Backlog opérationnel, MOEX, Consultants, Entreprises tiles) | `aggregator.compute_operational_dashboard` over `latest_enriched_view(ctx)` (via `compute_operational_universe`) | Already chain-appropriate terminology. No UI label change needed in Step 7c. |
+| `window.OVERVIEW.kpis.total_docs_current` (legacy "Documents soumis" — renamed "Chaînes" in Step 7c) | `aggregator.compute_project_kpis` reading `latest_enriched_view(ctx)` | Chain count (~2,553). Pre-Phase-9 value was `dernier_df` row count (~4,360); migration removes the indice-pollution overcount. |
+| `window.OVERVIEW.kpis.total_docs_all_indices` | `aggregator` reading `ctx.docs_df` directly | Historical raw OPEN_DOC count; retained for surfaces that need the full-indice count (e.g. contractor fiche "Documents soumis" all-time total). |
+| `window.CONSULTANTS[*]` | `aggregator.compute_consultant_summary` over `latest_enriched_view(ctx)` | Per-consultant counts on canonical chain set. |
+| `window.CONTRACTORS_LIST[*]` | `aggregator.compute_contractor_summary` over `latest_enriched_view(ctx)` | Per-contractor counts on canonical chain set. |
+| `window.FICHE_DATA.*` (consultant fiche bloc1/bloc2/bloc3) | `consultant_fiche.build_consultant_fiche` over `latest_enriched_view(ctx)` (chain-level metrics) + `ctx.docs_df` (full-history sparklines) | Hybrid (Phase 9 + Phase 7 hybrid-payload contract from 2026-05-10). |
+| `window.CONTRACTOR_FICHE_DATA.quality.*` (peer stats, dormant queues, polar) | `contractor_quality.build_contractor_quality` over `latest_enriched_view(ctx)`; `dormant_ref` continues to read Action MOEX artifact (§F-2) | Canonical post-Phase-9. |
+| DCC search & panel | `document_command_center.compute_dcc_tags_bulk` iterates `latest_enriched_view(ctx)`; `_resolve_doc_rows` resolves indice via `ctx.latest_chain_df` with alphabetical-max fallback | Decision-3 numero 253100 trips the fallback (logger.warning). |
+| Dashboard drilldown drawer | `drilldown_builder.build_drilldown` over `latest_enriched_view(ctx)` for operational kinds; `op_broad` mask still applies for `operational_enterprise_ref` | Counts match `window.OVERVIEW.operational.*`. |
+| Action MOEX queue & item payloads | `counter_attack_builder.build_counter_attack_items` filters by `ctx.latest_chain_df.(family_key, latest_indice)` before bucket assignment; `counter_attack_export._resolve_dernier_row` reads `latest_enriched_view(ctx)` | Stable bucket counts 687 / 98 / 107 / 146 = 1,038. |
+
+Surfaces that intentionally continue to read `ctx.dernier_df` or
+`ctx.docs_df` directly (NOT migrated, by design):
+
+- Revision history view in DCC (intentionally renders all indices from
+  the chain timeline; scope filter via `latest_enriched_view` only
+  selects the chain context).
+- `_precompute_focus_columns` (mutator — adds `_visa_global` /
+  `_focus_owner_tier` / `_focus_priority` columns onto `ctx.dernier_df`
+  in place).
+- `compute_focus_ownership` (mutator — adds `_focus_owner` /
+  `_focus_owner_tier` onto `ctx.dernier_df` in place).
+- `contractor_fiche` "Documents soumis" historical total field
+  (`total_submitted` from `ctx.docs_df`, all-indices count).

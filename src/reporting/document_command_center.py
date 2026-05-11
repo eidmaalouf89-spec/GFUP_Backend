@@ -36,6 +36,8 @@ from typing import Optional
 
 import pandas as pd
 
+from reporting.latest_chain_view import latest_enriched_view
+
 logger = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -116,6 +118,23 @@ def search_documents(
     subset = subset.copy()
     subset["_rank"] = subset.apply(_rank, axis=1)
     subset = subset.sort_values("_rank", kind="mergesort")
+
+    # Prefer the actual latest indice when deduplicating per-numero.
+    lc = getattr(ctx, "latest_chain_df", None)
+    if lc is not None and not lc.empty:
+        lc_keys = set(zip(
+            lc["numero"].astype(str).str.strip(),
+            lc["latest_indice"].astype(str).str.strip(),
+        ))
+        subset = subset.copy()
+        subset["_is_latest"] = [
+            (str(n).strip(), str(i).strip()) in lc_keys
+            for n, i in zip(subset["numero"], subset["indice"])
+        ]
+        subset = subset.sort_values(
+            ["_rank", "_is_latest"], ascending=[True, False], kind="mergesort",
+        )
+        subset = subset.drop(columns=["_is_latest"])
     subset = subset.drop_duplicates(subset=["numero"], keep="first").head(limit)
 
     # For each result compute primary_tag and latest_status summary
@@ -220,8 +239,13 @@ def build_document_command_center(
 def _resolve_doc_rows(ctx, numero: str, indice: Optional[str]):
     """Return (doc_row_dict, indice_str) for the given numero/indice.
 
-    If indice is None, picks the alphabetically latest indice from dernier_df.
-    Raises ValueError if the document is not found.
+    If indice is None, picks ctx.latest_chain_df.latest_indice when that
+    indice is present in dernier_df. Falls back to alphabetical max of
+    dernier_df indices when (a) latest_chain_df is unavailable, or
+    (b) chain_register's latest_indice is absent from dernier_df (flat-GED
+    lag — logs a warning).
+
+    Raises ValueError if the document is not found in dernier_df at all.
     """
     d = ctx.dernier_df
     mask = d["numero"] == numero
@@ -236,8 +260,28 @@ def _resolve_doc_rows(ctx, numero: str, indice: Optional[str]):
         row = row_df.iloc[0]
         return row.to_dict(), str(indice)
 
-    # Pick alphabetically latest indice
-    latest_indice = sorted(subset["indice"].tolist())[-1]
+    # Canonical latest indice from ctx.latest_chain_df; fall back to
+    # alphabetical max if latest_chain_df is unavailable (legacy mode)
+    # or if the chain_register-declared latest_indice is not present in
+    # dernier_df (flat-GED-vs-chain-register lag, e.g. numero 253100).
+    latest_indice = None
+    lc = getattr(ctx, "latest_chain_df", None)
+    subset_indices = subset["indice"].astype(str).str.strip().values
+    if lc is not None and not lc.empty:
+        hit = lc[lc["numero"].astype(str).str.strip() == str(numero).strip()]
+        if not hit.empty:
+            cand = str(hit.iloc[0]["latest_indice"]).strip()
+            if cand in subset_indices:
+                latest_indice = cand
+            else:
+                logger.warning(
+                    "_resolve_doc_rows: chain_register latest_indice %r for "
+                    "numero %r not present in dernier_df (indices=%s) — "
+                    "falling back to alphabetical max. Suggests flat-GED export lag.",
+                    cand, numero, list(subset_indices),
+                )
+    if latest_indice is None:
+        latest_indice = sorted(subset["indice"].tolist())[-1]
     row = subset[subset["indice"] == latest_indice].iloc[0]
     return row.to_dict(), latest_indice
 
@@ -633,13 +677,15 @@ def _build_revision_history(ctx, numero: str, chain_timeline: dict = None) -> li
     resp = ctx.responses_df
     resp_counts = resp.groupby("doc_id").size().to_dict()
 
+    lev = latest_enriched_view(ctx)
+
     result = []
     for _, row in rows.iterrows():
         doc_id = row["doc_id"]
         indice = row["indice"]
 
-        # Status summary: use _visa_global from dernier_df if available
-        dernier_match = ctx.dernier_df[ctx.dernier_df["doc_id"] == doc_id]
+        # Status summary: use _visa_global from latest-chain view if available
+        dernier_match = lev[lev["doc_id"] == doc_id] if not lev.empty else lev
         if not dernier_match.empty:
             vg = dernier_match.iloc[0].get("_visa_global")
             status_summary = str(vg) if vg and str(vg) not in ("nan", "None") else "open"
@@ -683,7 +729,8 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
     - Does NOT introduce new tag rules.
     - Returns an empty DataFrame in degraded mode.
     """
-    if ctx.degraded_mode or ctx.dernier_df is None:
+    dd = latest_enriched_view(ctx)
+    if dd is None or dd.empty:
         return pd.DataFrame()
 
     # Load chain timeline once, with graceful fallback
@@ -696,100 +743,9 @@ def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
     except Exception as exc:
         logger.warning("compute_dcc_tags_bulk: Failed to load chain_timeline: %s", exc)
 
-    # Iterate dernier_df and build result rows
+    # Iterate latest-only rows and build result rows
     rows = []
-    for _, row in ctx.dernier_df.iterrows():
-        doc_row = row.to_dict()
-        numero = doc_row.get("numero")
-        doc_id = doc_row.get("doc_id")
-
-        # Call private helpers
-        latest_responses = _get_latest_responses_for_doc(ctx, doc_row)
-        days_since_moex_ref = _compute_days_since_moex_ref(ctx, latest_responses)
-        focus_owner_tier = str(doc_row.get("_focus_owner_tier") or "")
-        if not _moex_called(latest_responses) and _called_consultant_final(latest_responses)[0]:
-            focus_owner_tier = "CLOSED"
-        primary_tag = _compute_primary_tag(focus_owner_tier, latest_responses, days_since_moex_ref)
-        chain_payload = chain_timeline.get(numero)
-        secondary_tags = _compute_secondary_tags(ctx, doc_row, latest_responses, chain_payload)
-
-        # Compute blocking_bet_count: BET responses (non-MOEX) with blocking status
-        bet_responses = [
-            r for r in latest_responses
-            if _is_technical_consultant_response(r) and r.get("status") in BLOCKING_STATUSES
-        ]
-        blocking_bet_count = len(bet_responses)
-
-        # Compute countdown_expired
-        countdown_expired = bool(ctx.moex_countdown.get(doc_id, {}).get("countdown_expired", False))
-
-        # Visa global
-        visa_global = doc_row.get("_visa_global")
-        if not visa_global and not _moex_called(latest_responses):
-            visa_global = _called_consultant_final(latest_responses)[0]
-
-        deadline_truth = _compute_open_consultant_deadlines(ctx, latest_responses)
-
-        rows.append({
-            "doc_id": doc_id,
-            "numero": numero,
-            "indice": doc_row.get("indice"),
-            "emetteur": doc_row.get("emetteur"),
-            "libelle_du_document": doc_row.get("libelle_du_document"),
-            "lot": doc_row.get("lot"),
-            "focus_owner_tier": focus_owner_tier,
-            "primary_tag": primary_tag,
-            "secondary_tags": secondary_tags,
-            "days_since_moex_ref": days_since_moex_ref,
-            "blocking_bet_count": blocking_bet_count,
-            "countdown_expired": countdown_expired,
-            "visa_global": visa_global,
-            "min_open_consultant_deadline": deadline_truth["min_open_consultant_deadline"],
-            "consultant_days_remaining": deadline_truth["consultant_days_remaining"],
-            "primary_open_consultant_deadline": deadline_truth["primary_open_consultant_deadline"],
-            "primary_consultant_days_remaining": deadline_truth["primary_consultant_days_remaining"],
-            "secondary_open_consultant_deadline": deadline_truth["secondary_open_consultant_deadline"],
-            "secondary_consultant_days_remaining": deadline_truth["secondary_consultant_days_remaining"],
-        })
-
-    return pd.DataFrame(rows)
-
-
-def compute_dcc_tags_bulk(ctx) -> pd.DataFrame:
-    """Bulk variant of DCC tag computation, reusing DCC private helpers.
-
-    Returns one row per latest-indice document with columns:
-        doc_id, numero, indice, emetteur, libelle_du_document, lot,
-        focus_owner_tier, primary_tag, secondary_tags,
-        days_since_moex_ref, blocking_bet_count, countdown_expired, visa_global
-
-    - Loads chain timeline ONCE via load_chain_timeline_artifact(_CHAIN_TIMELINE_DIR).
-    - Iterates ctx.dernier_df rows, calling the existing private helpers:
-        _get_latest_responses_for_doc(ctx, doc_row)
-        _compute_days_since_moex_ref(ctx, latest_responses)
-        _compute_primary_tag(focus_owner_tier, latest_responses, days_since_moex_ref)
-        _compute_secondary_tags(ctx, doc_row, latest_responses, chain_timeline.get(numero))
-    - Does NOT mutate ctx.
-    - Does NOT recompute ownership.
-    - Does NOT introduce new tag rules.
-    - Returns an empty DataFrame in degraded mode.
-    """
-    if ctx.degraded_mode or ctx.dernier_df is None:
-        return pd.DataFrame()
-
-    # Load chain timeline once, with graceful fallback
-    chain_timeline = {}
-    try:
-        from reporting.chain_timeline_attribution import load_chain_timeline_artifact
-        chain_timeline = load_chain_timeline_artifact(_CHAIN_TIMELINE_DIR)
-    except FileNotFoundError:
-        pass
-    except Exception as exc:
-        logger.warning("compute_dcc_tags_bulk: Failed to load chain_timeline: %s", exc)
-
-    # Iterate dernier_df and build result rows
-    rows = []
-    for _, row in ctx.dernier_df.iterrows():
+    for _, row in dd.iterrows():
         doc_row = row.to_dict()
         numero = doc_row.get("numero")
         doc_id = doc_row.get("doc_id")

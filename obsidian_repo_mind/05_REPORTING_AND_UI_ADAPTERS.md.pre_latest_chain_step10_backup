@@ -1,0 +1,401 @@
+#repo-map #reporting #adapters #ui-feed
+
+# Reporting and UI Adapters
+
+> Maps `src/reporting/*` modules to the UI screens they feed.
+> See [[06_JANSA_UI_RUNTIME]] for the UI layer, [[03_EXECUTION_FLOW]] for the full read path.
+
+---
+
+## Module map: `src/reporting/`
+
+| File | Role | Consumers |
+|---|---|---|
+| `data_loader.py` | Builds `RunContext` from `run_memory.db`; manages FLAT_GED pickle cache; resolves latest run | `app.py` — all `Api` methods start here |
+| `aggregator.py` | Computes project KPIs, monthly/weekly timeseries, consultant/contractor summaries | `app.py::get_dashboard_data` |
+| `ui_adapter.py` | Shapes aggregator output to `window.OVERVIEW / CONSULTANTS / CONTRACTORS` shapes | `app.py::get_*_for_ui` |
+| `focus_filter.py` | Applies Focus mode (stale_days + live_numeros narrowing) | `app.py::_apply_focus_filter` |
+| `focus_ownership.py` | Computes `_focus_owner` (list) + `_focus_owner_tier` per document. Tiers: `PRIMARY`, `SECONDARY`, `MOEX` (incl. owner `["MOEX SAS"]` variant), `CONTRACTOR`, `CLOSED`. Implements no-MOEX-called closure derivation; SAS REF → CONTRACTOR; SAS-pending → MOEX SAS. (Rewritten 2026-05-09.) | `data_loader._precompute_focus_columns`, `aggregator` |
+| `consultant_fiche.py` | Builds per-consultant fiche payload | `app.py::get_consultant_fiche` |
+| `contractor_fiche.py` | Builds per-contractor fiche payload; `resolve_emetteur_name` canonical name resolver | `app.py::get_contractor_fiche_for_ui` |
+| `contractor_quality.py` | Phase 7: per-contractor quality KPIs (peer stats, polar histogram, long-chains, dormant queues) | `app.py::get_contractor_fiche_for_ui` (merges with fiche header) |
+| `document_command_center.py` | DCC backend: search, full panel payload, 7 sections, tag computation | `app.py::search_documents`, `get_document_command_center` |
+| `chain_timeline_attribution.py` | Per-chain timing + delay attribution; reads chain_onion CSVs; applies 10-day secondary cap | `app.py::get_chain_timeline`; DCC Chronologie section |
+| `drilldown_builder.py` | Builds drilldown drawer rows for KPI tile / VisaFlow / WeeklyActivity / Focus clicks | `app.py::get_documents_drilldown` |
+| `counter_attack_builder.py` | Phase 6A: builds `COUNTER_ATTACK_ITEMS.csv` artifact (Action MOEX items) | `scripts/build_counter_attack.py` |
+| `counter_attack_query.py` | Phase 6B: query API over `COUNTER_ATTACK_ITEMS.csv` (home, queue, item detail) | `app.py::get_counter_attack_home/queue/item` |
+| `counter_attack_ai_pack.py` | Phase 6D: builds `JANSA_AI_AUDIT_PACK_*.zip` export | `app.py::generate_counter_attack_ai_audit_pack` |
+| `narrative_translation.py` | FR overlay translations for chain_onion top_issues entries | `app.py::get_chain_onion_intel` |
+| `aggregator.py` | Also: `compute_contractor_summary`, `compute_monthly_timeseries`, `compute_weekly_timeseries` | various |
+| `bet_report_merger.py` | RETIRED — still on disk, import commented out | — |
+
+---
+
+## UI screen → backend module mapping
+
+| UI Screen | `app.py` method | Backend module | Window global |
+|---|---|---|---|
+| **Overview** | `get_overview_for_ui` | `aggregator.compute_project_kpis` + `compute_monthly/weekly_timeseries` + `compute_consultant_summary` + `compute_contractor_summary` + `focus_filter.apply_focus_filter` → `ui_adapter.adapt_overview` | `window.OVERVIEW` |
+| **Consultants list** | `get_consultants_for_ui` | `aggregator.compute_consultant_summary` → `ui_adapter.adapt_consultants` | `window.CONSULTANTS` |
+| **Consultant fiche** | `get_fiche_for_ui` | `consultant_fiche.build_consultant_fiche` (or `build_sas_fiche` for MOEX SAS) | `window.FICHE_DATA` |
+| **Contractors list** | `get_contractors_for_ui` | `aggregator.compute_contractor_summary` → `ui_adapter.adapt_contractors_lookup` + `adapt_contractors_list` | `window.CONTRACTORS` + `window.CONTRACTORS_LIST` |
+| **Contractor fiche** | `get_contractor_fiche_for_ui` | `contractor_quality.build_contractor_quality` (+ `contractor_fiche.build_contractor_fiche` for header) | `window.CONTRACTOR_FICHE_DATA` |
+| **Chain+Onion panel** | `get_chain_onion_intel` | reads `output/chain_onion/top_issues.json` + `dashboard_summary.json`; `narrative_translation.translate_top_issue` per item | `window.CHAIN_INTEL` |
+| **DCC — search** | `search_documents` | `document_command_center.search_documents` | — (on-demand) |
+| **DCC — panel** | `get_document_command_center` | `document_command_center.build_document_command_center` | — (on-demand) |
+| **DCC — Chronologie** | `get_chain_timeline` | `chain_timeline_attribution.load_chain_timeline_artifact` | — (on-demand) |
+| **Drilldown drawer** | `get_documents_drilldown` | `drilldown_builder.build_drilldown` | — (on-demand) |
+| **Action MOEX — home** | `get_counter_attack_home` | `counter_attack_query.get_counter_attack_home` | — (on-demand) |
+| **Action MOEX — queue** | `get_counter_attack_queue` | `counter_attack_query.get_counter_attack_queue` | — (on-demand) |
+| **Action MOEX — item** | `get_counter_attack_item` | `counter_attack_query.get_counter_attack_item` | — (on-demand) |
+| **Reports — Tableau VISA** | `export_team_version` | `data_loader` + shutil atomic copy | — |
+| **Reports — Pack Audit IA** | `generate_counter_attack_ai_audit_pack` | `counter_attack_ai_pack.build_ai_audit_pack` | — |
+| **Runs page** | `get_all_runs` / `export_run_bundle` | `run_explorer.get_all_runs` (SQLite) | — |
+| **Executer** | `run_pipeline_async` / `get_pipeline_status` | `run_orchestrator.run_pipeline_controlled` | — |
+
+---
+
+## Consultant fiche correction pass (2026-05-10)
+
+Scope: consultant fiche only.
+
+- ~~Rework note: `app.py::get_consultant_fiche` intentionally keeps the
+  pre-patch fiche-wide focus scope for header KPIs.~~ **SUPERSEDED 2026-05-10
+  (afternoon).** `get_consultant_fiche` now DOES apply Chain+Onion
+  live-operational narrowing in focus mode, matching `get_dashboard_data` and
+  `get_consultant_list`. KPI contract aligned: fiche `header.open_blocking` ==
+  consultant card focus_owned == `operational.moex_fresh` == 392 for MOEX
+  (focus=True, stale_days=90). Single source of truth =
+  `apply_focus_filter` + `_apply_live_narrowing` for any focus-mode "à traiter"
+  KPI. The prior fiche-wide scope (without narrowing) was inconsistent with the
+  consultant list/card and confused users — it has been retired.
+
+- **Fiche drilldown drawer name collision (root cause + final fix,
+  2026-05-10).** `fiche_base.jsx` and `overview.jsx` originally both
+  declared a top-level `function DrilldownDrawer(...)` with
+  **different prop contracts** (`{state}` vs `{drill}`). Each
+  `<script type="text/babel">` block executes in global scope, so each
+  declaration becomes a `window.*` property and the file loaded later
+  wins. Load order in `ui/jansa-connected.html` is fiche_base.jsx →
+  overview.jsx, so `window.DrilldownDrawer` was bound to the overview
+  drawer. fiche_page.jsx's `<window.DrilldownDrawer state={drilldown}>`
+  was hitting overview's `if (!drill) return null;` and silently
+  rendering nothing — that was the entire reason fiche drilldowns
+  appeared not to open. Final state:
+  - fiche_base.jsx exports the fiche drawer as both
+    `window.DrilldownDrawer` (legacy) and `window.FicheDrilldownDrawer`
+    (canonical, unambiguous).
+  - overview.jsx's component has been renamed `OverviewDrilldownDrawer`
+    and is no longer attached to a window key (only the local lexical
+    reference is used inside `OverviewPage`).
+  - fiche_page.jsx references `window.FicheDrilldownDrawer` and renders
+    via `ReactDOM.createPortal(..., document.body)` to escape ancestor
+    `transform` / `overflow:auto`.
+  Hard rule going forward: any drawer-style component declared at
+  `<script>`-top level MUST use a uniquely qualified name; if a
+  `window.*` alias is needed, prefix with the surface name (e.g.
+  `FicheDrilldownDrawer`, `OverviewDrilldownDrawer`,
+  `ContractorDrilldownDrawer`).
+- **Hybrid fiche payload in focus mode (2026-05-10 afternoon).** Earlier
+  iteration of the focus-mode fiche replaced the entire bloc1 dataframe with
+  `focused_docs`, which erased VSO / VAO / REF / HM and emptied the bloc2
+  cumulative chart. New contract: `_build_bloc1_weekly(docs, ..., focus_docs=)`
+  uses full-history `docs` for the status histogram (s1/s2/s3/hm, nvx,
+  doc_ferme, percentages) and uses `focus_docs` only for the weekly open
+  backlog band (open_ok/late, open_blocking_ok/late, open_nb). Card sparklines
+  in `HeroStats` (which read `data.bloc1.slice(-12)`) and the bloc2 evolution
+  graph (which composes from bloc1) therefore keep historical content. Header
+  override on `open_*` fields stays in place for backlog parity with the
+  consultant list. Verified live for MOEX focus=True/stale_days=90: header
+  open_blocking=392, bloc1 weekly s1/s2/s3/hm populated from history, bloc2
+  cumulative non-zero across the window.
+- In focus mode, `build_consultant_fiche` emits
+  `bloc1_title="Activité hebdomadaire"` and `bloc1_period_label="Semaine"`.
+  The weekly `bloc1` and cumulative `bloc2` bloquant / non-bloquant counts are
+  computed from the backend-owned focused scope. JSX does not classify or count
+  documents.
+- The fiche payload emits `blocking_legend.blocking` and
+  `blocking_legend.non_blocking` for the table explanation.
+- `bloc3` performance rows and side lists carry canonical contractor names from
+  `reporting.contractor_fiche.resolve_emetteur_name`, including critical late
+  lots and top-5 refusal-rate lists.
+- Fiche cell drilldowns route through
+  `data_bridge.js:loadFicheDrilldown` to `Api.get_doc_details(...)` with the
+  same `focus` and `stale_days` scope as the loaded fiche, plus optional
+  `period_label` for activity-table cells. Period filtering is backend-side in
+  `Api.get_doc_details`. Drilldown row click remains the existing DCC handoff:
+  `window.openDocumentCommandCenter(numero, indice)`.
+- UI-only formatting: cumulative chart weekly labels are compacted from
+  `YYYY-SWW` / `SWW-YYYY` to `SWW-YY`; tick font size is reduced slightly.
+
+Validation used for this pass:
+`python -m py_compile app.py src/reporting/consultant_fiche.py src/reporting/drilldown_builder.py`,
+`python -m pytest tests/test_consultant_fiche.py tests/test_ui_payload_full_surface.py -q`,
+backend payload diagnostic via `Api.get_fiche_for_ui` / `Api.get_doc_details`,
+and `_resolve_ui()` smoke confirming `ui/jansa-connected.html`.
+
+**2026-05-10 focus-reload fix (runtime — shell.jsx only):**
+Root cause identified: `setFocusMode` and `onStaleChange` in `shell.jsx` called
+`refreshForFocus` → `_loadCoreData` which only reloads OVERVIEW / CONSULTANTS /
+CONTRACTORS, leaving `window.FICHE_DATA` stale when the user is on the
+ConsultantFiche page. Fix: added `activeRef` + `selectedConsultantRef` (ref
+mirrors of the corresponding React state), and a `useEffect([focusMode,
+staleDays])` that calls `window.jansaBridge.loadFiche(apiName, focusMode,
+staleDays)` and then `setDataVersion(v => v+1)` whenever those values change
+while `activeRef.current === 'ConsultantFiche'`. Drilldown wiring in
+`fiche_page.jsx` / `fiche_base.jsx` / `data_bridge.js` is already correct;
+drilldowns route through `loadFicheDrilldown` → `Api.get_doc_details` (6-arg
+signature match confirmed). App restart required after app.py changes. Pipeline
+rerun not needed for UI/bridge changes.
+
+---
+
+## Composed truth principle
+
+`context/guardrail.txt` states:
+
+> *Use the highest-level existing composed truth first. Only fall back to raw artifacts when the composed layer does not expose the required field.*
+
+Applied:
+- **Never read** `FLAT_GED.xlsx` directly in a reporting module — go through `RunContext.docs_df` / `responses_df`
+- **Never compute** `visa_global` independently — use `ctx.flat_ged_doc_meta` (authoritative, Phase 8 Step 3 fix)
+- **Never read** `GF_V0_CLEAN.xlsx` in a UI adapter — read from RunContext layers
+
+---
+
+## Focus mode pipeline
+
+When Focus mode is active (`focus=true` from UI):
+
+1. `app.py::_apply_focus_filter()` calls `focus_filter.apply_focus_filter(ctx, stale_days)`
+2. Then `app.py::_build_live_operational_numeros()` queries `chain_onion.query_hooks.get_live_operational(ctx)` to get the set of live-operational chain `numero`s
+3. Then `app.py::_apply_live_narrowing()` intersects focus results with live-operational set
+
+Focus result carries: `focused`, `p1_overdue`, `p2_urgent`, `p3_soon`, `p4_ok`, `total_dernier`, `excluded`, `stale`, `resolved`, `by_consultant`, `by_contractor`
+
+---
+
+## data_loader pickle cache (schema version)
+
+`data_loader.py` caches parsed `docs_df` + `responses_df` + `flat_doc_meta` as `.pkl` files. Cache is rejected (forced rebuild) if:
+1. `FLAT_GED.xlsx` mtime is newer than cache mtime
+2. `cache_schema_version` in `FLAT_GED_cache_meta.json` ≠ `CACHE_SCHEMA_VERSION` constant
+
+**After any change to `stage_read_flat.py` or `flat_ged/transformer.py`**: manually delete the three cache files (`FLAT_GED_cache_docs.pkl`, `FLAT_GED_cache_resp.pkl`, `FLAT_GED_cache_meta.json`) under `output/intermediate/`.
+
+See [[11_DEBUGGING_SEAMS]] §H-2.
+
+---
+
+---
+
+## Operational dashboard ownership (shipped 2026-05-07)
+
+**Owner:** `src/reporting/aggregator.py::compute_operational_dashboard` (lines 554–660).
+
+**Wire-up:** `app.py::get_dashboard_data` calls `compute_operational_dashboard(ctx)` and
+merges the returned dict into the dashboard payload under key `"operational"`.
+
+**UI bridge:** `src/reporting/ui_adapter.py::adapt_overview` (lines 236–239) passes
+`dashboard["operational"]` through verbatim; no reshaping. Result is exposed as
+`window.OVERVIEW.operational` with 21 keys.
+
+**22 keys (verbatim from `compute_operational_dashboard` return dict, post-2026-05-09):**
+
+```
+operational_total, fresh_total, stale_total,
+moex_total, moex_sas_total, moex_fresh, moex_stale,
+primary_total, secondary_total, consultants_total, contractor_total,
+priority_p1, priority_p2, priority_p3, priority_p4,
+enterprise_ref_sas_candidates, enterprise_action_rows,
+old_debt_age_days_min, old_debt_age_days_median, old_debt_age_days_max,
+stale_threshold_days, universe_definition
+```
+
+**Changes 2026-05-09 (focus-ownership SAS routing + P5 removal patch):**
+- `priority_p5` REMOVED. Global workflow is 30 days (business rule A); "no
+  deadline" is no longer a valid operational state. Backend collapses
+  missing-deadline rows into P1 via a `last_activity + 30d` fallback.
+- `moex_total` is now **normal Maître d'Œuvre EXE only**. SAS-pending
+  pollution moves to the new `moex_sas_total` field (owner `["MOEX SAS"]`,
+  tier still `"MOEX"`).
+- `contractor_total` NEW — counts tier `CONTRACTOR` rows inside `op` (REF /
+  DEF / SAS REF / no-MOEX-called negative-worst closure).
+- `op` universe now also excludes `tier=="CLOSED"` (rule D6 — no-MOEX-called
+  favorable-worst closure); ownership-bucket sums reconcile to `operational_total`.
+
+See `context/03_UI_FEED_MAP.md` (2026-05-09 section) and
+`context/06_EXCEPTIONS_AND_MAPPINGS.md` ("SAS routing + P5 removal") for
+the per-key description, status-equivalence table, and ownership matrix.
+
+**UI screen mapping update:** `OverviewPage` in `ui/jansa/overview.jsx` now reads
+`window.OVERVIEW.operational` as the primary tile source (default view). The legacy
+`window.OVERVIEW.focus` (11 keys) remains populated but is no longer the default.
+
+**Cross-reference:** `docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md` — full
+contract, locked baseline, and Phase 1 findings.
+
+---
+
+## Phase 7 (orchestration session 2026-05-10) — Dashboard drilldown unification + Action MOEX export
+
+### Step 1 — Dashboard drilldown UX parity
+
+- `src/reporting/drilldown_builder.py::_row_to_payload` widened to emit the
+  same key set as the consultant-fiche drawer expects. New keys added on top
+  of the existing `numero, indice, titre, emetteur_code, lot,
+  last_action_date, latest_status, primary_owner`:
+  `emetteur, emetteur_name, date_soumission, date_limite, remaining_days,
+  status`. Fallbacks: `titre` → `libelle_du_document`; `date_soumission` →
+  `created_at` / `cree_le`. `_to_iso` now handles plain `datetime.date` (not
+  just `Timestamp`).
+- `ui/jansa/overview.jsx` — new ~85-line `OverviewFicheDrawerHost` adapter
+  that reuses `window.FicheDrilldownDrawer` via
+  `ReactDOM.createPortal(..., document.body)`. The previous
+  `OverviewDrilldownDrawer` is kept defined but unmounted (dead code,
+  retained as a safety net per scope). No `window.OverviewDrilldownDrawer`
+  assignment is introduced. The fiche_base.jsx aliases (`DrilldownDrawer`,
+  `FicheDrilldownDrawer`) are untouched.
+- Backups: `backups/step1_20260510_122525/`.
+
+### Step 1.5 — Dashboard drilldown Excel export
+
+- New `Api.export_documents_drilldown_xlsx(self, kind, params, focus,
+  stale_days)` in `app.py` (lines 1168–1296). Mirrors `Api.export_drilldown_xlsx`
+  style: same column set, header_font/header_fill, `freeze_panes="A2"`,
+  `auto_filter`, late-row pink fill, atomic temp+rename, and identity dtype
+  preservation on `numero` / `indice`.
+- New bridge wrapper `exportDocumentsDrilldown(kind, params, focusMode,
+  staleDays)` in `ui/jansa/data_bridge.js` (lines 231–250).
+- `OverviewFicheDrawerHost` wires `onExport` to the drawer; clicking
+  "Exporter Excel" calls the bridge → on success
+  `pywebview.api.open_file_in_explorer(res.path)`.
+- Filename pattern:
+  `Drilldown_dashboard_{safe_kind}_{safe_params}_{YYYYMMDD_HHMMSS}.xlsx`
+  under `output/`. `safe_params` extracts `segment` for `visa_segment`,
+  `week_label` for `weekly`, and `P{n}` for `focus_priority`.
+- Backups: `backups/step1_5_20260510_124159/`.
+
+### Step 2 — Dashboard drilldown coverage extension
+
+- `src/reporting/aggregator.py` — extracted public helper
+  `compute_operational_universe(ctx) -> (op_broad, op)` from the first 26
+  lines of `compute_operational_dashboard`. The dashboard function now
+  delegates to it. No behavior change in the dashboard dict (byte-for-byte
+  identical output). Helper is now the single source of truth for the
+  operational mask, used by both `compute_operational_dashboard` and
+  `drilldown_builder`.
+- `src/reporting/drilldown_builder.py` — 7 new kinds added via dispatch
+  branch (all funnel through `_row_to_payload` and inherit the export
+  workbook):
+  - `operational_total` → all `op` rows
+  - `operational_fresh` → `op[_days_since_last_activity <= 90]`
+  - `operational_stale` → `op[_days_since_last_activity > 90]`
+  - `operational_moex` (±`scope ∈ {fresh, stale}`) →
+    `op[tier=="MOEX" & ~(_focus_owner == ["MOEX SAS"])]` (excludes MOEX SAS
+    by design — counts match `moex_total`)
+  - `operational_consultants` (±`tier ∈ {PRIMARY, SECONDARY}`) →
+    `op[tier ∈ {PRIMARY, SECONDARY}]`
+  - `operational_enterprise_ref` →
+    `op_broad[_visa_global ∈ {REF, SAS REF}]` (uses `op_broad` —
+    pre-visa-exclusion mask, mirrors the `enterprise_ref_sas_candidates`
+    definition per Seam 14)
+  - `operational_priority` (`priority ∈ {1..4}`) →
+    `op[_focus_priority == n]`
+- `ui/jansa/overview.jsx` — `OperationalDashboard` and
+  `OperationalPriorityRow` accept an `onDrill` prop. onClicks wired on 6
+  operational tiles (T1–T6) plus 4 priority cells (P1–P4). Best Consultant +
+  Best Entreprise unchanged (kept as fiche navigation per user request).
+  `_OV_DRILL_HEADERS` and `_ovDrillTitle` extended with branches for the 7
+  new kinds. T4/T5 sub-rows (Frais/Stale, PRIMAIRE/SECONDARY) are inert
+  text inside the now-clickable parent — sub-row clicks NOT wired (backend
+  supports `scope`/`tier` params; UI follow-up).
+- Surfaced gaps: MOEX SAS has no tile (count exists in aggregator as
+  `moex_sas_total`); `legacy_backlog_count` (focus mode) text not clickable.
+- Backups: `backups/step2_20260510_125905/`.
+
+### Step 3 — Canonical contractor display normalization
+
+- `src/reporting/consultant_fiche.py` — 4 `name` values changed inside
+  `CONTRACTOR_REFERENCE`:
+  - line 104: `LAC` `"Lacroix"` → `"LAC"`
+  - line 110: `API` `"Apilog / Schneider"` → `"API"`
+  - line 111: `FER` `"Fermeté"` → `"FER"`
+  - line 117: `CHV` `"Atchouel"` → `"CHV"`
+  - SCH (`"Schindler"`) unchanged — verified separate from API by inspecting
+    `output/intermediate/COUNTER_ATTACK_ITEMS.csv`: API rows are lot 35 GTB /
+    building automation, SCH rows are lot 51 elevators ("ascenseur",
+    "BILAN DE PUISSANCE" for elevator banks AA1/AH1/MCH1).
+- All ~10 consumer call sites of `resolve_emetteur_name` automatically
+  inherit the new display: `contractor_fiche.py`, `contractor_quality.py`,
+  `drilldown_builder.py`, `focus_filter.py`, `ui_adapter.py`,
+  `chain_onion/exporter.py`, `app.py`, `scripts/audit/_common.py`,
+  `consultant_fiche.py` (other call sites).
+- Two precomputed artifacts retain old names until rebuild:
+  `output/intermediate/COUNTER_ATTACK_ITEMS.csv` (rebuild via
+  `python scripts/build_counter_attack.py`) and
+  `output/chain_onion/top_issues.json` (rebuild via
+  `python run_chain_onion.py`). Cowork did not run these.
+- Backups: `backups/step3_20260510_131933/`.
+
+### Step 5 — Per-category Excel export for Action MOEX
+
+- New module `src/reporting/counter_attack_export.py` (~330 lines). Exports
+  `build_action_moex_bucket_xlsx(ctx, bucket, dest_dir) -> dict`. Reads
+  `output/intermediate/COUNTER_ATTACK_ITEMS.csv` filtered by bucket, joins
+  to `dernier_df` for `titre` + reception date, calls
+  `_get_latest_responses_for_doc` from `document_command_center.py` for the
+  reviewer list, reuses `plain_reason` verbatim, appends an empty
+  `MOEX AVIS` column, atomic write.
+- New `Api.export_action_moex_bucket_xlsx(self, bucket)` in `app.py`.
+  Validates `bucket` against `BUCKET_DISPLAY_ORDER` (7-bucket enum from
+  `counter_attack_query`). Returns rich envelope
+  `{success, path, filename, rows_exported, bucket, message, error}`.
+- New bridge wrapper `exportActionMoexBucket(bucket)` in
+  `ui/jansa/data_bridge.js`.
+- `ui/jansa/counter_attack.jsx` — "Exporter Excel" button on each queue
+  panel header. State: `exportingBucket`, `exportNotice`. Handler calls the
+  bridge → on success
+  `pywebview.api.open_file_in_explorer(res.path)`.
+- Workbook contract (Layout Y — one row per item, French headers, real
+  UTF-8): `Numéro` (string, `number_format="@"` preserves leading zeros),
+  `Indice` (string), `Émetteur` (canonical via
+  `resolve_emetteur_name(emetteur_code)`; fallback CSV `emetteur_name`,
+  then code), `Titre` (`dernier_df.libelle_du_document`; fallback to
+  `subject_label` minus `"emetteur — "` prefix), `Date de réception`
+  (`dernier_df.created_at`, ISO), `Date contractuelle de réponse`
+  (`created_at + 30 days`, ISO — see decision rationale below),
+  `Réviseurs` (multi-line; tier order PRIMARY → SECONDARY → MOEX → MOEX_SAS
+  → unknown; alphabetic by canonical within tier), `Statuts` (multi-line;
+  `"En attente"` for empty), `Dates de réponse` (multi-line, ISO or empty),
+  `Commentaires` (multi-line, raw text), `Pourquoi il est ici`
+  (`plain_reason` verbatim), `MOEX AVIS` (always empty — manual team input).
+- Filename: `ACTION_MOEX_{bucket}_{YYYYMMDD_HHMMSS}.xlsx` under
+  `output/exports/`.
+- Empty bucket: header-only workbook with `success=True,
+  message="Bucket vide..."`.
+- Date contractuelle decision rationale: `dernier_df` does NOT carry a
+  `date_limite` column (per `src/normalize.py:431`, `date_limite` is
+  per-response, only on `responses_df`). The `_earliest_deadline` column on
+  `dernier_df` is the synthetic earliest pending-response deadline —
+  semantically different from "30 days from doc submission". The export
+  computes `created_at + 30 days` directly, matching the documented
+  30-day workflow business rule (per the 2026-05-09 SAS routing patch).
+- Residual coupling: `_get_latest_responses_for_doc` is a private DCC
+  symbol (leading underscore). Imported directly because protected-zone
+  rules forbid modifying DCC. If DCC ever renames or repackages this
+  helper, the export breaks. See `context/07_OPEN_ITEMS.md` for the open
+  item.
+- Backups: `backups/step5_20260510_143451/`.
+
+### Step 4 — ROLLED BACK
+
+Step 4 (SUJET_REUNION removal cascade) was attempted and rolled back by
+the user after a bucket-count regression appeared on artifact rebuild.
+Files restored from `backups/step4_20260510_134214/`. Investigation is
+documented in `context/07_OPEN_ITEMS.md` and
+`obsidian_repo_mind/09_ACTION_MOEX_COUNTER_ATTACK.md`.
+
+---
+
+*Back to [[00_START_HERE]]*

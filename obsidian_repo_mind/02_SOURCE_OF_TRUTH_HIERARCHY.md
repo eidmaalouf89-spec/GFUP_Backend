@@ -94,6 +94,47 @@ Three identity systems coexist — they are NOT automatically bridged:
 
 ---
 
+## Chain truth vs operational view (Phase 9, 2026-05-11)
+
+The repository now distinguishes three layers when reading "the
+documents":
+
+1. **`output/chain_onion/CHAIN_REGISTER.csv`** — canonical chain layer.
+   One row per chain (`family_key`). Source of truth for
+   `latest_indice`, `current_state`, `portfolio_bucket`, `stale_days`.
+2. **`ctx.latest_chain_df`** — in-memory canonical chain DataFrame.
+   Built by `reporting.latest_chain_view.build_latest_chain_view`
+   during context load. ~2,554 rows currently.
+3. **`latest_enriched_view(ctx)`** — operational view. Intersection of
+   `ctx.dernier_df` (pollution-prone but enriched with
+   `_visa_global` / `_focus_owner_tier` / etc.) and
+   `ctx.latest_chain_df.(numero, latest_indice)`. ~2,553 rows. THE
+   canonical view for operational reporting (Action MOEX, dormants,
+   DCC tags, fiches, drilldowns).
+
+`ctx.dernier_df` itself is NOT a source of truth. In flat mode it
+contains every `(numero, indice)` OPEN_DOC pair — 4,360 rows for 2,554
+chains. It serves as: (a) the substrate for the
+`_precompute_focus_columns` and `compute_focus_ownership` mutators,
+(b) the substrate for history views and full-corpus search,
+(c) the substrate that `latest_enriched_view` filters down.
+
+**Decision tree for new code.**
+
+- "I need to count chains / KPI / dormant / route / aggregate."
+  → Use `latest_enriched_view(ctx)`.
+- "I need chain identity only (family_key, latest_indice, etc.)."
+  → Use `ctx.latest_chain_df`.
+- "I need revision history / full-corpus search / all indices."
+  → Use `ctx.dernier_df` directly.
+- "I am a mutator (`_precompute_focus_columns`, `compute_focus_ownership`)."
+  → Continue to mutate `ctx.dernier_df` in place by design.
+
+See `README.md §Phase 9`, `context/11_TOOLING_HAZARDS.md §H-9`, and
+`reports/STEP1_DERNIER_DF_INVENTORY.md` for the migration evidence.
+
+---
+
 ## WorkflowEngine dual-attribute hazard
 
 `WorkflowEngine.__init__` immediately filters `is_exception_approver == True`, stripping ALL SAS rows and Exception List approver rows from its internal copy. This means:

@@ -111,6 +111,23 @@ The main JANSA UI consumes Chain+Onion **only** through:
 
 The other 24+ query functions (`get_top_issues`, `get_high_pressure`, `get_contractor_quality`, `get_sas_friction`, etc.) are available in Python but **not yet surfaced in the UI**.
 
+### Consumers of `CHAIN_REGISTER.csv` (Phase 9, 2026-05-11)
+
+Beyond chain_onion's own outputs and the three UI feeds above,
+`CHAIN_REGISTER.csv` is now also consumed by the reporting context:
+
+- `reporting.latest_chain_view.build_latest_chain_view(base_dir, docs_df=None)`
+  is called by `data_loader._load_from_flat_artifacts` (and the parallel
+  legacy path) to populate `ctx.latest_chain_df` (~2,554 rows). This is the
+  canonical in-memory chain DataFrame.
+- `reporting.latest_chain_view.latest_enriched_view(ctx)` then intersects
+  `ctx.dernier_df` with `ctx.latest_chain_df.(numero, latest_indice)` to
+  produce the operational view (~2,553 rows) used by every operational
+  reporting module.
+
+See `README.md §Phase 9` and [[05_REPORTING_AND_UI_ADAPTERS]] for the
+full migration summary.
+
 ---
 
 ## Validation harness (Step 14)

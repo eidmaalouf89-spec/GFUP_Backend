@@ -144,4 +144,48 @@ and §Implementation summary.
 
 ---
 
+## Dashboard drilldown drawer reuse + dashboard click coverage (shipped 2026-05-10)
+
+**File:** `ui/jansa/overview.jsx`
+
+**OverviewFicheDrawerHost adapter (Step 1).** A new ~85-line wrapper component
+in `overview.jsx` reuses the canonical `window.FicheDrilldownDrawer` from
+`fiche_base.jsx` for the dashboard's drilldown drawer. The drawer is rendered
+via `ReactDOM.createPortal(..., document.body)` so it escapes any ancestor
+`transform` / `overflow:auto` (same pattern adopted on the consultant fiche
+in 2026-05-10). The legacy `OverviewDrilldownDrawer` is left defined but
+unmounted (kept as a safety net per scope; no `window.OverviewDrilldownDrawer`
+assignment is introduced). The fiche_base.jsx aliases (`DrilldownDrawer`,
+`FicheDrilldownDrawer`) are untouched.
+
+**Dashboard drilldown click coverage (Step 2).** `OperationalDashboard` and
+`OperationalPriorityRow` now accept an `onDrill` prop. onClicks are wired on
+6 operational tiles (T1–T6) and 4 priority cells (P1–P4); the 7 new backend
+drilldown kinds (see `05_REPORTING_AND_UI_ADAPTERS.md` Phase 7 Step 2) feed
+the drawer. Best Consultant + Best Entreprise cards remain fiche-navigation
+shortcuts. T4/T5 sub-rows (Frais/Stale, PRIMAIRE/SECONDARY) are inert text
+inside the now-clickable parent — backend supports `scope` / `tier` params
+but JSX does not surface separate clicks (UI follow-up).
+
+**Drilldown export trigger (Step 1.5).** `OverviewFicheDrawerHost` wires the
+drawer's `onExport` prop to
+`window.jansaBridge.exportDocumentsDrilldown(kind, params, focusMode, staleDays)`,
+which calls `Api.export_documents_drilldown_xlsx`. On success the file is
+opened via `pywebview.api.open_file_in_explorer(res.path)`. Same handler shape
+as the consultant-fiche drawer — the drawer component itself is shared.
+
+### Hard rule (re-affirmed)
+
+Any drawer-style component declared at `<script>`-top level MUST use a
+uniquely qualified name. If a `window.*` alias is needed, prefix with the
+surface name (e.g. `FicheDrilldownDrawer`, `OverviewDrilldownDrawer`,
+`ContractorDrilldownDrawer`). When reusing an existing drawer outside its
+original surface, write a thin **adapter host** component (see
+`OverviewFicheDrawerHost`) that owns the drawer-state shape conversion +
+portal mount + on-export wiring; do NOT alias `window.FicheDrilldownDrawer`
+to a second name. Cross-reference: this section and the analogous note in
+`05_REPORTING_AND_UI_ADAPTERS.md` "Consultant fiche correction pass".
+
+---
+
 *Back to [[00_START_HERE]]*

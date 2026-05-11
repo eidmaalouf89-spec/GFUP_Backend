@@ -10,6 +10,7 @@ import pandas as pd
 
 from .data_loader import RunContext
 from .consultant_fiche import CONTRACTOR_REFERENCE
+from .latest_chain_view import latest_enriched_view
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,8 @@ def build_contractor_fiche(ctx: RunContext, contractor_code: str,
     # Get dernier indice docs for this contractor
     dernier = None
     if ctx.dernier_df is not None:
-        dernier = ctx.dernier_df[ctx.dernier_df["emetteur"] == contractor_code].copy()
+        lev = latest_enriched_view(ctx)
+        dernier = lev[lev["emetteur"] == contractor_code].copy() if not lev.empty else lev.copy()
 
     # Focus filter: compute focused_ids but do NOT filter dernier yet
     # Charts and tables need full history; only open counts use focused set

@@ -174,8 +174,8 @@ Produced by `python run_chain_onion.py`, NOT by the main pipeline.
 
 | File | Producer (Step) | Consumer |
 |---|---|---|
-| `CHAIN_REGISTER.csv` | family_grouper (05) + classifier (07) | `chain_onion.query_hooks`, `validation_harness`; `app._build_live_operational_numeros` |
-| `CHAIN_VERSIONS.csv` | family_grouper (05) | `query_hooks`, `validation_harness` |
+| `CHAIN_REGISTER.csv` | family_grouper (05) + classifier (07) | `chain_onion.query_hooks`, `validation_harness`; `app._build_live_operational_numeros`; Phase 9 (2026-05-11) — also consumed by `reporting.latest_chain_view.build_latest_chain_view` to populate `ctx.latest_chain_df` (~2,554 rows, one per chain) during context load |
+| `CHAIN_VERSIONS.csv` | family_grouper (05) | `query_hooks`, `validation_harness` (~4,374 rows; all document versions) |
 | `CHAIN_EVENTS.csv` | chain_builder (06) | `validation_harness` |
 | `CHAIN_METRICS.csv` | chain_metrics (08) | `query_hooks`, `validation_harness` |
 | `ONION_LAYERS.csv` | onion_engine (09) | `query_hooks`, `validation_harness` |

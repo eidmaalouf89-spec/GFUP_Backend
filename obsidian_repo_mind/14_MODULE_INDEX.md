@@ -60,20 +60,22 @@
 
 | File/Path | Role | Risk |
 |---|---|---|
-| `src/reporting/data_loader.py` | Builds `RunContext`; pickle cache management | HIGH |
-| `src/reporting/aggregator.py` | KPIs, timeseries, consultant/contractor summaries | HIGH |
+| `src/reporting/data_loader.py` | Builds `RunContext`; pickle cache management. Phase 9: populates `ctx.latest_chain_df` | HIGH |
+| `src/reporting/latest_chain_view.py` | Phase 9 canonical chain truth + operational view. `build_latest_chain_view`, `latest_enriched_view`. Consumed by every operational reporting module | HIGH |
+| `src/reporting/aggregator.py` | KPIs, timeseries, consultant/contractor summaries. Phase 9: reads `latest_enriched_view(ctx)` | HIGH |
 | `src/reporting/ui_adapter.py` | Shapes output to `window.*` globals | HIGH |
-| `src/reporting/focus_filter.py` | Focus mode (stale_days + live_numeros narrowing) | HIGH |
-| `src/reporting/focus_ownership.py` | PRIMARY/SECONDARY/MOEX tier per document | HIGH |
-| `src/reporting/consultant_fiche.py` | Per-consultant fiche; `resolve_emetteur_name` canonical names | HIGH |
-| `src/reporting/contractor_fiche.py` | Per-contractor fiche; `resolve_emetteur_name` | HIGH |
-| `src/reporting/contractor_quality.py` | Phase 7: contractor quality KPIs (peer stats, polar, long-chains) | HIGH |
-| `src/reporting/document_command_center.py` | DCC backend — search + panel + all business logic | HIGH |
-| `src/reporting/chain_timeline_attribution.py` | Per-chain timing + 10-day secondary cap | HIGH |
-| `src/reporting/drilldown_builder.py` | Drilldown drawer rows | MEDIUM |
-| `src/reporting/counter_attack_builder.py` | Phase 6A: builds COUNTER_ATTACK_ITEMS.csv | HIGH |
+| `src/reporting/focus_filter.py` | Focus mode (stale_days + live_numeros narrowing). Phase 9: imports `latest_enriched_view` | HIGH |
+| `src/reporting/focus_ownership.py` | PRIMARY/SECONDARY/MOEX tier per document. Phase 9: mutator — continues to mutate `dernier_df` in place by design | HIGH |
+| `src/reporting/consultant_fiche.py` | Per-consultant fiche; `resolve_emetteur_name` canonical names. Phase 9: imports `latest_enriched_view` | HIGH |
+| `src/reporting/contractor_fiche.py` | Per-contractor fiche; `resolve_emetteur_name`. Phase 9: imports `latest_enriched_view` | HIGH |
+| `src/reporting/contractor_quality.py` | Phase 7: contractor quality KPIs (peer stats, polar, long-chains). Phase 9: imports `latest_enriched_view`; `_load_dormant_ref_from_artifact` rehabilitated as canonical (§F-2) | HIGH |
+| `src/reporting/document_command_center.py` | DCC backend — search + panel + all business logic. Phase 9: imports `latest_enriched_view`; `compute_dcc_tags_bulk` iterates it; `_resolve_doc_rows` uses `ctx.latest_chain_df` | HIGH |
+| `src/reporting/chain_timeline_attribution.py` | Per-chain timing + 10-day secondary cap. Phase 9: imports `latest_enriched_view` | HIGH |
+| `src/reporting/drilldown_builder.py` | Drilldown drawer rows. Phase 9: imports `latest_enriched_view` | MEDIUM |
+| `src/reporting/counter_attack_builder.py` | Phase 6A: builds COUNTER_ATTACK_ITEMS.csv. Phase 9 Step 4: filters by `ctx.latest_chain_df` | HIGH |
 | `src/reporting/counter_attack_query.py` | Phase 6B: read API over COUNTER_ATTACK_ITEMS.csv | MEDIUM |
 | `src/reporting/counter_attack_ai_pack.py` | Phase 6D: AI Audit Pack export | MEDIUM |
+| `src/reporting/counter_attack_export.py` | Phase 7 Step 5: per-bucket Excel export. Phase 9 Step 7: `_resolve_dernier_row` reads `latest_enriched_view(ctx)` | MEDIUM |
 | `src/reporting/narrative_translation.py` | FR overlay for top_issues | LOW |
 
 ---

@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .data_loader import RunContext
+from .latest_chain_view import latest_enriched_view
 
 if TYPE_CHECKING:
     from .focus_filter import FocusResult
@@ -88,7 +89,7 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
         return result
 
     # Full computation from GED data
-    dernier = ctx.dernier_df
+    dernier = latest_enriched_view(ctx)
     resp = ctx.responsible_parties or {}
 
     # Focus mode: use FULL dernier for visa distribution (historical performance)
@@ -158,7 +159,7 @@ def compute_project_kpis(ctx: RunContext, focus_result: Optional["FocusResult"] 
                 consultants.add(name)
 
     result.update({
-        "total_docs_current": len(ctx.dernier_df),
+        "total_docs_current": len(dernier),
         "total_docs_all_indices": len(ctx.docs_df) if ctx.docs_df is not None else 0,
         "by_visa_global": dict(visa_counts),
         "by_visa_global_pct": {k: round(v / max(len(dernier), 1), 4) for k, v in visa_counts.items()},
@@ -193,7 +194,7 @@ def compute_monthly_timeseries(
     if ctx.degraded_mode or ctx.dernier_df is None or ctx.workflow_engine is None:
         return []
 
-    dernier = ctx.dernier_df
+    dernier = latest_enriched_view(ctx)
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
         dernier = dernier[dernier["doc_id"].isin(focus_result.focused_doc_ids)]
 
@@ -238,7 +239,7 @@ def compute_weekly_timeseries(ctx: RunContext, focus_result=None) -> list:
 
     # Use FULL dernier for historical avis (VSO/VAO/REF/HM are performance data)
     # Only the "open" bucket should reflect the focused set
-    dernier = ctx.dernier_df
+    dernier = latest_enriched_view(ctx)
     focused_ids = None
     if focus_result is not None and focus_result.stats.get("focus_enabled"):
         focused_ids = focus_result.focused_doc_ids
@@ -466,7 +467,7 @@ def compute_contractor_summary(
 
     # Use FULL dernier for historical counts (VSO/VAO/REF/SAS REF are performance data)
     # The focus_owned field tells the UI how many docs each contractor must act on
-    dernier_iter = ctx.dernier_df
+    dernier_iter = latest_enriched_view(ctx)
 
     for _, row in dernier_iter.iterrows():
         em = _safe_str(row.get("emetteur"))
@@ -551,13 +552,18 @@ def _build_operational_keys():
     return keys
 
 
-def compute_operational_dashboard(ctx: RunContext) -> dict:
-    """Compute the 19-field operational dashboard payload.
+def compute_operational_universe(ctx: RunContext):
+    """Return (op_broad, op) DataFrames for the operational dashboard.
 
-    Source: ctx.dernier_df joined to chain_onion portfolio_bucket via family_key.
-    See docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md §3 for the locked baseline.
+    op_broad: dernier rows whose family_key is in LIVE_OPERATIONAL ∪ LEGACY_BACKLOG.
+    op:       op_broad with terminal visas removed and tier=="CLOSED" removed
+              (rule D6, see compute_operational_dashboard for the rationale).
+
+    Extracted from compute_operational_dashboard so drilldown_builder can reuse
+    the exact same masking without duplicating the rule. compute_operational_dashboard
+    delegates to this helper; behavior is unchanged.
     """
-    dernier = ctx.dernier_df
+    dernier = latest_enriched_view(ctx)
     operational_keys = _build_operational_keys()
     bucket_mask = dernier["numero_normalized"].astype(str).isin(operational_keys)
     op_broad = dernier[bucket_mask]
@@ -577,6 +583,16 @@ def compute_operational_dashboard(ctx: RunContext) -> dict:
         op = op_broad[open_mask & not_closed_mask]
     else:
         op = op_broad[open_mask]
+    return op_broad, op
+
+
+def compute_operational_dashboard(ctx: RunContext) -> dict:
+    """Compute the 19-field operational dashboard payload.
+
+    Source: ctx.dernier_df joined to chain_onion portfolio_bucket via family_key.
+    See docs/implementation/OPERATIONAL_DASHBOARD_REDESIGN.md §3 for the locked baseline.
+    """
+    op_broad, op = compute_operational_universe(ctx)
 
     days = op["_days_since_last_activity"]
     fresh_mask = days <= _OPERATIONAL_STALE_THRESHOLD

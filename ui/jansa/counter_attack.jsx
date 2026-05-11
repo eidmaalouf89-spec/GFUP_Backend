@@ -69,34 +69,10 @@ const AM_BUCKET_PRESENTATION = [
     priority: 'Relance BET',
     description: 'Un consultant bloque la chaîne documentaire.',
   },
-  {
-    bucket: 'MOEX_SHAME_INTERNAL',
-    label: 'MOEX interne — exposition',
-    priority: 'Risque interne',
-    description: 'Le sujet expose MOEX et doit être repris en main.',
-  },
-  {
-    bucket: 'SECONDAIRE_EXPIRE',
-    label: 'Secondaires expirés',
-    priority: null, // resolved per-card by amBucketPrioritySubtitle()
-    description: 'La fenêtre secondaire est dépassée.',
-  },
-  {
-    bucket: 'SUJET_REUNION',
-    label: 'Sujets réunion critique',
-    priority: null, // resolved per-card by amBucketPrioritySubtitle()
-    description: 'À mettre à l’ordre du jour chantier.',
-  },
 ];
 
 /* Conditional priority/subtitle text for the two count-sensitive buckets. */
 function amBucketPrioritySubtitle(preset, count) {
-  if (preset.bucket === 'SECONDAIRE_EXPIRE') {
-    return count === 0 ? 'Aucun aujourd’hui' : 'Décision MOEX requise';
-  }
-  if (preset.bucket === 'SUJET_REUNION') {
-    return count === 0 ? 'Aucun aujourd’hui' : 'Réunion chantier';
-  }
   return preset.priority;
 }
 
@@ -125,6 +101,11 @@ const AM_COPY = {
   btnShowEvidence:     'Voir preuves',
   btnHideEvidence:     'Masquer preuves',
   queueSubtitle:       'File d’action — langage opérationnel uniquement',
+  btnExport:           'Exporter Excel',
+  btnExporting:        'Export en cours…',
+  exportSuccess:       'Export terminé.',
+  exportError:         'Échec de l’export.',
+  exportEmptyOk:       'Bucket vide — fichier généré avec en-tête seul.',
 };
 
 /* Inline SVG bucket symbols — 22×22, stroke 1.4, matching shell.jsx style. */
@@ -153,26 +134,6 @@ const amBucketSymbols = {
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="7.5" r="3"/>
       <path d="M5 19c0-3.3 2.7-5 6-5s6 1.7 6 5"/>
-    </svg>
-  ),
-  MOEX_SHAME_INTERNAL: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 3 L19 17 H3 Z"/>
-      <path d="M11 9 V13"/>
-      <circle cx="11" cy="15.5" r="0.7" fill="currentColor"/>
-    </svg>
-  ),
-  SECONDAIRE_EXPIRE: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 4 H16 M6 18 H16"/>
-      <path d="M6 4 V7 L11 11 L16 7 V4"/>
-      <path d="M6 18 V15 L11 11 L16 15 V18"/>
-    </svg>
-  ),
-  SUJET_REUNION: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="5" width="14" height="13" rx="1.4"/>
-      <path d="M4 9 H18 M8 3 V6 M14 3 V6"/>
     </svg>
   ),
 };
@@ -332,9 +293,6 @@ function AmBucketGrid({ buckets, selectedBucket, onSelect }) {
         const count = live ? Number(live.count) || 0 : 0;
         const subtitle = amBucketPrioritySubtitle(preset, count);
         const isActive = selectedBucket === preset.bucket;
-        const isAucun = count === 0
-          && (preset.bucket === 'SECONDAIRE_EXPIRE' || preset.bucket === 'SUJET_REUNION');
-
         return (
           <AmCard
             key={preset.bucket}
@@ -370,7 +328,7 @@ function AmBucketGrid({ buckets, selectedBucket, onSelect }) {
             {subtitle && (
               <div style={{
                 marginTop: 4, fontSize: 11, fontWeight: 500,
-                color: isAucun ? 'var(--text-3)' : 'var(--accent)',
+                color: 'var(--accent)',
                 letterSpacing: '.02em',
               }}>{subtitle}</div>
             )}
@@ -446,6 +404,10 @@ function AmQueueRow({ row, isSelected, onSelect }) {
             </span>
           </AmChip>
         )}
+        {row.warning_tags && row.warning_tags.split(',').map(function(t) {
+          var tag = t.trim();
+          return tag ? <AmChip key={tag} tone="accent">{tag}</AmChip> : null;
+        })}
         {(row.numero || row.indice) && (
           <span style={{
             fontFamily: amFonts.num, fontVariantNumeric: 'tabular-nums',
@@ -459,8 +421,10 @@ function AmQueueRow({ row, isSelected, onSelect }) {
   );
 }
 
-function AmQueuePanel({ bucketLabel, queue, selectedItemId, onSelectItem, loading, errorMessage }) {
+function AmQueuePanel({ bucketLabel, queue, selectedItemId, onSelectItem, loading, errorMessage,
+                        onExport, exporting, exportNotice }) {
   const rendered = queue && queue.rows ? queue.rows.length : 0;
+  const exportDisabled = !!exporting;
   return (
     <AmCard padding={0} style={{ overflow: 'hidden' }}>
       <div style={{
@@ -479,14 +443,48 @@ function AmQueuePanel({ bucketLabel, queue, selectedItemId, onSelectItem, loadin
             {AM_COPY.queueSubtitle}
           </div>
         </div>
-        {rendered > 0 && (
-          <AmChip tone="neutral">
-            <span style={{ fontFamily: amFonts.num, fontVariantNumeric: 'tabular-nums' }}>
-              {amFmt(rendered)}
-            </span>
-          </AmChip>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {rendered > 0 && (
+            <AmChip tone="neutral">
+              <span style={{ fontFamily: amFonts.num, fontVariantNumeric: 'tabular-nums' }}>
+                {amFmt(rendered)}
+              </span>
+            </AmChip>
+          )}
+          {onExport && (
+            <button
+              type="button"
+              onClick={onExport}
+              disabled={exportDisabled}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: amFonts.ui,
+                color: exportDisabled ? 'var(--text-3)' : 'var(--text)',
+                background: exportDisabled ? 'var(--bg-elev)' : 'var(--bg)',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                cursor: exportDisabled ? 'default' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {exporting ? AM_COPY.btnExporting : AM_COPY.btnExport}
+            </button>
+          )}
+        </div>
       </div>
+      {exportNotice && (
+        <div style={{
+          padding: '8px 18px',
+          borderBottom: '1px solid var(--line)',
+          fontSize: 12,
+          color: exportNotice.tone === 'error' ? 'var(--warn)' : 'var(--text-2)',
+          background: exportNotice.tone === 'error' ? 'var(--warn-soft)' : 'var(--bg-elev)',
+        }}>
+          {exportNotice.text}
+        </div>
+      )}
       <div style={{ maxHeight: 'calc(100vh - 380px)', overflowY: 'auto' }}>
         {loading && (
           <div style={{ padding: 32, fontSize: 13, color: 'var(--text-3)', textAlign: 'center' }}>
@@ -714,6 +712,10 @@ function ActionMoexPage(/* props: focusMode (forwarded by shell, unused) */) {
   const [itemLoading, setItemLoading] = useStateAm(false);
   const [itemError, setItemError] = useStateAm(null);
 
+  // Step 5 — Excel export feedback per-bucket. Notice carries {tone, text}.
+  const [exportingBucket, setExportingBucket] = useStateAm(null);
+  const [exportNotice, setExportNotice] = useStateAm(null);
+
   useEffectAm(function () {
     var cancelled = false;
     if (!window.jansaBridge || typeof window.jansaBridge.loadCounterAttackHome !== 'function') {
@@ -794,6 +796,7 @@ function ActionMoexPage(/* props: focusMode (forwarded by shell, unused) */) {
     setQueueError(null);
     setItemLoading(false);
     setItemError(null);
+    setExportNotice(null);
     _amFetchQueue(bucket);
   };
 
@@ -858,6 +861,38 @@ function ActionMoexPage(/* props: focusMode (forwarded by shell, unused) */) {
     }
   };
 
+  // Step 5 — Excel export of the currently-selected bucket.
+  const onExportBucket = async () => {
+    const bucket = selectedBucket;
+    if (!bucket) return;
+    if (!window.jansaBridge || typeof window.jansaBridge.exportActionMoexBucket !== 'function') {
+      setExportNotice({ tone: 'error', text: AM_COPY.backendUnavailable });
+      return;
+    }
+    setExportingBucket(bucket);
+    setExportNotice(null);
+    try {
+      const res = await window.jansaBridge.exportActionMoexBucket(bucket);
+      if (res && res.success) {
+        const baseText = res.message || AM_COPY.exportSuccess;
+        setExportNotice({ tone: 'ok', text: baseText });
+        if (res.path && window.pywebview && window.pywebview.api
+            && typeof window.pywebview.api.open_file_in_explorer === 'function') {
+          try { await window.pywebview.api.open_file_in_explorer(res.path); }
+          catch (e) { console.warn('[ActionMoex] open_file_in_explorer failed:', e); }
+        }
+      } else {
+        const msg = (res && res.error) ? String(res.error) : AM_COPY.exportError;
+        setExportNotice({ tone: 'error', text: AM_COPY.exportError + ' ' + msg });
+      }
+    } catch (e) {
+      console.error('[ActionMoex] export error:', e);
+      setExportNotice({ tone: 'error', text: AM_COPY.exportError });
+    } finally {
+      setExportingBucket(null);
+    }
+  };
+
   const buckets = (home && home.buckets) || [];
   const totalToday = (home && home.available !== false && home.summary) ? home.summary.total_today : null;
   const currentQueue = queueByBucket[selectedBucket] || null;
@@ -914,6 +949,9 @@ function ActionMoexPage(/* props: focusMode (forwarded by shell, unused) */) {
             errorMessage={queueError}
             selectedItemId={selectedRow ? selectedRow.item_id : null}
             onSelectItem={onSelectItem}
+            onExport={onExportBucket}
+            exporting={exportingBucket === selectedBucket}
+            exportNotice={exportNotice}
           />
           <AmDetailPanel
             item={selectedItem}

@@ -44,6 +44,8 @@ OUTPUT_COLUMNS = [
     "consultant_reports_full",
     "consultant_reports_refs",
     "consultant_reports_available",
+    "primary_tag",
+    "warning_tags",
 ]
 
 IDENTITY_COLUMNS = ["item_id", "numero", "indice", "family_key", "emetteur_code"]
@@ -52,8 +54,6 @@ TERMINAL_STATES = {
     "CLOSED_VAO",
     "CLOSED_VSO",
     "DEAD_AT_SAS_A",
-    "ABANDONED_CHAIN",
-    "VOID_CHAIN",
     "UNKNOWN_CHAIN_STATE",
 }
 
@@ -63,6 +63,12 @@ CONTRACTOR_TAGS = {
     "Att Entreprise — Dans les délais",
     "Att Entreprise — Hors délais",
     "Att Entreprise â€” Dans les dÃ©lais",
+    "Att Entreprise â€” Hors dÃ©lais",
+}
+
+CONTRACTOR_OVERDUE_TAGS = {
+    "Att Entreprise - Hors delais",
+    "Att Entreprise — Hors délais",
     "Att Entreprise â€” Hors dÃ©lais",
 }
 
@@ -282,6 +288,10 @@ def _is_contractor_tag(tag: str) -> bool:
     return tag in CONTRACTOR_TAGS or tag.startswith("Att Entreprise")
 
 
+def _is_contractor_overdue_tag(tag: str) -> bool:
+    return tag in CONTRACTOR_OVERDUE_TAGS
+
+
 def _is_moex_facile(tag: str) -> bool:
     return tag in MOEX_FACILE_TAGS
 
@@ -334,56 +344,29 @@ def _assign_bucket(row: pd.Series) -> str:
     primary_tag = _safe_str(row.get("primary_tag"))
     if current_state in TERMINAL_STATES:
         return ""
-
-    if current_state == "WAITING_CORRECTED_INDICE":
-        if _is_contractor_tag(primary_tag):
-            return "ENTREPRISE_A_RELANCER"
-        return ""
-
-    if current_state == "CHRONIC_REF_CHAIN":
-        if _is_contractor_tag(primary_tag):
-            return "ENTREPRISE_A_RELANCER"
-        return ""
-
+    if _is_moex_facile(primary_tag):
+        return "FERMER_MAINTENANT"
+    if _is_moex_arbitrage(primary_tag):
+        return "DECISION_MOEX"
+    if _is_contractor_overdue_tag(primary_tag):
+        return "ENTREPRISE_A_RELANCER"
     if _is_primary_tag(primary_tag):
-        value = row.get("primary_consultant_days_remaining")
-        if _safe_str(value) == "":
-            return ""
-        remaining = _safe_int(value)
-        if remaining < 0:
-            return "CONSULTANT_A_ATTAQUER"
-        return ""
-
-    if current_state == "OPEN_WAITING_MOEX":
-        moex_wait_days = _safe_int(row.get("moex_wait_days"))
-        if moex_wait_days > 100:
-            return "MOEX_SHAME_INTERNAL"
-        if _is_moex_facile(primary_tag):
-            return "FERMER_MAINTENANT"
-        if _is_moex_arbitrage(primary_tag):
-            return "DECISION_MOEX"
-
-    secondary_age = _secondary_backlog_age(row)
-    if secondary_age is not None and secondary_age > 0:
-        if secondary_age <= 10:
-            return ""
-        if secondary_age <= 30:
-            if _is_moex_facile(primary_tag):
-                return "FERMER_MAINTENANT"
-            if _is_moex_arbitrage(primary_tag):
-                return "DECISION_MOEX"
-            return ""
-        if secondary_age <= 100:
-            return "SECONDAIRE_EXPIRE"
-        return "MOEX_SHAME_INTERNAL"
-
-    if (
-        _safe_bool(row.get("escalation_flag"))
-        and _safe_str(row.get("urgency_label")).upper() in {"CRITICAL", "HIGH"}
-    ):
-        return "SUJET_REUNION"
-
+        return "CONSULTANT_A_ATTAQUER"
     return ""
+
+
+def _compute_warning_tags(row: pd.Series, bucket: str) -> str:
+    if bucket not in ("FERMER_MAINTENANT", "DECISION_MOEX"):
+        return ""
+    secondary_wait = _safe_int(row.get("secondary_wait_days"))
+    if secondary_wait <= 10:
+        return ""
+    tags = ["Secondaire expiré"]
+    moex_wait = _safe_int(row.get("moex_wait_days"))
+    if moex_wait > 30:
+        tags.append("MOEX interne")
+    return ", ".join(tags)
+
 
 def _subject_label(row: pd.Series, emetteur_name: str) -> str:
     title = _safe_str(row.get("libelle_du_document"))
@@ -617,6 +600,8 @@ def _build_output_row(ctx: Any, row: pd.Series, bucket: str) -> dict[str, Any]:
         "normalized_score_100": _safe_float(row.get("normalized_score_100")),
         "is_internal_moex_exposure": _internal_moex_exposure(bucket, row),
         "is_external_attackable": _external_attackable(bucket, row),
+        "primary_tag": _safe_str(row.get("primary_tag")),
+        "warning_tags": _compute_warning_tags(row, bucket),
     }
     out.update(evidence)
     return out
@@ -643,6 +628,21 @@ def build_counter_attack_items(ctx: Any, output_dir: Path) -> Path:
     if "focus_owner_tier" in merged.columns:
         merged = merged[merged["focus_owner_tier"].map(_safe_str) != "CLOSED"].copy()
 
+    lcv = getattr(ctx, "latest_chain_df", None)
+    if lcv is not None and not lcv.empty and {"family_key", "latest_indice"}.issubset(lcv.columns):
+        valid_keys = set(zip(
+            lcv["family_key"].map(_norm_key),
+            lcv["latest_indice"].map(_norm_key),
+        ))
+        fkeys = merged["family_key"].map(_norm_key)
+        ikeys = merged["indice"].map(_norm_key)
+        mask = [(fk, ik) in valid_keys for fk, ik in zip(fkeys, ikeys)]
+        merged = merged[mask].copy()
+    elif "latest_indice" in merged.columns:
+        li = merged["latest_indice"].map(_norm_key)
+        idx = merged["indice"].map(_norm_key)
+        merged = merged[(idx == li) | (li == "")].copy()
+
     rows = []
     for _, row in merged.iterrows():
         bucket = _assign_bucket(row)
@@ -654,6 +654,7 @@ def build_counter_attack_items(ctx: Any, output_dir: Path) -> Path:
     if not result.empty:
         result = result.drop_duplicates(subset=["family_key"], keep="first")
         result = result.drop_duplicates(subset=["numero", "indice"], keep="first")
+        result = result[pd.to_numeric(result["days_late"], errors="coerce").fillna(0) > 0]
         result = result.sort_values(["action_bucket", "days_late", "numero", "indice"], kind="mergesort")
     for column in OUTPUT_COLUMNS:
         if column not in result.columns:

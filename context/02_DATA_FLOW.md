@@ -157,6 +157,33 @@ load_run_context(BASE_DIR)
   → REBUILDS workflow_engine over the effective_responses_df
   → ctx.responses_df is replaced with the effective frame for downstream
   → calls reporting.focus_ownership.compute_focus_ownership IN PLACE on dernier_df
+
+  ┌─ Phase 9 — `latest_chain_df` build (2026-05-11) ─────────────────┐
+  │  After `dernier_df = docs_df.copy()` in `_load_from_flat_artifacts`│
+  │  (and the parallel point in the legacy path), the loader calls    │
+  │  `latest_chain_view.build_latest_chain_view(base_dir,             │
+  │                                              docs_df=docs_df)`.    │
+  │  This reads `output/chain_onion/CHAIN_REGISTER.csv` (~2,554 rows),│
+  │  produces one canonical row per chain, and attaches the result as │
+  │  `ctx.latest_chain_df`. The view is built whether or not the      │
+  │  chain_onion subprocess ran this session — chain_onion artifacts  │
+  │  live on disk and persist across runs.                            │
+  │                                                                    │
+  │  Operational reporting modules then call                          │
+  │  `latest_chain_view.latest_enriched_view(ctx)` which intersects   │
+  │  `ctx.dernier_df` (carrying `_precompute_focus_columns` and       │
+  │  `compute_focus_ownership` enrichments) with                      │
+  │  `ctx.latest_chain_df.(numero, latest_indice)` to obtain one row  │
+  │  per chain WITH the enriched columns. Current invariants:         │
+  │    len(ctx.dernier_df) = 4,360                                    │
+  │    len(ctx.latest_chain_df) = 2,554                               │
+  │    len(latest_enriched_view(ctx)) = 2,553                         │
+  │    pollution gap = 1,807; Decision-3 gap = 1                      │
+  │  See `context/11_TOOLING_HAZARDS.md` §H-9 and                     │
+  │  `context/06_EXCEPTIONS_AND_MAPPINGS.md` §F-3 for the Decision-3  │
+  │  steady-state asymmetry (numero 253100).                          │
+  └──────────────────────────────────────────────────────────────────┘
+
   → returns RunContext (cached at module level; cleared by clear_cache()
     after a new pipeline run)
 ```

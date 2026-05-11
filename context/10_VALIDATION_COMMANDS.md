@@ -442,3 +442,93 @@ Acceptance:
 - `priority_p5` absent from payload
 - all SAS REF docs have `_focus_owner_tier == CONTRACTOR`
 - 0 docs have `_focus_owner == ["MOEX"]` AND tier-MOEX while having SAS pending
+
+---
+
+## Step 5 — Action MOEX bucket export smoke (2026-05-10)
+
+After modifying `src/reporting/counter_attack_export.py`, `app.py`, or
+`ui/jansa/data_bridge.js`:
+
+```
+python -m py_compile app.py src\reporting\counter_attack_export.py
+
+python -c "import sys; sys.path.insert(0,'src'); import app; print('APP_IMPORT_OK')"
+
+python -c "import sys; sys.path.insert(0,'src'); from reporting.data_loader import load_run_context; from reporting.counter_attack_export import build_action_moex_bucket_xlsx; from pathlib import Path; ctx = load_run_context(); out = build_action_moex_bucket_xlsx(ctx, 'FERMER_MAINTENANT', Path('output/exports')); print(out)"
+```
+
+Expected: third command prints
+`{success: True, path: '...ACTION_MOEX_FERMER_MAINTENANT_<ts>.xlsx',
+filename: '...', rows_exported: <int>, bucket: 'FERMER_MAINTENANT',
+message: '...', error: None}`. Workbook lands under `output/exports/`
+with 12 columns (Layout Y) — see
+`obsidian_repo_mind/09_ACTION_MOEX_COUNTER_ATTACK.md` Phase 6E.
+
+Empty-bucket smoke (validates `success=True` with header-only workbook):
+substitute any bucket key whose count is 0 in the current artifact.
+
+UI smoke: open the Action MOEX page, click the "Exporter Excel" button on
+each queue panel header in turn. On success the file should auto-open via
+`pywebview.api.open_file_in_explorer(res.path)`. The button's notice
+state (`exportNotice`) carries any error envelope verbatim.
+
+---
+
+## Step 1.5 — Dashboard drilldown export smoke (2026-05-10)
+
+UI-driven, no direct Python smoke needed (Step 1.5 wires through the same
+`Api`):
+
+1. Open the dashboard, toggle Focus on/off as desired.
+2. Click any operational tile (T1–T6) or priority cell (P1–P4) → the
+   shared fiche-style drawer opens.
+3. Click "Exporter Excel" inside the drawer.
+4. On success the file should auto-open via
+   `pywebview.api.open_file_in_explorer(res.path)`.
+5. Filename pattern:
+   `Drilldown_dashboard_{safe_kind}_{safe_params}_{YYYYMMDD_HHMMSS}.xlsx`
+   under `output/`.
+
+Bridge call:
+`window.jansaBridge.exportDocumentsDrilldown(kind, params, focusMode, staleDays)`.
+Backend: `Api.export_documents_drilldown_xlsx` (`app.py` lines
+1168–1296). Workbook contract mirrors `Api.export_drilldown_xlsx`
+(consultant fiche): same column set, header_font/header_fill,
+`freeze_panes="A2"`, `auto_filter`, late-row pink fill, atomic
+temp+rename, identity dtype preservation on `numero` / `indice`.
+
+If a syntax-only check is needed:
+
+```
+python -m py_compile app.py src\reporting\drilldown_builder.py
+```
+
+---
+
+## Step 2 — Operational drilldown kinds smoke (2026-05-10)
+
+Row-count parity check between the new drilldown kinds and the
+authoritative aggregator counts. Reuses
+`reporting.aggregator.compute_operational_universe` (the helper extracted
+from `compute_operational_dashboard`).
+
+```
+python -c "import sys; sys.path.insert(0,'src'); from reporting.data_loader import load_run_context; from reporting.aggregator import compute_operational_universe, compute_operational_dashboard; from reporting.drilldown_builder import build_drilldown; ctx = load_run_context(); op_broad, op = compute_operational_universe(ctx); dash = compute_operational_dashboard(ctx); kinds = [('operational_total', None), ('operational_fresh', None), ('operational_stale', None), ('operational_moex', None), ('operational_moex', {'scope':'fresh'}), ('operational_moex', {'scope':'stale'}), ('operational_consultants', None), ('operational_consultants', {'tier':'PRIMARY'}), ('operational_consultants', {'tier':'SECONDARY'}), ('operational_enterprise_ref', None), ('operational_priority', {'priority':1}), ('operational_priority', {'priority':2}), ('operational_priority', {'priority':3}), ('operational_priority', {'priority':4})]; rows = []; [rows.append((k, p, build_drilldown(ctx, k, p, None).get('total_count'))) for k, p in kinds]; print('KIND, PARAMS, ROWS'); [print(r) for r in rows]; print('DASH:', {k: dash[k] for k in ['operational_total','fresh_total','stale_total','moex_total','primary_total','secondary_total','consultants_total','enterprise_ref_sas_candidates','priority_p1','priority_p2','priority_p3','priority_p4']})"
+```
+
+Expected parity (verify per current run):
+- `operational_total` ↔ `operational_total`
+- `operational_fresh` ↔ `fresh_total`
+- `operational_stale` ↔ `stale_total`
+- `operational_moex` (no scope) ↔ `moex_total`
+- `operational_consultants` (no tier) ↔ `consultants_total`
+- `operational_consultants` (`tier=PRIMARY`) ↔ `primary_total`
+- `operational_consultants` (`tier=SECONDARY`) ↔ `secondary_total`
+- `operational_enterprise_ref` ↔ `enterprise_ref_sas_candidates`
+- `operational_priority {priority=N}` ↔ `priority_pN` for N ∈ {1,2,3,4}
+
+If counts mismatch the dashboard, the helper extraction is broken (or
+the `op_broad` vs `op` choice for `operational_enterprise_ref` is wrong).
+The dashboard payload is byte-for-byte unchanged by the Step 2 helper
+refactor — any divergence here is a bug.

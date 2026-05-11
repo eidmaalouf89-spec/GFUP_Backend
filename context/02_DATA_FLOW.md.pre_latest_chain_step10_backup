@@ -1,0 +1,435 @@
+# 02 — Data Flow
+
+> End-to-end: what enters, what is generated, what is consumed.
+> Reconstructed from `paths.py`, `run_orchestrator.py`, all 11 stages,
+> `flat_ged_runner.py`, `data_loader.py`, `aggregator.py`, `consultant_fiche.py`,
+> `chain_onion/source_loader.py`.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                INPUTS                                       │
+└────────────────────────────────────────────────────────────────────────────┘
+input/
+  GED_export.xlsx                ← required (sheet "Doc. sous workflow, x versions")
+  Grandfichier_v3.xlsx           ← optional; if missing, last-good FINAL_GF inherited
+                                   from runs/run_*/ via run_memory.db
+  Mapping.xlsx                   ← present in repo, but NOT consumed at pipeline
+                                   runtime today (UI exposes it as informational).
+  consultant_reports/            ← optional folder of PDFs/XLSXs
+    AMO HQE/                       (Le Sommer)
+    BET Acoustique AVLS/           (AVLS)
+    BET Structure TERRELL/         (Terrell)
+    socotec/                       (SOCOTEC)
+                                                  │
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       FLAT GED BUILDER (auto, pre-pipeline)                 │
+└────────────────────────────────────────────────────────────────────────────┘
+src/flat_ged_runner.build_flat_ged_artifacts(ged_path, output/intermediate/)
+  src/flat_ged.build_flat_ged(...) [FROZEN MODULE]
+    ├─ reader.py        : reads GED via the parser contract
+    ├─ resolver.py      : per-doc resolution
+    ├─ transformer.py   : applies consultant_mapping + status_mapping
+    │                     EXCEPTION_COLUMNS rows go to "Exception List" → excluded
+    ├─ validator.py
+    └─ writer.py        : writes FLAT_GED.xlsx + DEBUG_TRACE.csv
+Output:
+  output/intermediate/FLAT_GED.xlsx           (sheets GED_RAW_FLAT + GED_OPERATIONS)
+  output/intermediate/DEBUG_TRACE.csv
+  output/intermediate/flat_ged_run_report.json
+  output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv
+  Then registered as run_memory artifacts: FLAT_GED, FLAT_GED_DEBUG_TRACE,
+  FLAT_GED_RUN_REPORT.
+                                                  │
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│           CONSULTANT INTEGRATION (auto, when reports_dir provided)          │
+└────────────────────────────────────────────────────────────────────────────┘
+src/run_orchestrator.run_pipeline_controlled invokes
+src/consultant_integration.run_consultant_integration(rebuild_consultant_wb=auto, skip_gf_update=True)
+between Flat GED build and the 11-stage pipeline whenever reports_dir is
+provided to the orchestrator (UI Executer → Reports field, or main.py
+__main__ auto-detect of input/consultant_reports/). The matcher:
+  STEP A — load (or rebuild from PDFs) output/consultant_reports.xlsx
+  STEP B — load normalized GED universe
+  STEP C — build GED lookup index
+  STEP D — match consultant rows to GED documents
+  STEP E — write output/consultant_match_report.xlsx
+  STEP F — build enrichment records (HIGH/MEDIUM only; LOW excluded)
+Steps F-G direct GF write are deprecated (Step 8) — guarded off.
+The pipeline's stage_report_memory then reads consultant_match_report.xlsx
+and ingests HIGH/MEDIUM matches into report_memory.db. Failures here are
+non-fatal — pipeline continues without report ingestion (warning emitted).
+Phase 9A.5 (2026-05-06) — pre-9A this step had to be invoked manually as
+`python src/consultant_integration.py`; the UI's Reports field was a path
+constant pass-through with no consumer. The orchestrator hook makes the
+UI button do what users always assumed it did.
+                                                  │
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       11-STAGE PIPELINE (src/pipeline/stages/)              │
+└────────────────────────────────────────────────────────────────────────────┘
+stage_init_run         → row in runs table (run_memory.db); creates runs/run_NNNN/
+stage_read_flat        → ctx.docs_df, ctx.responses_df from FLAT_GED.xlsx
+                          (or stage_read in raw fallback when GFUP_FORCE_RAW=1)
+stage_normalize        → normalize_docs / normalize_responses + SAS RAPPEL pre-2026
+                          filter; writes ctx.sas_filtered_df
+stage_version          → version_engine.VersionEngine: ctx.versioned_df with
+                          is_dernier_indice / lifecycle_id / chain_position;
+                          ctx.dernier_df derived
+stage_route            → routing.build_routing_table + route_documents +
+                          read_all_gf_sheet_structures (reads GF .xlsx);
+                          applies ExclusionConfig (from config_loader)
+stage_report_memory    → init/load report_memory.db; ingests new
+                          consultant_match_report.xlsx (HIGH/MEDIUM gate);
+                          builds ctx.effective_responses_df via
+                          effective_responses.build_effective_responses
+stage_write_gf         → workflow_engine.WorkflowEngine; writes GF_V0_CLEAN.xlsx
+                          + ANOMALY_REPORT, AUTO_RESOLUTION_LOG, IGNORED_ITEMS_LOG
+stage_build_team_version → team_version_builder.build_team_version: surgical
+                          patch of OGF (Grandfichier_v3.xlsx) using
+                          GF_V0_CLEAN.xlsx → GF_TEAM_VERSION.xlsx
+stage_discrepancy      → reconciliation_engine.run_reconciliation;
+                          classify_discrepancy; Part H-1 BENTIN exception pass
+                          → DISCREPANCY_REPORT.xlsx + REVIEW_REQUIRED + ignored
+stage_diagnosis        → MISSING_IN_GED_DIAGNOSIS / TRUE_ONLY,
+                          MISSING_IN_GF_DIAGNOSIS / TRUE_ONLY,
+                          INSERT_LOG, NEW_SUBMITTAL_ANALYSIS,
+                          debug_writer.write_all_debug
+stage_finalize_run     → register every artifact in run_memory.db with sha256;
+                          mark_run_current; copies into runs/run_NNNN/
+                                                  │
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      OUTPUTS (under output/ and runs/run_N/)                │
+└────────────────────────────────────────────────────────────────────────────┘
+output/                                 ← latest artifacts (mirrors runs/run_N/)
+output/intermediate/                    ← FLAT_GED.xlsx etc.
+output/debug/                           ← *_summary.xlsx debug aids
+runs/run_0000/ … run_NNNN/              ← immutable per-run snapshot
+data/run_memory.db                      ← artifact registry (sha256 keyed)
+data/report_memory.db                   ← persistent consultant truth
+```
+
+---
+
+## Read-side flow (UI feed)
+
+`app.py` UI calls go through `src/reporting/data_loader.load_run_context`.
+
+```
+load_run_context(BASE_DIR)
+  → resolves latest COMPLETED run from data/run_memory.db
+  → reads registered artifact paths
+  → resolves the registered FLAT_GED artifact, then:
+
+  ┌─ FLAT_GED pickle cache layer ────────────────────────────────────┐
+  │  _flat_cache_is_fresh(flat_ged_path):                            │
+  │    1. xlsx mtime ≥ cache file mtime → REJECT (run wrote new xlsx)│
+  │    2. cache_schema_version != CACHE_SCHEMA_VERSION → REJECT      │
+  │       (D-001 fix, 2026-04-29: catches pandas pickle drift +      │
+  │        upstream stage_read_flat.py schema changes)               │
+  │  HIT  → unpickle docs_df + responses_df + flat_doc_meta (~3s)    │
+  │  MISS → run stage_read_flat → normalize_docs → normalize_responses│
+  │         (~30s one-time cost) → _save_flat_normalized_cache(...)  │
+  │         writes new pkl + meta with current schema version.       │
+  └──────────────────────────────────────────────────────────────────┘
+
+  → docs_df["is_dernier_indice"] = True; dernier_df = docs_df.copy()
+    (in flat mode, all rows are ACTIVE → docs_df ≡ dernier_df)
+
+  ┌─ WorkflowEngine construction ────────────────────────────────────┐
+  │  workflow_engine = WorkflowEngine(responses_df)                  │
+  │  Inside __init__ (workflow_engine.py:54-57):                     │
+  │    self.responses_df = responses_df[~is_exception_approver]      │
+  │    → STRIPS every SAS row + Exception List approver row.         │
+  │    → ctx.workflow_engine.responses_df is therefore SMALLER       │
+  │      than ctx.responses_df by ~len(dernier_df) rows (one SAS     │
+  │      per active doc).                                            │
+  │    → SAS-track signal lives ONLY on ctx.responses_df.            │
+  │    → workflow_engine._lookup is built from the FILTERED frame —  │
+  │      correct for visa_global / deadline / non-SAS use cases.     │
+  │  See context/06_EXCEPTIONS_AND_MAPPINGS.md §B.0 (H-3 hazard).    │
+  └──────────────────────────────────────────────────────────────────┘
+
+  → builds effective_responses_df via effective_responses.build_effective_responses
+    (composes report_memory enrichment over the GED responses)
+  → REBUILDS workflow_engine over the effective_responses_df
+  → ctx.responses_df is replaced with the effective frame for downstream
+  → calls reporting.focus_ownership.compute_focus_ownership IN PLACE on dernier_df
+  → returns RunContext (cached at module level; cleared by clear_cache()
+    after a new pipeline run)
+```
+
+Two named transformations are explicit above so audit consumers can reason
+about which `responses_df` view they are reading. The B-stage cache layer
+and the C-stage WorkflowEngine filter both materially change downstream
+counts; both have caused production bugs (Phase 7 12a-fix2 SNI SAS REF and
+Phase 0 canary StringDtype unpickle drift).
+
+Aggregators take a `RunContext` (+ optional `FocusResult`):
+
+| Adapter | Produces |
+|---|---|
+| `aggregator.compute_project_kpis(ctx, focus_result)` | KPI dict |
+| `aggregator.compute_monthly_timeseries(ctx)` | history (no focus) |
+| `aggregator.compute_weekly_timeseries(ctx, focus_result)` | history (focus) |
+| `aggregator.compute_consultant_summary(ctx, focus_result)` | list of consultant dicts |
+| `aggregator.compute_contractor_summary(ctx, focus_result)` | list of contractor dicts |
+| `consultant_fiche.build_consultant_fiche(ctx, name, focus_result)` | full fiche payload |
+| `consultant_fiche.build_sas_fiche(ctx, focus_result)` | special MOEX SAS fiche |
+| `contractor_fiche.build_contractor_fiche(ctx, code, focus_result)` | full contractor fiche |
+
+Then UI-shaping (`reporting.ui_adapter.adapt_*`) flattens to the
+`window.OVERVIEW / CONSULTANTS / CONTRACTORS / FICHE_DATA` shape.
+
+### Contractor quality fiche lane (Phase 7, shipped 2026-05-01)
+
+```
+RunContext.docs_df, dernier_df, responses_df, workflow_engine
++ output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json (loaded once per request)
+  → contractor_quality.build_contractor_quality_peer_stats (project-wide median/p25/p75 across 29)
+  → contractor_quality.build_contractor_quality (per-contractor payload)
+  → app.py::get_contractor_fiche_for_ui (merges with build_contractor_fiche header + lots + buildings)
+  → bridge: loadContractorFiche → window.CONTRACTOR_FICHE_DATA
+  → ContractorFichePage.jsx (renders 7 widgets)
+```
+
+**Phase 5 (2026-04-29):** focus stats produced by
+`focus_filter.apply_focus_filter` now carry `by_contractor` (list of
+`{code, name, p1, p2, p3, p4, total}`) alongside the existing
+`by_consultant`, derived from `pq_records` items where
+`owner_tier == "CONTRACTOR"`. `adapt_overview` passes both through into
+`window.OVERVIEW.focus.{by_consultant, by_contractor}`. Canonical
+emetteur names (Bentin, Legendre, …) are applied via
+`reporting.contractor_fiche.resolve_emetteur_name` — the single source
+of truth for code → company name.
+
+### Dashboard drilldown lane (Phase 3, completed via recovery 2026-05-01)
+
+```
+KPI tile click / VisaFlow segment click / WeeklyActivity bar click /
+FocusRadial ring click  →  overview.jsx:openDrill(kind, params)
+  →  data_bridge.js:loadDrilldown(kind, params, focusMode, staleDays)
+  →  app.py:Api.get_documents_drilldown(kind, params, focus, stale_days)
+       load_run_context(BASE_DIR)
+       focus on  →  apply_focus_filter + _build_live_operational_numeros
+                     + _apply_live_narrowing  →  focus_result
+       focus off →  focus_result = None
+       reporting.drilldown_builder.build_drilldown(ctx, kind, params, focus_result=focus_result)
+  →  _sanitize_for_json(payload)  →  {rows, total_count, truncated, kind, params}
+  →  DrilldownDrawer renders rows; row click → window.openDocumentCommandCenter(numero, indice)
+```
+
+`build_drilldown` was authored in Phase 3 but the `Api` exposure was missing
+until 2026-05-01 — the JS bridge had been calling a non-existent method,
+causing every drilldown to fail at the bridge layer. The recovery method
+mirrors the focus-handling pattern of `Api.get_dashboard_data`. Contract:
+`build_drilldown` returns `{rows, total_count, truncated, kind, params}`;
+on exception, `Api.get_documents_drilldown` returns the same shape with an
+extra `error` field and `rows=[]`, which the UI already handles gracefully.
+
+---
+
+## Chain Timeline Attribution layer (post-Phase 2 of DCC project)
+
+`src/reporting/chain_timeline_attribution.py` consumes
+`output/chain_onion/CHAIN_EVENTS.csv` + `CHAIN_REGISTER.csv` +
+`CHAIN_VERSIONS.csv` and a `RunContext` (for `data_date` + `dernier_df`).
+It produces:
+
+- `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.json`
+- `output/intermediate/CHAIN_TIMELINE_ATTRIBUTION.csv`
+
+Both are disk-only (NOT registered in run_memory.db). They are auto-
+refreshed by Phase 3's `Api._ensure_chain_data_fresh()` at app startup.
+Phase 4's Document Command Center consumes the JSON for the
+"Chronologie de la chaîne" panel section.
+
+What the module does on top of chain_onion:
+
+1. **Caps secondary consultant delays at 10 days from `last_primary_date`**
+   per chain version. Excess days are re-attributed to MOEX as synthetic
+   `MOEX_CAP_REATTRIBUTED` rows. (The Flat GED transformer's
+   `compute_delay_contribution` does NOT apply this cap — see
+   `context/06_EXCEPTIONS_AND_MAPPINGS.md` § F.)
+2. Computes per-indice review + rework phases with per-segment timing
+   vs. expected (30d review + 15d rework).
+3. **Implicit closure rule:** when contractor submits indice N+1 before
+   MOEX has formally closed indice N, indice N's review is closed at
+   indice N+1's submittal date. The rework window for N collapses to
+   0 days (contractor used 0 of 15 allowed).
+4. Per-indice `closure_type ∈ {MOEX_TERMINAL, MOEX_REF,
+   IMPLICIT_NEXT_INDICE, OPEN}`.
+5. Chain-level `chain_long` (total > 120d) and `cycle_depasse`
+   (any phase over budget, open or closed).
+6. `attribution_breakdown` aggregates `MOEX_CAP_REATTRIBUTED` into the
+   `Maître d'Oeuvre EXE` bucket; sibling field
+   `attribution_cap_reattributed` exposes how many days came from
+   the cap re-attribution.
+
+`compute_all_chain_timelines(ctx, ...)` raises `ValueError` if
+`ctx.data_date` or `ctx.dernier_df` is missing — production callers
+must always supply a real RunContext.
+
+---
+
+## Chain + Onion data flow (independent runner)
+
+```
+python run_chain_onion.py
+  Inputs:
+    output/intermediate/FLAT_GED.xlsx
+    output/intermediate/DEBUG_TRACE.csv
+    data/report_memory.db (optional)
+  Sequence (Steps 04 → 14):
+    source_loader.load_chain_sources       → ops_df, debug_df, effective_df
+    family_grouper.build_chain_versions    → CHAIN_VERSIONS
+    family_grouper.build_chain_register    → CHAIN_REGISTER
+    chain_builder.build_chain_events       → CHAIN_EVENTS
+    chain_classifier.classify_chains       → portfolio_bucket on CHAIN_REGISTER
+    chain_metrics.build_chain_metrics      → CHAIN_METRICS
+    onion_engine.build_onion_layers        → ONION_LAYERS
+    onion_scoring.build_onion_scores       → ONION_SCORES
+    narrative_engine.build_chain_narratives → CHAIN_NARRATIVES
+    exporter.export_chain_onion_outputs    → 7 CSV + 1 XLSX + 2 JSON
+    validation_harness.run_chain_onion_validation
+  Outputs (output/chain_onion/):
+    CHAIN_REGISTER.csv
+    CHAIN_VERSIONS.csv
+    CHAIN_EVENTS.csv
+    CHAIN_METRICS.csv
+    ONION_LAYERS.csv
+    ONION_SCORES.csv
+    CHAIN_NARRATIVES.csv
+    CHAIN_ONION_SUMMARY.xlsx
+    dashboard_summary.json
+    top_issues.json
+```
+
+**Phase 4 enrichment (2026-05-01):** `run_chain_onion.py` now passes
+`issue_meta_df=ops_df` into `export_chain_onion_outputs(...)`. The
+exporter's `_build_top_issues` joins each chain's `family_key` to
+`chain_register_df.latest_version_key` and pulls `emetteur` + `titre`
+from the matching `ops_df` row, then resolves the canonical company
+name via `reporting.contractor_fiche.resolve_emetteur_name`. Three
+new keys (`emetteur_code`, `emetteur_name`, `titre`) are appended to
+every `top_issues.json` record. CSV outputs are unchanged. The
+exporter remains pure (no Excel/CSV/parquet reads) — all metadata is
+in-memory pass-through.
+
+**Validation harness loader fix (2026-05-01):** `validation_harness._load_csv`
+now reads identity columns as strings — `pd.read_csv(path, ...,
+dtype={"family_key": str, "numero": str, "version_key": str})`.
+Previously, default dtype inference cast numeric-looking keys to int64
+and stripped leading zeros (e.g. `045080 → 45080`), which caused F32
+to falsely report all 20 `top_issues` family_keys as missing from
+ONION_SCORES. Numeric columns continue to use pandas inference; only
+identity columns are forced to string. Documented as a one-line
+chokepoint fix in `_load_csv`.
+
+The main UI consumes Chain+Onion **only** through
+`app.Api._build_live_operational_numeros` → `chain_onion.query_hooks`:
+
+- `get_live_operational(ctx)` → `live_numeros` set, used to narrow Focus to
+  the live-operational chains.
+- `get_legacy_backlog(ctx)` → `legacy_count`, displayed under the Focus stats.
+
+The other 24+ query functions (`get_top_issues`, `get_high_pressure`,
+`get_contractor_quality`, `get_sas_friction`, etc.) are **not yet surfaced
+in the UI**. They are accessible from Python but no button or screen
+triggers them today.
+
+---
+
+## RAW ↔ FLAT projection reference (Phase 8B, closed 2026-05-01)
+
+For RAW↔FLAT projection questions — why a RAW row appears or doesn't appear
+in FLAT, why SAS REF row counts differ between layers, what the SAS REF
+projection rules are — use `docs/RAW_TO_FLAT_GED_KNOWLEDGE.md` and the
+Phase 8B final report at `output/debug/PHASE_8B_FINAL_REPORT.md`.
+
+Phase 8B proved the identity contract holds (RAW unique numero == FLAT
+unique numero == 2,819; RAW unique (numero, indice) == FLAT == 4,848 after
+`_MISSING_` filter) and classified the SAS REF projection gap to 99.3%
+coverage (830/836 rows accounted for). The 6 remaining UNEXPLAINED rows in
+the 28xxx /A C1 cluster are tracked as future backlog (see
+`context/07_OPEN_ITEMS.md` Phase 8 family closure section).
+
+---
+
+## Three identity systems, one repo
+
+| Identity | Where it's primary | Notes |
+|---|---|---|
+| `(numero, indice)` | `flat_ged/*`, `chain_onion/*` | Stable across runs |
+| `doc_id` (UUID) | pipeline runtime + `effective_responses_df` + `RunContext` | **Session-scoped — never persist** |
+| `family_key = str(numero)` | chain_onion outputs | Stable across runs |
+
+`query_library.py` (`src/query_library.py`) explicitly notes: "These two
+identity systems are NOT automatically bridged here." Be careful when
+joining flat_ged_ops_df (numero/indice) with effective_responses_df (doc_id).
+
+---
+
+## Hand-off contracts (what each layer guarantees the next)
+
+1. **Flat GED builder → pipeline.** `FLAT_GED.xlsx` always has
+   `GED_OPERATIONS` (active rows only) and `GED_RAW_FLAT`; Exception List
+   rows are excluded. `DEBUG_TRACE.csv` may be present (batch mode).
+
+2. **Pipeline → reporting.** `run_memory.db` holds a row for the COMPLETED
+   run with sha256-verified artifacts. `data_loader` resolves them by
+   `artifact_type`.
+
+3. **Pipeline → Chain+Onion.** Chain+Onion reads `output/intermediate/*` and
+   `report_memory.db` directly (NOT `run_memory.db`). It is therefore
+   coupled to "the most recent run that wrote intermediate", not to a
+   specific run_number.
+
+4. **Reporting → UI.** UI consumes only the four globals
+   (`window.OVERVIEW / CONSULTANTS / CONTRACTORS / FICHE_DATA`) plus
+   per-call results from `get_doc_details`, `export_*`, `get_pipeline_status`.
+
+---
+
+## What flows but is currently NOT consumed
+
+(Useful for evaluating ROI of next steps.)
+
+- `consultant_match_report.xlsx` is produced and registered as artifact, but
+  the UI does not surface it as a screen — only `report_memory` ingests it.
+- `MISSING_IN_GED_TRUE_ONLY.xlsx`, `MISSING_IN_GF_TRUE_ONLY.xlsx`,
+  `INSERT_LOG.xlsx`, `NEW_SUBMITTAL_ANALYSIS.xlsx`, `SUSPICIOUS_ROWS_REPORT.xlsx`
+  are written every run but the UI's Discrepancies / Reports tab is a stub
+  for everything except Tableau de Suivi VISA export.
+- `output/chain_onion/CHAIN_NARRATIVES.csv`, `top_issues.json`,
+  `CHAIN_ONION_SUMMARY.xlsx` are produced but not surfaced in the UI.
+- `output/debug/*_summary.xlsx` debug XLSXs are registered as artifacts
+  (DEBUG_*) but not consumed by reporting.
+
+---
+
+## Raw GED source qualification
+
+Document-level exceptions are raw GED documents/rows intentionally excluded
+from the operational Raw GED -> Flat GED population. They are not status
+vocabulary mappings, SOCOTEC/FAV/SUS/DEF normalization, UI labels, or
+consultant display names.
+
+Current source-level exception owner:
+
+- `src/flat_ged/source_exclusions.py`
+- `context/source_exclusions/remaining bentin.csv`
+- `output/intermediate/RAW_GED_SOURCE_EXCLUSIONS.csv`
+
+BENTIN/BEN rule: for every GED import, BEN/BENTIN rows are included only if
+`NUMERO+INDICE` matches the remaining-Bentin registry, parsed `DOCUMENT`
+tail+`INDICE` matches the registry, or raw GED `Créé le >= 2026-03-10`.
+Otherwise they are source-excluded with `BENTIN_SOURCE_OLD_NOT_LISTED`.
+Debug preview files under `output/debug/` are validation evidence only and
+are not production source-of-truth. Runtime must not hardcode `raw_row_id`.
+
+The old LGD pre-2026 year filter is retired. LGD rows must not disappear
+only because they are pre-2026; any future LGD exclusion needs an explicit
+source-exclusion reason.

@@ -131,6 +131,34 @@ Active entry points:
 
 ---
 
+## Phase 9 (`latest_enriched_view`, 2026-05-11)
+
+- `compute_dcc_tags_bulk(ctx)` now iterates
+  `reporting.latest_chain_view.latest_enriched_view(ctx)` instead of
+  `ctx.dernier_df`. The duplicate copy of `compute_dcc_tags_bulk` at
+  line 667 was removed during Step 6 (one canonical implementation
+  remains). Current row count: 2,553.
+- `_resolve_doc_rows(ctx, numero, indice)` resolves `indice=None` via
+  `ctx.latest_chain_df.latest_indice` (canonical chain truth) with an
+  existence guard: if the resolved indice is not present in
+  `ctx.dernier_df` for that numero, the helper falls back to the
+  alphabetical-max indice and emits a `logger.warning`. This is the
+  Step 6b existence-guard that handles the permanent Decision-3 N≈1
+  asymmetry for numero 253100. See
+  `context/06_EXCEPTIONS_AND_MAPPINGS.md` §F-3 and
+  `context/11_TOOLING_HAZARDS.md` §H-9.
+- `search_documents` deduplicates results by latest indice using the
+  `_is_latest` tiebreaker (Step 6).
+- Revision history view (`_build_revision_history`) intentionally
+  reads `latest_enriched_view(ctx)` to scope to the latest-indice
+  chain context, then renders all indices from the chain timeline
+  (the chain timeline itself comes from
+  `CHAIN_TIMELINE_ATTRIBUTION.json`).
+
+See `README.md §Phase 9` for the full migration summary.
+
+---
+
 **Related:** [[07_CHAIN_ONION_MENTAL_MODEL]] · [[05_REPORTING_AND_UI_ADAPTERS]] · [[09_ACTION_MOEX_COUNTER_ATTACK]] · [[06_JANSA_UI_RUNTIME]]
 
 *Back to [[00_START_HERE]]*

@@ -23,6 +23,7 @@ import pandas as pd
 
 from .contractor_fiche import resolve_emetteur_name
 from .data_loader import RunContext
+from .latest_chain_view import latest_enriched_view
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +162,7 @@ def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:
 
     if not config.enabled:
         if ctx.dernier_df is not None:
-            result.focused_doc_ids = set(ctx.dernier_df["doc_id"].tolist())
+            result.focused_doc_ids = set(latest_enriched_view(ctx)["doc_id"].tolist())
         result.stats = {"focus_enabled": False}
         return result
 
@@ -169,7 +170,7 @@ def apply_focus_filter(ctx: RunContext, config: FocusConfig) -> FocusResult:
         result.stats = {"focus_enabled": True, "error": "insufficient data"}
         return result
 
-    dernier = ctx.dernier_df
+    dernier = latest_enriched_view(ctx)
 
     # Check that pre-computed columns exist (Patches 3+4)
     required_cols = ["_visa_global", "_days_since_last_activity", "_focus_owner_tier"]

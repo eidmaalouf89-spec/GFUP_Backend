@@ -1,0 +1,106 @@
+"""
+Diagnostic: verify build_latest_chain_view against live Chain+Onion artifacts.
+Exit 0 + ALL GATES PASSED if every invariant holds. Exit 1 + GATE FAILED otherwise.
+"""
+import sys
+from pathlib import Path
+
+# Ensure src/ is importable
+repo_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(repo_root / "src"))
+
+import pandas as pd
+from reporting.latest_chain_view import build_latest_chain_view
+
+
+def main():
+    base = repo_root
+    register_path = base / "output" / "chain_onion" / "CHAIN_REGISTER.csv"
+    versions_path = base / "output" / "chain_onion" / "CHAIN_VERSIONS.csv"
+
+    register_df = pd.read_csv(register_path, dtype={"family_key": str, "numero": str})
+    versions_df = pd.read_csv(versions_path, dtype={"family_key": str, "version_key": str})
+
+    try:
+        df = build_latest_chain_view(base)
+    except Exception as exc:
+        print(f"GATE FAILED: build_latest_chain_view raised {type(exc).__name__}: {exc}")
+        sys.exit(1)
+
+    # Counts table
+    families_with_multi = (
+        versions_df.groupby("family_key").size().pipe(lambda s: (s > 1).sum())
+    )
+    print(f"latest_chain_df rows:            {len(df)}")
+    print(f"latest_chain_df unique family_key: {df['family_key'].nunique()}")
+    print(f"latest_chain_df unique numero:     {df['numero'].nunique()}")
+    print(f"CHAIN_REGISTER rows:             {len(register_df)}")
+    print(f"CHAIN_VERSIONS rows:             {len(versions_df)}")
+    print(f"families with >1 version:        {families_with_multi}")
+
+    # Report present / deferred columns
+    present_cols = list(df.columns)
+    deferred = []
+    for col in ["emetteur_name", "visa_global", "days_late"]:
+        deferred.append(col)
+    optional_present = [c for c in ["emetteur", "titre"] if c in df.columns]
+    optional_missing = [c for c in ["emetteur", "titre"] if c not in df.columns]
+
+    print(f"columns present:                 {present_cols}")
+    if optional_present:
+        print(f"optional enrichment included:    {optional_present}")
+    if optional_missing:
+        print(f"optional enrichment omitted:     {optional_missing}")
+    print(f"deferred to later steps:         {deferred}")
+
+    # Gate checks
+    gate_ok = True
+
+    if len(df) != len(register_df):
+        print(f"GATE FAILED: row count {len(df)} != CHAIN_REGISTER {len(register_df)}")
+        gate_ok = False
+
+    if not df["family_key"].is_unique:
+        print("GATE FAILED: family_key not unique")
+        gate_ok = False
+
+    if not df["numero"].is_unique:
+        print("GATE FAILED: numero not unique")
+        gate_ok = False
+
+    if not df["version_key"].equals(df["latest_version_key"]):
+        print("GATE FAILED: version_key != latest_version_key")
+        gate_ok = False
+
+    if not df["indice"].equals(df["latest_indice"]):
+        print("GATE FAILED: indice != latest_indice")
+        gate_ok = False
+
+    if gate_ok:
+        print("ALL GATES PASSED")
+    else:
+        sys.exit(1)
+
+    # --- Loader smoke (Step 3) ---
+    try:
+        from reporting.data_loader import load_run_context, clear_cache
+        clear_cache()
+        ctx = load_run_context(repo_root)
+        dn = ctx.dernier_df
+        lc = ctx.latest_chain_df
+        print()
+        print("=== Loader smoke ===")
+        print(f"ctx.dernier_df rows                : {len(dn) if dn is not None else 'None'}")
+        print(f"ctx.dernier_df unique numero       : {dn['numero'].astype(str).nunique() if dn is not None else 'None'}")
+        print(f"ctx.latest_chain_df rows           : {len(lc) if lc is not None else 'None'}")
+        print(f"ctx.latest_chain_df unique numero  : {lc['numero'].astype(str).nunique() if lc is not None else 'None'}")
+        print(f"CHAIN_REGISTER rows                : {len(register_df)}")
+        print(f"Pollution gap (dernier - latest)   : {len(dn) - len(lc) if dn is not None and lc is not None else 'N/A'}")
+    except Exception as exc:
+        print(f"Loader smoke FAILED: {type(exc).__name__}: {exc}")
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
